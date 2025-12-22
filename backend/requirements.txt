@@ -1,0 +1,11 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
+pydantic-settings>=2.2
+asyncpg>=0.29
+python-dotenv>=1.0
+psycopg2-binary>=2.9.10
+geopandas>=0.14
+shapely>=2.0
+pyproj>=3.6
+

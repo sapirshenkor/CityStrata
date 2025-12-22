@@ -1,0 +1,41 @@
+# ======================
+# Python
+# ======================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# ======================
+# Environment variables
+# ======================
+.env
+.env.*
+
+# ======================
+# OS / IDE
+# ======================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ======================
+# Jupyter / notebooks
+# ======================
+.ipynb_checkpoints/
+
+# ======================
+# Data files (GIS / raw data)
+# ======================
+#backend/data/
+
+# ======================
+# Logs
+# ======================
+*.log
