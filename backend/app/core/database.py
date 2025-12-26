@@ -1,4 +1,5 @@
-""" database connection  """
+"""database connection"""
+
 """
 This module provides a global database connection pool for the application.
 It uses asyncpg to create a pool of connections to the database.
@@ -26,6 +27,7 @@ async def init_db_pool() -> Pool:
             min_size=1,
             max_size=10,
             command_timeout=30,
+            statement_cache_size=0,
         )
     return _pool
 
@@ -45,5 +47,7 @@ def get_pool() -> Pool:
     Returns the initialized pool (raises if not initialized).
     """
     if _pool is None:
-        raise RuntimeError("DB pool is not initialized. Did you start the app properly?")
+        raise RuntimeError(
+            "DB pool is not initialized. Did you start the app properly?"
+        )
     return _pool

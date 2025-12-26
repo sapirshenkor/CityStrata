@@ -1,5 +1,4 @@
-"""
- """
+""" """
 
 import argparse
 import asyncio
@@ -44,11 +43,27 @@ def _ensure_multipolygon(geom):
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="Load CBS statistical areas (SHP) into PostGIS")
-    parser.add_argument("--shp", required=True, help="Path to statistical_areas_2022.shp")
-    parser.add_argument("--semel", type=int, default=2600, help="SEMEL_YISH (default: 2600 for Eilat)")
-    parser.add_argument("--srid_out", type=int, default=4326, help="Output SRID stored in DB (default: 4326)")
-    parser.add_argument("--srid_area", type=int, default=2039, help="SRID used for area/centroid calc (default: 2039)")
+    parser = argparse.ArgumentParser(
+        description="Load CBS statistical areas (SHP) into PostGIS"
+    )
+    parser.add_argument(
+        "--shp", required=True, help="Path to statistical_areas_2022.shp"
+    )
+    parser.add_argument(
+        "--semel", type=int, default=2600, help="SEMEL_YISH (default: 2600 for Eilat)"
+    )
+    parser.add_argument(
+        "--srid_out",
+        type=int,
+        default=4326,
+        help="Output SRID stored in DB (default: 4326)",
+    )
+    parser.add_argument(
+        "--srid_area",
+        type=int,
+        default=2039,
+        help="SRID used for area/centroid calc (default: 2039)",
+    )
     parser.add_argument("--batch", type=int, default=200, help="Batch size for inserts")
     args = parser.parse_args()
 
@@ -65,7 +80,9 @@ async def main():
 
     # 3) Validate STAT_2022 exists
     if "STAT_2022" not in gdf.columns:
-        raise RuntimeError("Column 'STAT_2022' not found in SHP. Please confirm the column name.")
+        raise RuntimeError(
+            "Column 'STAT_2022' not found in SHP. Please confirm the column name."
+        )
     # Normalize type
     gdf["STAT_2022"] = gdf["STAT_2022"].astype(int)
 
@@ -75,7 +92,9 @@ async def main():
 
     # centroid in metric CRS then convert to 4326
     cent_metric = gdf_metric.geometry.centroid
-    cent_wgs = gpd.GeoSeries(cent_metric, crs=f"EPSG:{args.srid_area}").to_crs(epsg=args.srid_out)
+    cent_wgs = gpd.GeoSeries(cent_metric, crs=f"EPSG:{args.srid_area}").to_crs(
+        epsg=args.srid_out
+    )
     gdf["centroid_geom"] = cent_wgs
 
     # 5) Convert main geometry to output SRID (4326)
@@ -84,7 +103,9 @@ async def main():
     # 6) Prepare rows
     # All properties except geometry
     geom_col = gdf.geometry.name
-    props_cols = [c for c in gdf.columns if c not in {geom_col, "area_m2", "centroid_geom"}]
+    props_cols = [
+        c for c in gdf.columns if c not in {geom_col, "area_m2", "centroid_geom"}
+    ]
 
     rows = []
     for _, row in gdf.iterrows():
@@ -103,10 +124,10 @@ async def main():
             (
                 int(row["SEMEL_YISH"]),
                 int(row["STAT_2022"]),
-                geom.wkt,                 # polygon/multipolygon WKT
+                geom.wkt,  # polygon/multipolygon WKT
                 float(row["area_m2"]) if row["area_m2"] is not None else None,
-                centroid_wkt,             # point WKT
-                json.dumps(props),        # json string -> jsonb
+                centroid_wkt,  # point WKT
+                json.dumps(props),  # json string -> jsonb
             )
         )
 
@@ -145,7 +166,9 @@ async def main():
                 print(f"Upserted {inserted}/{len(rows)} rows...")
 
     await close_db_pool()
-    print(f"Done. Upserted total: {inserted} statistical areas for SEMEL_YISH={args.semel}")
+    print(
+        f"Done. Upserted total: {inserted} statistical areas for SEMEL_YISH={args.semel}"
+    )
 
 
 if __name__ == "__main__":
