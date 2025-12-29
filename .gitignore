@@ -33,7 +33,7 @@ Thumbs.db
 # ======================
 # Data files (GIS / raw data)
 # ======================
-#backend/data/
+backend/data/
 
 # ======================
 # Logs
