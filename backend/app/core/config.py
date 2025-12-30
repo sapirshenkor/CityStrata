@@ -5,10 +5,17 @@ This module provides a configuration for the application.
 It uses pydantic-settings to load the configuration from the .env file.
 The configuration is used to configure the application.
 """
-from dotenv import find_dotenv
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ENV_FILE = find_dotenv(".env", usecwd=True)
+# Look for .env file in project root (parent of backend directory)
+backend_dir = Path(
+    __file__
+).parent.parent.parent  # app/core/config.py -> backend/app/core -> backend
+project_root = backend_dir.parent  # backend -> project root
+env_file_path = project_root / ".env"
+
+ENV_FILE = str(env_file_path) if env_file_path.exists() else None
 
 
 class Settings(BaseSettings):
