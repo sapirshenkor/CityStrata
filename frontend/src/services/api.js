@@ -46,6 +46,25 @@ export const getCoffeeShops = (params = {}) => {
   return api.get('/api/coffee-shops', { params })
 }
 
+// Hotels
+export const getHotels = (params = {}) => {
+  return api.get('/api/hotels', { params })
+}
+
+// Matnasim
+export const getMatnasim = (params = {}) => {
+  return api.get('/api/matnasim', { params })
+}
+
+// OSM Facilities
+export const getOSMFacilities = (params = {}) => {
+  return api.get('/api/osm-facilities', { params })
+}
+
+export const getOSMFacilityTypes = () => {
+  return api.get('/api/osm-facilities/types')
+}
+
 // Evacuation Analysis
 export const analyzeEvacuation = (data) => {
   return api.post('/api/evacuation/analyze', data)

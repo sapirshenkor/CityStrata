@@ -5,6 +5,9 @@ import InstitutionsLayer from './InstitutionsLayer'
 import AirbnbLayer from './AirbnbLayer'
 import RestaurantsLayer from './RestaurantsLayer'
 import CoffeeShopsLayer from './CoffeeShopsLayer'
+import HotelsLayer from './HotelsLayer'
+import MatnasimLayer from './MatnasimLayer'
+import OSMFacilitiesLayer from './OSMFacilitiesLayer'
 import LayerControls from './LayerControls'
 import 'leaflet/dist/leaflet.css'
 
@@ -31,6 +34,9 @@ function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, f
   const airbnbFilters = { ...filters.airbnb, ...(areaFilter && { area: areaFilter }) }
   const restaurantsFilters = { ...filters.restaurants, ...(areaFilter && { area: areaFilter }) }
   const coffeeShopsFilters = { ...filters.coffeeShops, ...(areaFilter && { area: areaFilter }) }
+  const hotelsFilters = { ...filters.hotels, ...(areaFilter && { area: areaFilter }) }
+  const matnasimFilters = { ...filters.matnasim, ...(areaFilter && { area: areaFilter }) }
+  const osmFacilitiesFilters = { ...filters.osmFacilities, ...(areaFilter && { area: areaFilter }) }
 
   return (
     <MapContainer
@@ -66,6 +72,18 @@ function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, f
 
       {layerVisibility.coffeeShops && (
         <CoffeeShopsLayer filters={coffeeShopsFilters} />
+      )}
+
+      {layerVisibility.hotels && (
+        <HotelsLayer filters={hotelsFilters} />
+      )}
+
+      {layerVisibility.matnasim && (
+        <MatnasimLayer filters={matnasimFilters} />
+      )}
+
+      {layerVisibility.osmFacilities && (
+        <OSMFacilitiesLayer filters={osmFacilitiesFilters} />
       )}
 
       <LayerControls />

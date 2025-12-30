@@ -2,6 +2,7 @@ import { useState } from 'react'
 import AreaDetails from './AreaDetails'
 import FilterPanel from './FilterPanel'
 import EvacuationPlanner from './EvacuationPlanner'
+import { useOSMFacilityTypes } from '../../hooks/useMapData'
 import './Sidebar.css'
 
 function Sidebar({
@@ -15,6 +16,54 @@ function Sidebar({
   onUpdateFilters,
 }) {
   const [activeTab, setActiveTab] = useState('layers')
+  const [facilityTypeSearch, setFacilityTypeSearch] = useState('')
+  const { data: facilityTypes } = useOSMFacilityTypes()
+
+  const toggleFacilityType = (facilityType) => {
+    const currentTypes = filters.osmFacilities?.facility_types || []
+    const newTypes = currentTypes.includes(facilityType)
+      ? currentTypes.filter(t => t !== facilityType)
+      : [...currentTypes, facilityType]
+    
+    onUpdateFilters({
+      ...filters,
+      osmFacilities: {
+        ...filters.osmFacilities,
+        facility_types: newTypes.length > 0 ? newTypes : undefined,
+      },
+    })
+  }
+
+  const selectAllFacilityTypes = () => {
+    if (facilityTypes && facilityTypes.length > 0) {
+      const filteredTypes = facilityTypeSearch
+        ? facilityTypes.filter(type => 
+            type.toLowerCase().includes(facilityTypeSearch.toLowerCase())
+          )
+        : facilityTypes
+      onUpdateFilters({
+        ...filters,
+        osmFacilities: {
+          ...filters.osmFacilities,
+          facility_types: filteredTypes,
+        },
+      })
+    }
+  }
+
+  const deselectAllFacilityTypes = () => {
+    onUpdateFilters({
+      ...filters,
+      osmFacilities: {
+        ...filters.osmFacilities,
+        facility_types: undefined,
+      },
+    })
+  }
+
+  const filteredFacilityTypes = facilityTypes?.filter(type =>
+    type.toLowerCase().includes(facilityTypeSearch.toLowerCase())
+  ) || []
 
   return (
     <div className="sidebar">
@@ -152,7 +201,109 @@ function Sidebar({
                 />
                 <span>Coffee Shops</span>
               </label>
+              <label className="layer-toggle">
+                <input
+                  type="checkbox"
+                  checked={layerVisibility.hotels}
+                  onChange={(e) =>
+                    onToggleLayer({
+                      ...layerVisibility,
+                      hotels: e.target.checked,
+                    })
+                  }
+                />
+                <span>Hotels</span>
+              </label>
+              <label className="layer-toggle">
+                <input
+                  type="checkbox"
+                  checked={layerVisibility.matnasim}
+                  onChange={(e) =>
+                    onToggleLayer({
+                      ...layerVisibility,
+                      matnasim: e.target.checked,
+                    })
+                  }
+                />
+                <span>Matnasim</span>
+              </label>
+              <label className="layer-toggle">
+                <input
+                  type="checkbox"
+                  checked={layerVisibility.osmFacilities}
+                  onChange={(e) =>
+                    onToggleLayer({
+                      ...layerVisibility,
+                      osmFacilities: e.target.checked,
+                    })
+                  }
+                />
+                <span>OSM Facilities</span>
+              </label>
             </div>
+
+            {layerVisibility.osmFacilities && facilityTypes && facilityTypes.length > 0 && (
+              <div className="osm-facility-types-section">
+                <div className="osm-facility-types-header">
+                  <h3>Select Facility Types</h3>
+                  <div className="osm-facility-types-actions">
+                    <button
+                      type="button"
+                      onClick={selectAllFacilityTypes}
+                      className="osm-select-all-button"
+                      title="Select all visible types"
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={deselectAllFacilityTypes}
+                      className="osm-deselect-all-button"
+                      title="Deselect all types"
+                    >
+                      None
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search facility types..."
+                  value={facilityTypeSearch}
+                  onChange={(e) => setFacilityTypeSearch(e.target.value)}
+                  className="osm-facility-type-search"
+                />
+                {filteredFacilityTypes.length === 0 ? (
+                  <div className="osm-no-results">No types found matching "{facilityTypeSearch}"</div>
+                ) : (
+                  <>
+                    <div className="osm-facility-types-checkboxes">
+                      {filteredFacilityTypes.map((type) => {
+                        const isChecked = filters.osmFacilities?.facility_types?.includes(type) || false
+                        return (
+                          <label key={type} className="osm-facility-type-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleFacilityType(type)}
+                            />
+                            <span>{type}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                    {filters.osmFacilities?.facility_types?.length > 0 ? (
+                      <div className="osm-selected-count">
+                        {filters.osmFacilities.facility_types.length} type(s) selected
+                      </div>
+                    ) : (
+                      <div className="osm-no-selection-message">
+                        ⚠️ Select at least one type to see facilities
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {selectedArea && (
               <AreaDetails stat2022={selectedArea} onClose={() => onSelectArea(null)} />

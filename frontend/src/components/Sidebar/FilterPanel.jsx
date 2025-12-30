@@ -16,6 +16,7 @@ function FilterPanel({ filters, onUpdateFilters }) {
     onUpdateFilters(newFilters)
   }
 
+
   return (
     <div className="filter-panel">
       <h2>Filters</h2>
@@ -158,6 +159,100 @@ function FilterPanel({ filters, onUpdateFilters }) {
               value={localFilters.coffeeShops.min_score || ''}
               onChange={(e) =>
                 updateFilter('coffeeShops', 'min_score', e.target.value ? parseFloat(e.target.value) : null)
+              }
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="filter-section">
+        <h3>Hotels</h3>
+        <div className="filter-group">
+          <label>
+            Area:
+            <input
+              type="number"
+              placeholder="Area code"
+              value={localFilters.hotels.area || ''}
+              onChange={(e) =>
+                updateFilter('hotels', 'area', e.target.value ? parseInt(e.target.value) : null)
+              }
+            />
+          </label>
+          <label>
+            Min Rating:
+            <input
+              type="number"
+              step="0.1"
+              placeholder="e.g., 4.0"
+              value={localFilters.hotels.min_rating || ''}
+              onChange={(e) =>
+                updateFilter('hotels', 'min_rating', e.target.value ? parseFloat(e.target.value) : null)
+              }
+            />
+          </label>
+          <label>
+            Type:
+            <input
+              type="text"
+              placeholder="e.g., Hotel"
+              value={localFilters.hotels.hotel_type || ''}
+              onChange={(e) => updateFilter('hotels', 'hotel_type', e.target.value)}
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="filter-section">
+        <h3>Matnasim</h3>
+        <div className="filter-group">
+          <label>
+            Area:
+            <input
+              type="number"
+              placeholder="Area code"
+              value={localFilters.matnasim.area || ''}
+              onChange={(e) =>
+                updateFilter('matnasim', 'area', e.target.value ? parseInt(e.target.value) : null)
+              }
+            />
+          </label>
+          <label>
+            Min Facility Area:
+            <input
+              type="number"
+              placeholder="m²"
+              value={localFilters.matnasim.min_facility_area || ''}
+              onChange={(e) =>
+                updateFilter('matnasim', 'min_facility_area', e.target.value ? parseInt(e.target.value) : null)
+              }
+            />
+          </label>
+          <label>
+            Min Occupancy:
+            <input
+              type="number"
+              placeholder="e.g., 100"
+              value={localFilters.matnasim.min_occupancy || ''}
+              onChange={(e) =>
+                updateFilter('matnasim', 'min_occupancy', e.target.value ? parseInt(e.target.value) : null)
+              }
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="filter-section">
+        <h3>OSM Facilities</h3>
+        <div className="filter-group">
+          <label>
+            Area:
+            <input
+              type="number"
+              placeholder="Area code"
+              value={localFilters.osmFacilities?.area || ''}
+              onChange={(e) =>
+                updateFilter('osmFacilities', 'area', e.target.value ? parseInt(e.target.value) : null)
               }
             />
           </label>

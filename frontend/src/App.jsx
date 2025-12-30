@@ -12,12 +12,18 @@ function App() {
     airbnb: false,
     restaurants: false,
     coffeeShops: false,
+    hotels: false,
+    matnasim: false,
+    osmFacilities: false,
   })
   const [filters, setFilters] = useState({
     institutions: {},
     airbnb: {},
     restaurants: {},
     coffeeShops: {},
+    hotels: {},
+    matnasim: {},
+    osmFacilities: {},
   })
 
   return (
