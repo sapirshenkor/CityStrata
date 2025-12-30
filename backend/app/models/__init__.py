@@ -26,6 +26,19 @@ from .airbnb import (
 )
 from .restaurant import RestaurantBase, Restaurant, RestaurantCreate, RestaurantGeoJSON
 from .coffee_shop import CoffeeShopBase, CoffeeShop, CoffeeShopCreate, CoffeeShopGeoJSON
+from .hotel import (
+    HotelListingBase,
+    HotelListing,
+    HotelListingCreate,
+    HotelListingGeoJSON,
+)
+from .matnas import MatnasBase, Matnas, MatnasCreate, MatnasGeoJSON
+from .osm_facility import (
+    OSMFacilityBase,
+    OSMFacility,
+    OSMFacilityCreate,
+    OSMFacilityGeoJSON,
+)
 from .evacuation import (
     EvacuationRequest,
     EvacuationCapacity,
@@ -66,6 +79,21 @@ __all__ = [
     "CoffeeShop",
     "CoffeeShopCreate",
     "CoffeeShopGeoJSON",
+    # Hotels
+    "HotelListingBase",
+    "HotelListing",
+    "HotelListingCreate",
+    "HotelListingGeoJSON",
+    # Matnasim
+    "MatnasBase",
+    "Matnas",
+    "MatnasCreate",
+    "MatnasGeoJSON",
+    # OSM Facilities
+    "OSMFacilityBase",
+    "OSMFacility",
+    "OSMFacilityCreate",
+    "OSMFacilityGeoJSON",
     # Evacuation
     "EvacuationRequest",
     "EvacuationCapacity",
