@@ -8,6 +8,7 @@ import CoffeeShopsLayer from './CoffeeShopsLayer'
 import HotelsLayer from './HotelsLayer'
 import MatnasimLayer from './MatnasimLayer'
 import OSMFacilitiesLayer from './OSMFacilitiesLayer'
+import SynagoguesLayer from './SynagoguesLayer'
 import LayerControls from './LayerControls'
 import 'leaflet/dist/leaflet.css'
 
@@ -37,6 +38,7 @@ function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, f
   const hotelsFilters = { ...filters.hotels, ...(areaFilter && { area: areaFilter }) }
   const matnasimFilters = { ...filters.matnasim, ...(areaFilter && { area: areaFilter }) }
   const osmFacilitiesFilters = { ...filters.osmFacilities, ...(areaFilter && { area: areaFilter }) }
+  const synagoguesFilters = { ...filters.synagogues, ...(areaFilter && { area: areaFilter }) }
 
   return (
     <MapContainer
@@ -84,6 +86,10 @@ function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, f
 
       {layerVisibility.osmFacilities && (
         <OSMFacilitiesLayer filters={osmFacilitiesFilters} />
+      )}
+
+      {layerVisibility.synagogues && (
+        <SynagoguesLayer filters={synagoguesFilters} />
       )}
 
       <LayerControls />

@@ -39,6 +39,12 @@ from .osm_facility import (
     OSMFacilityCreate,
     OSMFacilityGeoJSON,
 )
+from .synagogue import (
+    SynagogueBase,
+    Synagogue,
+    SynagogueCreate,
+    SynagogueGeoJSON,
+)
 from .evacuation import (
     EvacuationRequest,
     EvacuationCapacity,
@@ -94,6 +100,11 @@ __all__ = [
     "OSMFacility",
     "OSMFacilityCreate",
     "OSMFacilityGeoJSON",
+    # Synagogues
+    "SynagogueBase",
+    "Synagogue",
+    "SynagogueCreate",
+    "SynagogueGeoJSON",
     # Evacuation
     "EvacuationRequest",
     "EvacuationCapacity",

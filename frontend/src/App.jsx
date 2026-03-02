@@ -15,6 +15,7 @@ function App() {
     hotels: false,
     matnasim: false,
     osmFacilities: false,
+    synagogues: false,
   })
   const [filters, setFilters] = useState({
     institutions: {},
@@ -24,6 +25,7 @@ function App() {
     hotels: {},
     matnasim: {},
     osmFacilities: {},
+    synagogues: {},
   })
 
   return (

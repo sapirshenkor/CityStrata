@@ -13,6 +13,7 @@ from app.api.endpoints import (
     hotels,
     matnasim,
     osm_facilities,
+    synagogues,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -28,3 +29,4 @@ api_router.include_router(nearby.router)
 api_router.include_router(hotels.router)
 api_router.include_router(matnasim.router)
 api_router.include_router(osm_facilities.router)
+api_router.include_router(synagogues.router)

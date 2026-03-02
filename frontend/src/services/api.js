@@ -65,6 +65,11 @@ export const getOSMFacilityTypes = () => {
   return api.get('/api/osm-facilities/types')
 }
 
+// Synagogues
+export const getSynagogues = (params = {}) => {
+  return api.get('/api/synagogues', { params })
+}
+
 // Evacuation Analysis
 export const analyzeEvacuation = (data) => {
   return api.post('/api/evacuation/analyze', data)

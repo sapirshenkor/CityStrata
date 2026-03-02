@@ -240,6 +240,19 @@ function Sidebar({
                 />
                 <span>OSM Facilities</span>
               </label>
+              <label className="layer-toggle">
+                <input
+                  type="checkbox"
+                  checked={layerVisibility.synagogues}
+                  onChange={(e) =>
+                    onToggleLayer({
+                      ...layerVisibility,
+                      synagogues: e.target.checked,
+                    })
+                  }
+                />
+                <span>Synagogues</span>
+              </label>
             </div>
 
             {layerVisibility.osmFacilities && facilityTypes && facilityTypes.length > 0 && (

@@ -10,6 +10,7 @@ import {
   getMatnasim,
   getOSMFacilities,
   getOSMFacilityTypes,
+  getSynagogues,
 } from '../services/api'
 
 export const useStatisticalAreas = () => {
@@ -253,6 +254,32 @@ export const useOSMFacilityTypes = () => {
 
     fetchData()
   }, [])
+
+  return { data, loading, error }
+}
+
+export const useSynagogues = (filters = {}) => {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        const response = await getSynagogues(filters)
+        setData(response.data)
+        setError(null)
+      } catch (err) {
+        setError(err.message)
+        console.error('Error fetching synagogues:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [JSON.stringify(filters)])
 
   return { data, loading, error }
 }

@@ -258,6 +258,32 @@ function FilterPanel({ filters, onUpdateFilters }) {
           </label>
         </div>
       </div>
+
+      <div className="filter-section">
+        <h3>Synagogues</h3>
+        <div className="filter-group">
+          <label>
+            Area:
+            <input
+              type="number"
+              placeholder="Area code"
+              value={localFilters.synagogues?.area || ''}
+              onChange={(e) =>
+                updateFilter('synagogues', 'area', e.target.value ? parseInt(e.target.value) : null)
+              }
+            />
+          </label>
+          <label>
+            Type:
+            <input
+              type="text"
+              placeholder="e.g., Mizrahi, chabad"
+              value={localFilters.synagogues?.synagogue_type || ''}
+              onChange={(e) => updateFilter('synagogues', 'synagogue_type', e.target.value)}
+            />
+          </label>
+        </div>
+      </div>
     </div>
   )
 }
