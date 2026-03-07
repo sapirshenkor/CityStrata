@@ -50,3 +50,17 @@ export const getAreaStyle = (stat2022, isSelected) => {
   }
 }
 
+// Clusters (K=4 from pipeline): fixed color per cluster index
+export const CLUSTER_COLORS = ['#4C72B0', '#2ca02c', '#d62728', '#ff7f0e']
+
+export const getClusterStyle = (cluster, isSelected) => {
+  const fillColor = CLUSTER_COLORS[cluster % CLUSTER_COLORS.length] ?? '#888'
+  return {
+    fillColor: isSelected ? layerColors.statisticalAreas.selected : fillColor,
+    color: '#333',
+    weight: isSelected ? 3 : 1.5,
+    opacity: 0.9,
+    fillOpacity: isSelected ? 0.5 : 0.5,
+  }
+}
+

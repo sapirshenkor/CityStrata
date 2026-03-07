@@ -29,7 +29,7 @@ L.Marker.prototype.options.icon = DefaultIcon
 const EILAT_CENTER = [29.55, 34.95]
 const DEFAULT_ZOOM = 13
 
-function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, filters }) {
+function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, filters, showClusters, clusterAssignments }) {
   // Merge areaFilter into filters for all layers
   const institutionsFilters = { ...filters.institutions, ...(areaFilter && { area: areaFilter }) }
   const airbnbFilters = { ...filters.airbnb, ...(areaFilter && { area: areaFilter }) }
@@ -57,6 +57,8 @@ function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, f
           selectedArea={selectedArea}
           onSelectArea={onSelectArea}
           areaFilter={areaFilter}
+          showClusters={showClusters}
+          clusterAssignments={clusterAssignments}
         />
       )}
 

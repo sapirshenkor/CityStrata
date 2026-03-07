@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import LeafletMap from './components/Map/LeafletMap'
 import Sidebar from './components/Sidebar/Sidebar'
+import { useClusterAssignments } from './hooks/useMapData'
 import './App.css'
 
 function App() {
   const [selectedArea, setSelectedArea] = useState(null)
   const [areaFilter, setAreaFilter] = useState(null) // Filter to show only one area
+  const { data: clusterAssignments, refetch: refetchClusterAssignments } = useClusterAssignments()
   const [layerVisibility, setLayerVisibility] = useState({
     statisticalAreas: true,
     institutions: false,
@@ -16,6 +18,7 @@ function App() {
     matnasim: false,
     osmFacilities: false,
     synagogues: false,
+    clusters: false,
   })
   const [filters, setFilters] = useState({
     institutions: {},
@@ -39,6 +42,8 @@ function App() {
         onToggleLayer={setLayerVisibility}
         filters={filters}
         onUpdateFilters={setFilters}
+        clusterAssignments={clusterAssignments}
+        onRunClustering={refetchClusterAssignments}
       />
       <div className="map-container">
         <LeafletMap
@@ -47,6 +52,8 @@ function App() {
           areaFilter={areaFilter}
           layerVisibility={layerVisibility}
           filters={filters}
+          showClusters={layerVisibility.clusters}
+          clusterAssignments={clusterAssignments}
         />
       </div>
     </div>

@@ -11,6 +11,7 @@ import {
   getOSMFacilities,
   getOSMFacilityTypes,
   getSynagogues,
+  getClusterAssignments,
 } from '../services/api'
 
 export const useStatisticalAreas = () => {
@@ -282,6 +283,34 @@ export const useSynagogues = (filters = {}) => {
   }, [JSON.stringify(filters)])
 
   return { data, loading, error }
+}
+
+export const useClusterAssignments = () => {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const refetch = async () => {
+    try {
+      setLoading(true)
+      const response = await getClusterAssignments()
+      const assignments = response.data?.assignments ?? []
+      setData(assignments.length > 0 ? assignments : null)
+      setError(null)
+    } catch (err) {
+      setError(err.message)
+      console.error('Error fetching cluster assignments:', err)
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refetch()
+  }, [])
+
+  return { data: data, loading, error, refetch }
 }
 
 export const useAreaSummary = (stat2022) => {

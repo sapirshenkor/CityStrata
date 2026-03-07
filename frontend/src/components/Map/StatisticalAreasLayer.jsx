@@ -1,13 +1,20 @@
 import { useMemo, useEffect, useRef } from 'react'
 import { GeoJSON, useMap } from 'react-leaflet'
 import { useStatisticalAreas } from '../../hooks/useMapData'
-import { getAreaStyle } from '../../utils/colors'
+import { getAreaStyle, getClusterStyle } from '../../utils/colors'
 import L from 'leaflet'
 
-function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter }) {
+function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClusters, clusterAssignments }) {
   const { data, loading, error } = useStatisticalAreas()
   const map = useMap()
   const labelsRef = useRef(new Map()) // Track added labels to avoid duplicates
+
+  const statToCluster = useMemo(() => {
+    if (!clusterAssignments || !Array.isArray(clusterAssignments)) return null
+    const m = new Map()
+    clusterAssignments.forEach((a) => m.set(a.stat_2022, a.cluster))
+    return m
+  }, [clusterAssignments])
 
   // Filter data by areaFilter if set
   const filteredData = useMemo(() => {
@@ -23,12 +30,17 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter }) {
   }, [data, areaFilter])
 
   const style = useMemo(() => {
+    const byCluster = showClusters && statToCluster
     return (feature) => {
       const stat2022 = feature.properties.stat_2022
       const isSelected = selectedArea === stat2022
+      if (byCluster) {
+        const cluster = statToCluster.get(stat2022)
+        if (cluster !== undefined) return getClusterStyle(cluster, isSelected)
+      }
       return getAreaStyle(stat2022, isSelected)
     }
-  }, [selectedArea])
+  }, [selectedArea, showClusters, statToCluster])
 
   // Zoom to filtered area when areaFilter changes
   useEffect(() => {
@@ -100,7 +112,11 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter }) {
     })
     
     // Tooltip
-    layer.bindTooltip(`Area ${stat2022}`, {
+    const cluster = statToCluster?.get(stat2022)
+    const tooltipText = showClusters && cluster !== undefined
+      ? `Area ${stat2022} · ${clusterAssignments?.find((a) => a.stat_2022 === stat2022)?.cluster_label ?? `Cluster ${cluster}`}`
+      : `Area ${stat2022}`
+    layer.bindTooltip(tooltipText, {
       permanent: false,
       direction: 'center',
     })
