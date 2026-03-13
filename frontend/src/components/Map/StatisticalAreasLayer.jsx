@@ -113,9 +113,20 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClu
     
     // Tooltip
     const cluster = statToCluster?.get(stat2022)
-    const tooltipText = showClusters && cluster !== undefined
-      ? `Area ${stat2022} · ${clusterAssignments?.find((a) => a.stat_2022 === stat2022)?.cluster_label ?? `Cluster ${cluster}`}`
-      : `Area ${stat2022}`
+    const assignment = clusterAssignments?.find((a) => a.stat_2022 === stat2022)
+    const clusterName =
+      assignment?.cluster_name ??
+      assignment?.cluster_label ??
+      (cluster !== undefined ? `Cluster ${cluster}` : null)
+    const clusterDescription = assignment?.cluster_description
+
+    const tooltipText =
+      showClusters && cluster !== undefined && clusterName
+        ? `Area ${stat2022} · ${clusterName}${
+            clusterDescription ? `\n${clusterDescription}` : ''
+          }`
+        : `Area ${stat2022}`
+
     layer.bindTooltip(tooltipText, {
       permanent: false,
       direction: 'center',

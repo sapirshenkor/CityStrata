@@ -26,6 +26,57 @@ async def run_clustering(k: int = Query(4, ge=2, le=10, description="Number of c
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/profiles")
+async def get_cluster_profiles(
+    run_id: UUID | None = Query(None, description="Run ID; if omitted, latest run is used"),
+):
+    """
+    Get cluster profiles (names, descriptions, dimensions) for a run (or the latest run).
+    """
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        if run_id is None:
+            run = await conn.fetchrow(
+                """
+                SELECT id
+                FROM public.clustering_runs
+                ORDER BY created_at DESC
+                LIMIT 1
+                """
+            )
+            if not run:
+                return {"run_id": None, "profiles": []}
+            run_id = run["id"]
+
+        rows = await conn.fetch(
+            """
+            SELECT cluster, name, short_description, dimensions
+            FROM public.cluster_profiles
+            WHERE run_id = $1
+            ORDER BY cluster
+            """,
+            run_id,
+        )
+        if not rows:
+            # If the run exists but has no profiles yet, return empty list.
+            exists = await conn.fetchval(
+                "SELECT EXISTS (SELECT 1 FROM public.clustering_runs WHERE id = $1)", run_id
+            )
+            if not exists:
+                raise HTTPException(status_code=404, detail="Run not found")
+            return {"run_id": str(run_id), "profiles": []}
+
+    profiles = [
+        {
+            "cluster": r["cluster"],
+            "name": r["name"],
+            "short_description": r["short_description"],
+            "dimensions": r["dimensions"],
+        }
+        for r in rows
+    ]
+    return {"run_id": str(run_id), "profiles": profiles}
+
 @router.get("/assignments")
 async def get_assignments(
     run_id: UUID | None = Query(None, description="Run ID; if omitted, latest run is used"),

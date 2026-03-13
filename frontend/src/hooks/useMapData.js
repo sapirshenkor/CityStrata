@@ -12,6 +12,7 @@ import {
   getOSMFacilityTypes,
   getSynagogues,
   getClusterAssignments,
+  getClusterProfiles,
 } from '../services/api'
 
 export const useStatisticalAreas = () => {
@@ -294,8 +295,40 @@ export const useClusterAssignments = () => {
     try {
       setLoading(true)
       const response = await getClusterAssignments()
+      const runId = response.data?.run_id ?? null
       const assignments = response.data?.assignments ?? []
-      setData(assignments.length > 0 ? assignments : null)
+
+      if (!runId || assignments.length === 0) {
+        setData(null)
+        setError(null)
+        return
+      }
+
+      // Fetch cluster profiles for the same run to enrich assignments with
+      // human-friendly cluster names and descriptions.
+      const profilesResponse = await getClusterProfiles(runId)
+      const profiles = profilesResponse.data?.profiles ?? []
+      const byCluster = new Map()
+      profiles.forEach((p) => {
+        byCluster.set(p.cluster, {
+          name: p.name,
+          description: p.short_description,
+        })
+      })
+
+      const enriched = assignments.map((a) => {
+        const profile = byCluster.get(a.cluster)
+        return {
+          ...a,
+          cluster_name:
+            profile?.name ??
+            a.cluster_label ??
+            `Cluster ${a.cluster}`,
+          cluster_description: profile?.description ?? null,
+        }
+      })
+
+      setData(enriched.length > 0 ? enriched : null)
       setError(null)
     } catch (err) {
       setError(err.message)

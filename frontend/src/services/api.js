@@ -90,5 +90,10 @@ export const getClusterAssignments = (runId = null) => {
   return api.get('/api/clustering/assignments', { params })
 }
 
+export const getClusterProfiles = (runId = null) => {
+  const params = runId ? { run_id: runId } : {}
+  return api.get('/api/clustering/profiles', { params })
+}
+
 export default api
 
