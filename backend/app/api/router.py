@@ -14,6 +14,7 @@ from app.api.endpoints import (
     matnasim,
     osm_facilities,
     synagogues,
+    clustering,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -30,3 +31,4 @@ api_router.include_router(hotels.router)
 api_router.include_router(matnasim.router)
 api_router.include_router(osm_facilities.router)
 api_router.include_router(synagogues.router)
+api_router.include_router(clustering.router)

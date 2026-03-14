@@ -11,6 +11,8 @@ import {
   getOSMFacilities,
   getOSMFacilityTypes,
   getSynagogues,
+  getClusterAssignments,
+  getClusterProfiles,
 } from '../services/api'
 
 export const useStatisticalAreas = () => {
@@ -282,6 +284,66 @@ export const useSynagogues = (filters = {}) => {
   }, [JSON.stringify(filters)])
 
   return { data, loading, error }
+}
+
+export const useClusterAssignments = () => {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const refetch = async () => {
+    try {
+      setLoading(true)
+      const response = await getClusterAssignments()
+      const runId = response.data?.run_id ?? null
+      const assignments = response.data?.assignments ?? []
+
+      if (!runId || assignments.length === 0) {
+        setData(null)
+        setError(null)
+        return
+      }
+
+      // Fetch cluster profiles for the same run to enrich assignments with
+      // human-friendly cluster names and descriptions.
+      const profilesResponse = await getClusterProfiles(runId)
+      const profiles = profilesResponse.data?.profiles ?? []
+      const byCluster = new Map()
+      profiles.forEach((p) => {
+        byCluster.set(p.cluster, {
+          name: p.name,
+          description: p.short_description,
+        })
+      })
+
+      const enriched = assignments.map((a) => {
+        const profile = byCluster.get(a.cluster)
+        return {
+          ...a,
+          cluster_name:
+            profile?.name ??
+            a.cluster_label ??
+            `Cluster ${a.cluster}`,
+          cluster_description: profile?.description ?? null,
+        }
+      })
+
+      setData(enriched.length > 0 ? enriched : null)
+      setError(null)
+    } catch (err) {
+      setError(err.message)
+      console.error('Error fetching cluster assignments:', err)
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refetch()
+  }, [])
+
+  return { data: data, loading, error, refetch }
 }
 
 export const useAreaSummary = (stat2022) => {

@@ -3,6 +3,7 @@ import AreaDetails from './AreaDetails'
 import FilterPanel from './FilterPanel'
 import EvacuationPlanner from './EvacuationPlanner'
 import { useOSMFacilityTypes } from '../../hooks/useMapData'
+import { runClustering } from '../../services/api'
 import './Sidebar.css'
 
 function Sidebar({
@@ -14,10 +15,28 @@ function Sidebar({
   onToggleLayer,
   filters,
   onUpdateFilters,
+  clusterAssignments,
+  onRunClustering,
 }) {
   const [activeTab, setActiveTab] = useState('layers')
   const [facilityTypeSearch, setFacilityTypeSearch] = useState('')
+  const [clusteringRunning, setClusteringRunning] = useState(false)
+  const [clusteringError, setClusteringError] = useState(null)
   const { data: facilityTypes } = useOSMFacilityTypes()
+
+  const handleRunClustering = async () => {
+    setClusteringError(null)
+    setClusteringRunning(true)
+    try {
+      await runClustering(4)
+      await onRunClustering()
+      onToggleLayer({ ...layerVisibility, clusters: true })
+    } catch (err) {
+      setClusteringError(err.response?.data?.detail ?? err.message)
+    } finally {
+      setClusteringRunning(false)
+    }
+  }
 
   const toggleFacilityType = (facilityType) => {
     const currentTypes = filters.osmFacilities?.facility_types || []
@@ -253,6 +272,39 @@ function Sidebar({
                 />
                 <span>Synagogues</span>
               </label>
+
+              <div className="clustering-section">
+                <h3>Clustering</h3>
+                <button
+                  type="button"
+                  onClick={handleRunClustering}
+                  disabled={clusteringRunning}
+                  className="run-clustering-button"
+                >
+                  {clusteringRunning ? 'Running…' : 'Run clustering'}
+                </button>
+                {clusteringError && (
+                  <p className="clustering-error">{clusteringError}</p>
+                )}
+                <label className="layer-toggle">
+                  <input
+                    type="checkbox"
+                    checked={layerVisibility.clusters}
+                    onChange={(e) =>
+                      onToggleLayer({
+                        ...layerVisibility,
+                        clusters: e.target.checked,
+                      })
+                    }
+                  />
+                  <span>Show clusters on map</span>
+                </label>
+                {clusterAssignments && (
+                  <p className="clustering-info">
+                    {clusterAssignments.length} areas in latest run
+                  </p>
+                )}
+              </div>
             </div>
 
             {layerVisibility.osmFacilities && facilityTypes && facilityTypes.length > 0 && (

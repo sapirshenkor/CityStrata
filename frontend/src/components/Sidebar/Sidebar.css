@@ -124,6 +124,54 @@
   margin-bottom: 20px;
 }
 
+.clustering-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e9ecef;
+}
+
+.clustering-section h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.run-clustering-button {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  margin-bottom: 10px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.run-clustering-button:hover:not(:disabled) {
+  background: #5568d3;
+}
+
+.run-clustering-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.clustering-error {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: #e74c3c;
+}
+
+.clustering-info {
+  margin: 6px 0 0 0;
+  font-size: 12px;
+  color: #666;
+}
+
 .layer-controls h2 {
   margin: 0 0 16px 0;
   font-size: 18px;
