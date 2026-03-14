@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     ENV: str = "dev"
     DATABASE_URL: str
 
+    # OpenAI (for matching agent); optional so app starts without it
+    openai_api_key: str | None = None
+
     print("Loading .env from:", ENV_FILE)
 
 
