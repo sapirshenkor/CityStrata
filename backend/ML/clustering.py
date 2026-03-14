@@ -38,73 +38,77 @@ PC_GROUPS = {
     "religious": ["PC_RELIGIOUS_1", "PC_RELIGIOUS_2"],
 }
 
-# Human-readable labels for semantic groups, used in auto-generated cluster names.
-PC_GROUP_TITLES = {
-    "education": "education",
-    "tourism": "tourism",
-    "food": "food & dining",
-    "community": "community services",
-    "osm_infra": "general infrastructure",
-    "religious": "religious facilities",
+CLUSTER_DESCRIPTIONS = {
+    "Residential - Secular": (
+        "Secular residential zone with moderate tourism infrastructure (Airbnb/hotels). "
+        "Good education access. Suitable for secular families and individuals."
+    ),
+    "Residential - Religious/Family": (
+        "Quiet residential zone with strong religious and community character. "
+        "High education density, community centers present. Suitable for religious families."
+    ),
+    "Commercial Core": (
+        "City commercial center with very high food, dining and infrastructure density. "
+        "Mixed tourism presence. Suitable for individuals needing urban amenities."
+    ),
+    "Peripheral - Sparse": (
+        "Peripheral zone with minimal services and low activity across all dimensions. "
+        "Limited infrastructure and education access. Lower priority for family placement."
+    ),
 }
 
 KMEANS_N_INIT = 50
 KMEANS_RANDOM_STATE = 42
 
 
-def _auto_cluster_name(cluster_id: int, profile: dict[str, str]) -> str:
+def _assign_semantic_label(profile: dict[str, str]) -> str:
     """
-    Derive a short, human-friendly name from a dimension profile.
-    Focuses on the strongest 'high' / 'very_high' dimensions.
+    Map a cluster's dimension profile to one of the fixed, domain-specific labels:
+
+    - "Residential - Secular": Areas with Airbnb/hotel presence used as residential opportunity,
+      secular character, low religious activity, moderate education.
+    - "Residential - Religious/Family": Low tourism pressure, high religious character, high education,
+      strong community presence, family oriented.
+    - "Commercial Core": City commercial center with very high food/dining and infrastructure,
+      mixed tourism, secular character, city center feel.
+    - "Peripheral - Sparse": Peripheral areas with low scores across most dimensions,
+      minimal services and infrastructure.
     """
-    importance = {
-        "very_high": 2,
-        "high": 1,
-        "medium": 0,
-        "low": -1,
-        "very_low": -2,
-    }
+    religious = profile.get("religious", "medium")
+    tourism = profile.get("tourism", "medium")
+    food = profile.get("food", "medium")
+    osm_infra = profile.get("osm_infra", "medium")
 
-    scored = []
-    for dim, level in profile.items():
-        score = importance.get(level, 0)
-        scored.append((dim, level, score))
+    def is_high(level: str) -> bool:
+        return level in {"high", "very_high"}
 
-    # Sort by score (descending), then by dimension name for stability.
-    scored.sort(key=lambda x: (-x[2], x[0]))
+    def is_low(level: str) -> bool:
+        return level in {"low", "very_low"}
 
-    # Take dimensions that are at least "high".
-    top_dims = [s for s in scored if s[2] >= 1]
-    if not top_dims:
-        # If nothing clearly stands out, call it a balanced cluster.
-        return f"Balanced cluster {cluster_id}"
+    # 1. Residential - Religious/Family:
+    #    If religious is high or very_high AND tourism is low or very_low.
+    if is_high(religious) and is_low(tourism):
+        return "Residential - Religious/Family"
 
-    # If religious dimension is high/very_high, force it into the name.
-    religious_entry = next((s for s in top_dims if s[0] == "religious"), None)
+    # 2. Commercial Core:
+    #    If food is very_high OR osm_infra is very_high.
+    if food == "very_high" or osm_infra == "very_high":
+        return "Commercial Core"
 
-    if religious_entry is not None:
-        # Prefer to highlight religious facilities explicitly.
-        # Optionally combine with the strongest non-religious dimension.
-        non_religious = [s for s in top_dims if s[0] != "religious"]
-        if not non_religious:
-            return "Religious facilities cluster"
+    # 3. Residential - Secular:
+    #    If tourism is high or very_high AND religious is low, very_low, or medium.
+    if is_high(tourism) and religious in {"low", "very_low", "medium"}:
+        return "Residential - Secular"
 
-        non_religious.sort(key=lambda x: (-x[2], x[0]))
-        main_dim, _, _ = non_religious[0]
-        main_title = PC_GROUP_TITLES.get(main_dim, main_dim.replace("_", " "))
-        return f"{main_title.title()} & Religious facilities cluster"
+    # 4. Peripheral - Sparse:
+    #    If most dimensions are low or very_low.
+    low_count = sum(1 for level in profile.values() if is_low(level))
+    if low_count >= max(1, len(profile) - 1):
+        return "Peripheral - Sparse"
 
-    # No high religious dimension: use the strongest one or two dimensions.
-    # Use at most the top two.
-    top_dims = top_dims[:2]
-    titles = [PC_GROUP_TITLES.get(dim, dim.replace("_", " ")) for dim, _, _ in top_dims]
-
-    if len(titles) == 1:
-        main = titles[0]
-        return f"High-{main} cluster"
-
-    first, second = titles
-    return f"{first.title()} & {second.title()} cluster"
+    # 5. Fallback:
+    #    Default to "Residential - Secular" as the most common type in Eilat.
+    return "Residential - Secular"
 
 
 def _build_cluster_dimension_profile(
@@ -170,7 +174,85 @@ async def run_clustering_pipeline(conn, k: int = 4) -> dict:
     Load PCA data from DB, run K-Means, persist to clustering_runs and cluster_assignments.
     Returns run summary and assignments.
     """
-    # Load from pca_ready_for_clustering
+    # Duplicate run protection: reuse latest run with same k from last 24 hours.
+    existing = await conn.fetchrow(
+        """
+        SELECT id
+        FROM public.clustering_runs
+        WHERE k = $1
+          AND created_at > NOW() - INTERVAL '24 hours'
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        k,
+    )
+    if existing:
+        run_id = existing["id"]
+
+        run_row = await conn.fetchrow(
+            """
+            SELECT k, silhouette_score, calinski_harabasz_score, davies_bouldin_score
+            FROM public.clustering_runs
+            WHERE id = $1
+            """,
+            run_id,
+        )
+        assignments_rows = await conn.fetch(
+            """
+            SELECT stat_2022, cluster, cluster_label
+            FROM public.cluster_assignments
+            WHERE run_id = $1
+            ORDER BY stat_2022
+            """,
+            run_id,
+        )
+        profiles_rows = await conn.fetch(
+            """
+            SELECT cluster, name, short_description, dimensions
+            FROM public.cluster_profiles
+            WHERE run_id = $1
+            ORDER BY cluster
+            """,
+            run_id,
+        )
+
+        assignments = [
+            {
+                "stat_2022": r["stat_2022"],
+                "cluster": r["cluster"],
+                "cluster_label": r["cluster_label"],
+            }
+            for r in assignments_rows
+        ]
+        cluster_profiles = [
+            {
+                "cluster": r["cluster"],
+                "name": r["name"],
+                "short_description": r["short_description"],
+                "dimensions": r["dimensions"],
+            }
+            for r in profiles_rows
+        ]
+
+        return {
+            "run_id": str(run_id),
+            "k": run_row["k"],
+            "silhouette_score": float(run_row["silhouette_score"])
+            if run_row["silhouette_score"] is not None
+            else None,
+            "calinski_harabasz_score": float(run_row["calinski_harabasz_score"])
+            if run_row["calinski_harabasz_score"] is not None
+            else None,
+            "davies_bouldin_score": float(run_row["davies_bouldin_score"])
+            if run_row["davies_bouldin_score"] is not None
+            else None,
+            "n_areas": len(assignments),
+            "assignments": assignments,
+            "cluster_profiles": cluster_profiles,
+            "from_cache": True,
+        }
+
+    # Phase 1: load from pca_ready_for_clustering and compute clustering/profiles/metrics
     rows = await conn.fetch(
         """
         SELECT stat_2022, """
@@ -201,76 +283,76 @@ async def run_clustering_pipeline(conn, k: int = 4) -> dict:
     # Build per-cluster semantic profiles (based on relabelled clusters)
     dimension_profiles = _build_cluster_dimension_profile(X, labels)
 
+    # Map cluster -> semantic label once, reuse for assignments and profiles.
+    semantic_labels = {
+        int(cluster): _assign_semantic_label(profile)
+        for cluster, profile in dimension_profiles.items()
+    }
+
     # Metrics
     sil = float(silhouette_score(X, labels))
     ch = float(calinski_harabasz_score(X, labels))
     db = float(davies_bouldin_score(X, labels))
 
-    # Persist run
-    run_id = await conn.fetchval(
-        """
-        INSERT INTO public.clustering_runs (k, silhouette_score, calinski_harabasz_score, davies_bouldin_score)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id
-        """,
-        k,
-        sil,
-        ch,
-        db,
-    )
-
-    # Persist assignments
-    for stat_2022, cluster in zip(stat_2022_list, labels.tolist()):
-        await conn.execute(
+    # Phase 2: persist in a single transaction (run + assignments + profiles)
+    async with conn.transaction():
+        run_id = await conn.fetchval(
             """
-            INSERT INTO public.cluster_assignments (run_id, stat_2022, cluster, cluster_label)
+            INSERT INTO public.clustering_runs (k, silhouette_score, calinski_harabasz_score, davies_bouldin_score)
             VALUES ($1, $2, $3, $4)
+            RETURNING id
             """,
-            run_id,
-            stat_2022,
-            cluster,
-            f"Cluster_{cluster}",
+            k,
+            sil,
+            ch,
+            db,
         )
 
-    # Persist initial cluster profiles with simple, structured summaries.
-    for cluster, profile in dimension_profiles.items():
-        high_dims = [
-            name for name, level in profile.items() if level in {"high", "very_high"}
-        ]
-        low_dims = [
-            name for name, level in profile.items() if level in {"low", "very_low"}
-        ]
+        # Persist assignments with semantic labels as cluster_label
+        for stat_2022, cluster in zip(stat_2022_list, labels.tolist()):
+            await conn.execute(
+                """
+                INSERT INTO public.cluster_assignments (run_id, stat_2022, cluster, cluster_label)
+                VALUES ($1, $2, $3, $4)
+                """,
+                run_id,
+                stat_2022,
+                cluster,
+                semantic_labels[int(cluster)],
+            )
 
-        parts: list[str] = []
-        if high_dims:
-            parts.append("High in " + ", ".join(high_dims))
-        if low_dims:
-            parts.append("Low in " + ", ".join(low_dims))
-        if not parts:
-            parts.append("Balanced across dimensions")
-        short_description = ". ".join(parts)
-        name = _auto_cluster_name(cluster, profile)
+        # Persist initial cluster profiles with semantic labels and rich descriptions.
+        for cluster, profile in dimension_profiles.items():
+            label = semantic_labels[int(cluster)]
+            short_description = CLUSTER_DESCRIPTIONS.get(
+                label,
+                CLUSTER_DESCRIPTIONS["Residential - Secular"],
+            )
 
-        await conn.execute(
-            """
-            INSERT INTO public.cluster_profiles (run_id, cluster, name, short_description, dimensions)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (run_id, cluster) DO UPDATE
-            SET
-                name = EXCLUDED.name,
-                short_description = EXCLUDED.short_description,
-                dimensions = EXCLUDED.dimensions,
-                updated_at = NOW()
-            """,
-            run_id,
-            cluster,
-            name,
-            short_description,
-            json.dumps(profile),
-        )
+            await conn.execute(
+                """
+                INSERT INTO public.cluster_profiles (run_id, cluster, name, short_description, dimensions)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (run_id, cluster) DO UPDATE
+                SET
+                    name = EXCLUDED.name,
+                    short_description = EXCLUDED.short_description,
+                    dimensions = EXCLUDED.dimensions,
+                    updated_at = NOW()
+                """,
+                run_id,
+                cluster,
+                label,
+                short_description,
+                json.dumps(profile),
+            )
 
     assignments = [
-        {"stat_2022": s, "cluster": c, "cluster_label": f"Cluster_{c}"}
+        {
+            "stat_2022": s,
+            "cluster": c,
+            "cluster_label": semantic_labels[int(c)],
+        }
         for s, c in zip(stat_2022_list, labels.tolist())
     ]
 
@@ -285,7 +367,11 @@ async def run_clustering_pipeline(conn, k: int = 4) -> dict:
         "cluster_profiles": [
             {
                 "cluster": c,
-                "name": _auto_cluster_name(c, dimension_profiles[c]),
+                "name": semantic_labels[int(c)],
+                "short_description": CLUSTER_DESCRIPTIONS.get(
+                    semantic_labels[int(c)],
+                    CLUSTER_DESCRIPTIONS["Residential - Secular"],
+                ),
                 "dimensions": dimension_profiles[c],
             }
             for c in sorted(dimension_profiles.keys())

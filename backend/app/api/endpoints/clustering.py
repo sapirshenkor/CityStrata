@@ -19,8 +19,7 @@ async def run_clustering(k: int = Query(4, ge=2, le=10, description="Number of c
     pool = get_pool()
     try:
         async with pool.acquire() as conn:
-            async with conn.transaction():
-                result = await run_clustering_pipeline(conn, k=k)
+            result = await run_clustering_pipeline(conn, k=k)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -153,4 +152,91 @@ async def get_latest_run():
             "davies_bouldin_score": float(row["davies_bouldin_score"]) if row["davies_bouldin_score"] is not None else None,
             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
         }
+    }
+
+
+@router.get("/full")
+async def get_full_clustering(
+    run_id: UUID | None = Query(None, description="Run ID; if omitted, latest run is used"),
+):
+    """
+    Get assignments and profiles joined in a single response.
+    Each area includes its full cluster profile embedded directly.
+    """
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        if run_id is None:
+            run = await conn.fetchrow(
+                """
+                SELECT id, k FROM public.clustering_runs
+                ORDER BY created_at DESC
+                LIMIT 1
+                """
+            )
+            if not run:
+                return {"run_id": None, "k": None, "profiles": [], "areas": []}
+            run_id = run["id"]
+            k = run["k"]
+        else:
+            run = await conn.fetchrow(
+                "SELECT k FROM public.clustering_runs WHERE id = $1", run_id
+            )
+            if not run:
+                raise HTTPException(status_code=404, detail="Run not found")
+            k = run["k"]
+
+        profiles_rows = await conn.fetch(
+            """
+            SELECT cluster, name, short_description, dimensions
+            FROM public.cluster_profiles
+            WHERE run_id = $1
+            ORDER BY cluster
+            """,
+            run_id,
+        )
+        assignments_rows = await conn.fetch(
+            """
+            SELECT stat_2022, cluster, cluster_label
+            FROM public.cluster_assignments
+            WHERE run_id = $1
+            ORDER BY stat_2022
+            """,
+            run_id,
+        )
+
+    # Build profile lookup by cluster id
+    profile_map = {
+        r["cluster"]: {
+            "name": r["name"],
+            "short_description": r["short_description"],
+            "dimensions": r["dimensions"],
+        }
+        for r in profiles_rows
+    }
+
+    profiles = [
+        {
+            "cluster": r["cluster"],
+            "name": r["name"],
+            "short_description": r["short_description"],
+            "dimensions": r["dimensions"],
+        }
+        for r in profiles_rows
+    ]
+
+    areas = [
+        {
+            "stat_2022": r["stat_2022"],
+            "cluster": r["cluster"],
+            "cluster_label": r["cluster_label"],
+            "profile": profile_map.get(r["cluster"]),
+        }
+        for r in assignments_rows
+    ]
+
+    return {
+        "run_id": str(run_id),
+        "k": k,
+        "profiles": profiles,
+        "areas": areas,
     }

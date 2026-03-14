@@ -12,7 +12,12 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClu
   const statToCluster = useMemo(() => {
     if (!clusterAssignments || !Array.isArray(clusterAssignments)) return null
     const m = new Map()
-    clusterAssignments.forEach((a) => m.set(a.stat_2022, a.cluster))
+    clusterAssignments.forEach((a) => {
+      const key = Number(a.stat_2022)
+      if (!Number.isNaN(key)) {
+        m.set(key, a.cluster)
+      }
+    })
     return m
   }, [clusterAssignments])
 
@@ -32,7 +37,7 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClu
   const style = useMemo(() => {
     const byCluster = showClusters && statToCluster
     return (feature) => {
-      const stat2022 = feature.properties.stat_2022
+      const stat2022 = Number(feature.properties.stat_2022)
       const isSelected = selectedArea === stat2022
       if (byCluster) {
         const cluster = statToCluster.get(stat2022)
@@ -67,7 +72,7 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClu
   }, [areaFilter, filteredData, map])
 
   const onEachFeature = (feature, layer) => {
-    const stat2022 = feature.properties.stat_2022
+    const stat2022 = Number(feature.properties.stat_2022)
     
     // Add label at centroid (only once per area)
     if (!labelsRef.current.has(stat2022)) {
@@ -118,13 +123,9 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClu
       assignment?.cluster_name ??
       assignment?.cluster_label ??
       (cluster !== undefined ? `Cluster ${cluster}` : null)
-    const clusterDescription = assignment?.cluster_description
-
     const tooltipText =
       showClusters && cluster !== undefined && clusterName
-        ? `Area ${stat2022} · ${clusterName}${
-            clusterDescription ? `\n${clusterDescription}` : ''
-          }`
+        ? clusterName
         : `Area ${stat2022}`
 
     layer.bindTooltip(tooltipText, {
