@@ -16,6 +16,7 @@ from app.api.endpoints import (
     synagogues,
     clustering,
     matching,
+    evacuee_family_profiles,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -34,3 +35,4 @@ api_router.include_router(osm_facilities.router)
 api_router.include_router(synagogues.router)
 api_router.include_router(clustering.router)
 api_router.include_router(matching.router)
+api_router.include_router(evacuee_family_profiles.router)
