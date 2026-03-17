@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel
 
 from app.core.config import settings
+from app.models.evacuee_family_profiles import EvacueeFamilyProfileBase
 
 # OpenAI client; initialized lazily so app can start without key when matching is unused
 _client: AsyncOpenAI | None = None
@@ -27,44 +28,8 @@ def _get_openai_client() -> AsyncOpenAI:
 
 
 # ---------------------------------------------------------------------------
-# Family profile (input)
+# Evacuee family profile (input)
 # ---------------------------------------------------------------------------
-
-
-class ChildrenAges(BaseModel):
-    """Number of children in each age band."""
-
-    infants: int = 0      # 0–3
-    preschool: int = 0    # 3–6
-    elementary: int = 0   # 6–12
-    youth: int = 0        # 12–18
-
-
-class FamilyProfile(BaseModel):
-    """Family profile used for cluster matching."""
-
-    # Composition
-    total_people: int
-    children_ages: ChildrenAges
-    seniors: int = 0
-    has_mobility_disability: bool = False
-
-    # Mobility
-    has_car: bool = True
-
-    # Religious & cultural
-    religious_affiliation: str  # secular / traditional / religious / haredi
-    needs_synagogue: bool = False
-    matnas_participation: bool = False
-
-    # Priorities (1–5)
-    education_proximity_importance: int = 3
-    social_venues_importance: int = 3
-    services_importance: int = 3
-
-    # Accommodation
-    accommodation_preference: str = "airbnb"  # airbnb / hotel
-    needs_medical_proximity: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -113,25 +78,34 @@ class Agent1Response(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _format_family_profile_text(family: FamilyProfile) -> str:
+def _format_family_profile_text(family: EvacueeFamilyProfileBase) -> str:
     """
     Convert the family profile into readable natural language for the prompt.
     Omits children/seniors if counts are zero.
     """
     parts = [f"The family has {family.total_people} members."]
 
-    c = family.children_ages
-    has_children = c.infants or c.preschool or c.elementary or c.youth
+    has_children = family.infants or family.preschool or family.elementary or family.youth
     if has_children:
         segs = []
-        if c.infants:
-            segs.append(f"{c.infants} infant(s)" if c.infants > 1 else "1 infant")
-        if c.preschool:
-            segs.append(f"{c.preschool} preschool child/children" if c.preschool > 1 else "1 preschool child")
-        if c.elementary:
-            segs.append(f"{c.elementary} elementary school child/children" if c.elementary > 1 else "1 elementary school child")
-        if c.youth:
-            segs.append(f"{c.youth} youth" if c.youth > 1 else "1 youth")
+        if family.infants:
+            segs.append(
+                f"{family.infants} infant(s)" if family.infants > 1 else "1 infant"
+            )
+        if family.preschool:
+            segs.append(
+                f"{family.preschool} preschool child/children"
+                if family.preschool > 1
+                else "1 preschool child"
+            )
+        if family.elementary:
+            segs.append(
+                f"{family.elementary} elementary school child/children"
+                if family.elementary > 1
+                else "1 elementary school child"
+            )
+        if family.youth:
+            segs.append(f"{family.youth} youth" if family.youth > 1 else "1 youth")
         parts.append(" Including " + ", ".join(segs) + ".")
 
     if family.seniors > 0:
@@ -208,7 +182,7 @@ Return exactly one JSON object with these keys (no markdown, no backticks, no pr
 
 
 async def match_family_to_cluster(
-    family_profile: FamilyProfile,
+    family_profile: EvacueeFamilyProfileBase,
     cluster_profiles: list[ClusterProfile],
 ) -> Agent1Response:
     """

@@ -21,6 +21,7 @@ def _row_to_profile(row) -> EvacueeFamilyProfile:
         uuid=row["uuid"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        selected_matching_result_id=row["selected_matching_result_id"],
         family_name=row["family_name"],
         contact_name=row["contact_name"],
         contact_phone=row["contact_phone"],
@@ -54,7 +55,7 @@ def _row_to_profile(row) -> EvacueeFamilyProfile:
 
 
 _SELECT_COLS = """
-    id, uuid, created_at, updated_at,
+    id, uuid, created_at, updated_at, selected_matching_result_id,
     family_name, contact_name, contact_phone, contact_email, home_stat_2022,
     city_name, home_address,
     total_people, infants, preschool, elementary, youth, adults, seniors,

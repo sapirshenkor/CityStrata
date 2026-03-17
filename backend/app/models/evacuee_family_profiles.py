@@ -81,5 +81,6 @@ class EvacueeFamilyProfile(EvacueeFamilyProfileBase):
     uuid: UUID
     created_at: datetime
     updated_at: datetime
+    selected_matching_result_id: Optional[UUID] = None
 
     model_config = ConfigDict(from_attributes=True) # Replaces Config: orm_mode = True for Pydantic V2
