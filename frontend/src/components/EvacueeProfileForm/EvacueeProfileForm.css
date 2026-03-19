@@ -1,0 +1,245 @@
+.evpf-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px;
+    max-width: 720px;
+  }
+  
+  .evpf-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+  
+  .evpf-title {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+    font-weight: 700;
+  }
+  
+  .evpf-stepinfo {
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+    margin-top: 4px;
+  }
+  
+  .evpf-stepsbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  
+  .evpf-stepdot {
+    width: 28px;
+    height: 6px;
+    border-radius: 999px;
+    background: #e9ecef;
+  }
+  
+  .evpf-stepdot.active {
+    background: #667eea;
+  }
+  
+  .evpf-error-banner {
+    margin: 12px 0;
+    padding: 12px;
+    background: #fee;
+    border-radius: 6px;
+    color: #d32f2f;
+    font-size: 14px;
+  }
+  
+  .evpf-success-banner {
+    margin: 12px 0;
+    padding: 12px;
+    background: #e8f5e9;
+    border-radius: 6px;
+    color: #2e7d32;
+    font-size: 14px;
+  }
+  
+  .evpf-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  
+  @media (min-width: 640px) {
+    .evpf-grid.sm2 {
+      grid-template-columns: 1fr 1fr;
+    }
+  
+    .evpf-span2 {
+      grid-column: span 2;
+    }
+  }
+  
+  .evpf-field label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 6px;
+  }
+  
+  .evpf-input,
+  .evpf-select,
+  .evpf-textarea {
+    width: 100%;
+    padding: 10px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    box-sizing: border-box;
+    outline: none;
+  }
+  
+  .evpf-input:focus,
+  .evpf-select:focus,
+  .evpf-textarea:focus {
+    border-color: #667eea;
+  }
+  
+  .evpf-error {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #d32f2f;
+    font-weight: 500;
+  }
+  
+  .evpf-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  
+  .evpf-btn {
+    padding: 10px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 700;
+    border: none;
+    font-size: 14px;
+  }
+  
+  .evpf-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .evpf-btn.secondary {
+    background: #fff;
+    border: 1px solid #dcdcdc;
+    color: #333;
+  }
+  
+  .evpf-btn.secondary:hover:not(:disabled) {
+    background: #f6f6f6;
+  }
+  
+  .evpf-btn.primary {
+    background: #667eea;
+    color: #fff;
+  }
+  
+  .evpf-btn.primary:hover:not(:disabled) {
+    background: #5568d3;
+  }
+  
+  .evpf-btn.success {
+    background: #52be80;
+    color: #fff;
+  }
+  
+  .evpf-btn.success:hover:not(:disabled) {
+    background: #45a069;
+  }
+  
+  .evpf-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+  }
+  
+  .evpf-radioRow {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  
+  .evpf-radioCard {
+    flex: 1;
+    min-width: 220px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    background: #fafafa;
+    transition: background 0.2s;
+  }
+  
+  .evpf-radioCard:hover {
+    background: #f2f6ff;
+  }
+  
+  .evpf-radioCard input {
+    margin-right: 10px;
+  }
+  
+  .evpf-sliderRow {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .evpf-sliderTop {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: baseline;
+  }
+  
+  .evpf-sliderValue {
+    font-weight: 800;
+    color: #333;
+    font-size: 14px;
+  }
+  
+  .evpf-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .evpf-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #f0f4ff;
+    border: 1px solid #e0e7ff;
+    font-size: 13px;
+    color: #333;
+    font-weight: 600;
+  }
+  
+  .evpf-chip button {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #777;
+    font-size: 16px;
+    line-height: 1;
+  }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import AreaDetails from './AreaDetails'
 import FilterPanel from './FilterPanel'
 import EvacuationPlanner from './EvacuationPlanner'
+import EvacueeProfileForm from '../EvacueeProfileForm'
 import { useOSMFacilityTypes } from '../../hooks/useMapData'
 import { runClustering } from '../../services/api'
 import './Sidebar.css'
@@ -109,6 +110,12 @@ function Sidebar({
           onClick={() => setActiveTab('evacuation')}
         >
           Evacuation
+        </button>
+        <button
+          className={activeTab === 'evacuee-profile' ? 'active' : ''}
+          onClick={() => setActiveTab('evacuee-profile')}
+        >
+          Form
         </button>
       </div>
 
@@ -381,6 +388,7 @@ function Sidebar({
         )}
 
         {activeTab === 'evacuation' && <EvacuationPlanner />}
+        {activeTab === 'evacuee-profile' && <EvacueeProfileForm />}
       </div>
     </div>
   )

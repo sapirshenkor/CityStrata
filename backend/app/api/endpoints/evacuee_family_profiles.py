@@ -124,7 +124,7 @@ async def create_evacuee_family_profile(body: EvacueeFamilyProfileCreate):
                     $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
                     $27, $28, $29
                 )
-                RETURNING id, uuid, created_at, updated_at,
+                RETURNING id, uuid, created_at, updated_at, selected_matching_result_id,
                     family_name, contact_name, contact_phone, contact_email, home_stat_2022,
                     city_name, home_address,
                     total_people, infants, preschool, elementary, youth, adults, seniors,
