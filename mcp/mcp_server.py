@@ -13,7 +13,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -22,15 +28,17 @@ from uuid import UUID
 import asyncpg
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
-from openai import AsyncOpenAI
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
 
+# MCP uses stdio for JSON-RPC — never write logs to stdout (breaks the protocol).
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    stream=sys.stderr,
+    force=True,
 )
 logger = logging.getLogger("citystrata_mcp")
 
@@ -71,12 +79,11 @@ def _require_env(name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# DB pool + OpenAI (lazy singletons)
+# DB pool + embeddings (stdlib urllib in thread executor — see _embed_text)
 # ---------------------------------------------------------------------------
 
 _pool: Optional[asyncpg.Pool] = None
 _pool_lock = asyncio.Lock()
-_openai_client: Optional[AsyncOpenAI] = None
 
 
 async def _get_pool() -> asyncpg.Pool:
@@ -84,33 +91,107 @@ async def _get_pool() -> asyncpg.Pool:
     async with _pool_lock:
         if _pool is None:
             dsn = _require_env("DATABASE_URL")
+            logger.info("Creating asyncpg pool (timeout 60s for first connection)...")
+            # statement_timeout at pool startup survives PgBouncer transaction pooling better than
+            # SET LOCAL inside a transaction (which can be ignored or reset per transaction).
             _pool = await asyncpg.create_pool(
                 dsn=dsn,
                 min_size=1,
                 max_size=5,
                 command_timeout=120,
                 statement_cache_size=0,
+                timeout=60,
+                server_settings={
+                    # PostgreSQL accepts e.g. '120s'; aligns with command_timeout above.
+                    "statement_timeout": "120s",
+                },
             )
             logger.info("asyncpg pool created")
         return _pool
 
 
-def _get_openai() -> AsyncOpenAI:
-    global _openai_client
-    if _openai_client is None:
-        _openai_client = AsyncOpenAI(api_key=_require_env("OPENAI_API_KEY"))
-    return _openai_client
+def _embed_text_sync(text: str) -> list[float]:
+    """Pure stdlib HTTP POST — bypasses httpx (can stall in Windows MCP child with piped stdout)."""
+    api_key = _require_env("OPENAI_API_KEY")
+    payload = json.dumps(
+        {
+            "model": _EMBEDDING_MODEL,
+            "input": text,
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/embeddings",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"OpenAI embeddings HTTP {e.code}: {err_body[:800]}"
+        ) from e
+    data = json.loads(raw)
+    return list(data["data"][0]["embedding"])
 
 
 async def _embed_text(text: str) -> list[float]:
-    client = _get_openai()
-    resp = await client.embeddings.create(model=_EMBEDDING_MODEL, input=text)
-    return list(resp.data[0].embedding)
+    """Run stdlib HTTP in a thread pool so the event loop stays responsive under MCP stdio."""
+    loop = asyncio.get_running_loop()
+    return await asyncio.wait_for(
+        loop.run_in_executor(None, _embed_text_sync, text),
+        timeout=90.0,
+    )
 
 
 def _vector_literal(vec: list[float]) -> str:
     """Serialize embedding for pgvector cast in SQL ($1::vector)."""
     return json.dumps(vec)
+
+
+def _approx_lat_lng_bounds(
+    center_lat: float,
+    center_lng: float,
+    radius_km: float,
+    *,
+    pad: float = 1.25,
+) -> tuple[float, float, float, float]:
+    """
+    Rough WGS84 bounding box (degrees) for cheap SQL prefiltering before
+    ST_DWithin / ::geography on large tables. Pad slightly so we do not miss edge cases.
+    """
+    dlat = (radius_km / 111.0) * pad
+    cl = math.cos(math.radians(center_lat))
+    denom = 111.0 * max(0.2, cl)
+    dlon = (radius_km / denom) * pad
+    lat_min = center_lat - dlat
+    lat_max = center_lat + dlat
+    lng_min = center_lng - dlon
+    lng_max = center_lng + dlon
+    return (lat_min, lat_max, lng_min, lng_max)
+
+
+def _mcp_stderr(msg: str) -> None:
+    """Visible progress when running with tactical_agent --forward-server-stderr."""
+    print(msg, file=sys.stderr, flush=True)
+
+
+# Debug trace file — avoids stderr pipe deadlocks on Windows when MCP stdio is used.
+_DEBUG_LOG = Path(tempfile.gettempdir()) / "citystrata_mcp_debug.log"
+
+
+def _dbg(msg: str) -> None:
+    """Append to temp file — safe on Windows; use to pinpoint hangs without --forward-server-stderr."""
+    try:
+        with _DEBUG_LOG.open("a", encoding="utf-8") as f:
+            f.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -207,13 +288,6 @@ def _resolve_table(table_name: str) -> TableSpec:
     return TABLE_REGISTRY[key]
 
 
-def _geog_point(alias: str, spec: TableSpec) -> str:
-    return (
-        f"geography(ST_SetSRID(ST_MakePoint({alias}.{spec.lng_col}, "
-        f"{alias}.{spec.lat_col}), 4326))"
-    )
-
-
 # ---------------------------------------------------------------------------
 # MCP app
 # ---------------------------------------------------------------------------
@@ -236,6 +310,7 @@ async def get_family_tactical_context(family_id: str) -> dict[str, Any]:
     Args:
         family_id: evacuee_family_profiles.uuid as string.
     """
+    logger.info("Tool get_family_tactical_context start family_id=%r", family_id)
     try:
         fid = UUID(str(family_id).strip())
     except ValueError as e:
@@ -289,6 +364,7 @@ async def get_family_tactical_context(family_id: str) -> dict[str, Any]:
         )
 
     if not row:
+        logger.info("Tool get_family_tactical_context done ok=False (profile not found)")
         return {
             "ok": False,
             "error": f"No evacuee_family_profiles row for uuid={family_id}",
@@ -401,6 +477,11 @@ async def get_family_tactical_context(family_id: str) -> dict[str, Any]:
                 "No statistical areas found for this run/cluster; cluster center unknown."
             )
 
+    logger.info(
+        "Tool get_family_tactical_context done ok=True family=%s cluster_center=%s",
+        family_needs.get("family_uuid"),
+        cluster_center is not None,
+    )
     return {
         "ok": True,
         "family_needs": family_needs,
@@ -428,46 +509,147 @@ async def search_nearby_amenities(
         center_lat / center_lng: Search center (WGS84).
         radius_km: Radius in kilometers (default 2.0).
     """
+    logger.info(
+        "Tool search_nearby_amenities start table=%s radius_km=%s",
+        table_name,
+        radius_km,
+    )
+    _dbg(f"search_nearby_amenities: START table={table_name} radius_km={radius_km}")
+    _mcp_stderr(
+        f"[mcp] search_nearby_amenities: start table={table_name!r} "
+        f"radius_km={radius_km} — embedding via OpenAI…"
+    )
     spec = _resolve_table(table_name)
     if radius_km <= 0:
         raise ValueError("radius_km must be positive")
 
-    vec = await _embed_text(query_text)
+    t0 = time.monotonic()
+    _dbg("search_nearby_amenities: calling OpenAI embed...")
+    try:
+        # Hard cap even if httpx misbehaves
+        vec = await asyncio.wait_for(_embed_text(query_text), timeout=75.0)
+    except asyncio.TimeoutError as e:
+        _dbg("search_nearby_amenities: OpenAI TIMED OUT after 75s")
+        logger.warning("OpenAI embedding timed out after 75s")
+        raise RuntimeError(
+            "OpenAI embedding timed out after 75s — check network, API key, or proxy."
+        ) from e
+    embed_ms = (time.monotonic() - t0) * 1000.0
+    _dbg(f"search_nearby_amenities: OpenAI OK in {embed_ms:.0f}ms")
+    logger.info(
+        "search_nearby_amenities: OpenAI embedding done in %.0f ms", embed_ms
+    )
+    _mcp_stderr(
+        f"[mcp] search_nearby_amenities: OpenAI OK ({embed_ms:.0f} ms) — Postgres spatial + vector…"
+    )
     vec_lit = _vector_literal(vec)
     radius_m = float(radius_km) * 1000.0
+    lat_min, lat_max, lng_min, lng_max = _approx_lat_lng_bounds(
+        center_lat, center_lng, float(radius_km)
+    )
 
-    geo_center = "geography(ST_SetSRID(ST_MakePoint($3, $2), 4326))"
-    geo_row = _geog_point("t", spec)
+    # Two-phase query: (1) spatial-only candidate PKs (GiST-friendly), (2) vector sort on ≤500 rows.
+    # One nested SQL mixing vector ORDER BY with spatial filters often produces bad plans on remote DBs.
+    geo_center_ph = "geography(ST_SetSRID(ST_MakePoint($2, $1), 4326))"
+    bbox_clip_ph = """ST_MakeEnvelope(
+            $2::double precision - (
+                ($3::double precision / 1000.0) / (111.0 * cos(radians($1::double precision)))
+            ) * 1.25,
+            $1::double precision - (($3::double precision / 1000.0) / 111.0) * 1.25,
+            $2::double precision + (
+                ($3::double precision / 1000.0) / (111.0 * cos(radians($1::double precision)))
+            ) * 1.25,
+            $1::double precision + (($3::double precision / 1000.0) / 111.0) * 1.25,
+            4326
+        )"""
 
-    # Whitelisted table + columns only
-    sql = f"""
+    # Cheap numeric prefilter on lat/lng columns (all registry tables have them) so the planner
+    # does not evaluate geography casts / ST_DWithin on unrelated rows (major win on remote DBs).
+    sql_candidates = f"""
+        SELECT t.{spec.pk_column} AS pk
+        FROM {spec.sql_name} t
+        WHERE t.embedding IS NOT NULL
+          AND t.location IS NOT NULL
+          AND t.{spec.lat_col}::double precision BETWEEN $4::double precision AND $5::double precision
+          AND t.{spec.lng_col}::double precision BETWEEN $6::double precision AND $7::double precision
+          AND t.location && {bbox_clip_ph}
+          AND ST_DWithin(
+                t.location::geography,
+                {geo_center_ph},
+                $3::double precision
+              )
+        LIMIT 500
+    """
+
+    sql_rank = f"""
         SELECT
             t.{spec.pk_column}::text AS listing_id,
             {spec.label_sql} AS label,
             {spec.address_sql} AS address,
             (t.embedding <=> $1::vector) AS cosine_distance,
-            ST_Distance({geo_row}, {geo_center}) / 1000.0 AS distance_km
+            ST_Distance(t.location::geography, geography(ST_SetSRID(ST_MakePoint($3, $2), 4326))) / 1000.0 AS distance_km
         FROM {spec.sql_name} t
-        WHERE t.embedding IS NOT NULL
-          AND ST_DWithin(
-                {geo_row},
-                {geo_center},
-                $4::double precision
-              )
+        WHERE t.{spec.pk_column} = ANY($4::uuid[])
         ORDER BY t.embedding <=> $1::vector ASC
         LIMIT 5
     """
 
+    _mcp_stderr(
+        "[mcp] About to hit Postgres — if this is the last line you see, it's the DB query"
+    )
+    _dbg("search_nearby_amenities: calling _get_pool()...")
     pool = await _get_pool()
+    _dbg("search_nearby_amenities: got pool, acquiring connection...")
+    t1 = time.monotonic()
     async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            sql,
-            vec_lit,
-            center_lat,
-            center_lng,
-            radius_m,
+        _dbg(
+            "search_nearby_amenities: connection acquired, running SQL phase 1 (spatial candidates)..."
         )
-
+        async with conn.transaction():
+            id_rows = await conn.fetch(
+                sql_candidates,
+                center_lat,
+                center_lng,
+                radius_m,
+                lat_min,
+                lat_max,
+                lng_min,
+                lng_max,
+            )
+            pks = [r["pk"] for r in id_rows]
+            _dbg(
+                f"search_nearby_amenities: SQL phase 1 done — {len(pks)} candidates "
+                f"in {(time.monotonic() - t1) * 1000.0:.0f}ms"
+            )
+            logger.info(
+                "search_nearby_amenities: spatial candidates=%s (table=%s)",
+                len(pks),
+                spec.sql_name,
+            )
+            if not pks:
+                rows = []
+            else:
+                _dbg("search_nearby_amenities: running SQL phase 2 (vector rank)...")
+                rows = await conn.fetch(
+                    sql_rank,
+                    vec_lit,
+                    center_lat,
+                    center_lng,
+                    pks,
+                )
+                _dbg(
+                    f"search_nearby_amenities: SQL phase 2 done — {len(rows)} rows"
+                )
+    _dbg("search_nearby_amenities: DONE")
+    query_ms = (time.monotonic() - t1) * 1000.0
+    logger.info(
+        "search_nearby_amenities: DB query done in %.0f ms (rows=%s)",
+        query_ms,
+        len(rows),
+    )
+    _mcp_stderr(
+        f"[mcp] search_nearby_amenities: Postgres OK ({query_ms:.0f} ms, {len(rows)} row(s))."
+    )
     results: list[dict[str, Any]] = []
     for r in rows:
         results.append(
@@ -484,6 +666,11 @@ async def search_nearby_amenities(
             }
         )
 
+    logger.info(
+        "Tool search_nearby_amenities done table=%s count=%s",
+        spec.sql_name,
+        len(results),
+    )
     return {
         "ok": True,
         "table_name": spec.sql_name,
@@ -494,6 +681,103 @@ async def search_nearby_amenities(
         "results": results,
         "count": len(results),
     }
+
+
+# Family profiles store essential_education in Hebrew; educational_institutions.education_phase
+# uses English phrases — map so ILIKE can match both.
+_HEBREW_EDUCATION_TAG_TO_ENGLISH: dict[str, str] = {
+    "גן ילדים": "kindergarten",
+    "בית ספר יסודי": "elementary school",
+    "חטיבה": "high school",
+    "תיכון": "high school",
+}
+
+
+def _great_circle_distance_km(
+    lat1: float, lon1: float, lat2: float, lon2: float
+) -> float:
+    """Haversine distance in km (WGS84)."""
+    rlat1, rlon1 = math.radians(lat1), math.radians(lon1)
+    rlat2, rlon2 = math.radians(lat2), math.radians(lon2)
+    dlat = rlat2 - rlat1
+    dlon = rlon2 - rlon1
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(rlat1) * math.cos(rlat2) * math.sin(dlon / 2) ** 2
+    )
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(max(0.0, 1.0 - a)))
+    return 6371.0 * c
+
+
+async def _fetch_cluster_center_lat_lng(
+    conn: asyncpg.Connection, fam_uuid: UUID
+) -> Optional[tuple[float, float]]:
+    """Same cluster centroid as get_family_tactical_context (macro run + cluster #)."""
+    row = await conn.fetchrow(
+        """
+        SELECT mr.run_id, mr.recommended_cluster_number
+        FROM evacuee_family_profiles efp
+        LEFT JOIN matching_results mr ON mr.id = efp.selected_matching_result_id
+        WHERE efp.uuid = $1::uuid
+        """,
+        fam_uuid,
+    )
+    if (
+        not row
+        or row["run_id"] is None
+        or row["recommended_cluster_number"] is None
+    ):
+        return None
+    crow = await conn.fetchrow(
+        """
+        SELECT
+            AVG(
+                ST_Y(COALESCE(sa.centroid, ST_Centroid(sa.geom)))
+            ) AS center_lat,
+            AVG(
+                ST_X(COALESCE(sa.centroid, ST_Centroid(sa.geom)))
+            ) AS center_lng,
+            COUNT(*)::int AS area_count
+        FROM cluster_assignments ca
+        JOIN statistical_areas sa
+          ON sa.stat_2022 = ca.stat_2022
+         AND sa.semel_yish = 2600
+        WHERE ca.run_id = $1::uuid
+          AND ca.cluster = $2
+        """,
+        UUID(str(row["run_id"])),
+        int(row["recommended_cluster_number"]),
+    )
+    if (
+        not crow
+        or not crow["area_count"]
+        or crow["center_lat"] is None
+        or crow["center_lng"] is None
+    ):
+        return None
+    return float(crow["center_lat"]), float(crow["center_lng"])
+
+
+def _education_tag_search_patterns(tag: str) -> list[str]:
+    """
+    Return distinct substring patterns for SQL ILIKE: original tag plus DB English equivalent if known.
+    Order: original first, then English (deduplicated).
+    """
+    t = tag.strip()
+    if not t:
+        return []
+    patterns: list[str] = [t]
+    en = _HEBREW_EDUCATION_TAG_TO_ENGLISH.get(t)
+    if en and en not in patterns:
+        patterns.append(en)
+    # Preserve order, unique
+    seen: set[str] = set()
+    out: list[str] = []
+    for p in patterns:
+        if p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
 
 
 async def _nearest_distance_km(
@@ -531,8 +815,9 @@ async def _count_schools_near(
 ) -> tuple[int, int]:
     """
     Returns (all_schools_count, matching_tag_count) within radius.
-    Matching uses case-insensitive substring match of any essential_education tag
-    against education_phase or type_of_education.
+    Matching uses case-insensitive substring match on education_phase or type_of_education
+    for each essential_education tag, including the Hebrew profile text and its English
+    education_phase equivalent (see _HEBREW_EDUCATION_TAG_TO_ENGLISH).
     """
     radius_m = radius_km * 1000.0
     tags = [t.strip() for t in essential_education if t and str(t).strip()]
@@ -551,13 +836,27 @@ async def _count_schools_near(
     if not tags:
         return all_c, all_c
 
-    tag_conditions = " OR ".join(
-        [f"(ei.education_phase ILIKE ${i} OR ei.type_of_education ILIKE ${i})"
-         for i in range(4, 4 + len(tags))]
-    )
+    # Per family tag: OR together ILIKE on Hebrew + English DB terms (same tag slot).
+    tag_groups: list[str] = []
     params: list[Any] = [lat, lng, radius_m]
+    pi = 4
     for tag in tags:
-        params.append(f"%{tag}%")
+        patterns = _education_tag_search_patterns(tag)
+        if not patterns:
+            continue
+        inner_parts: list[str] = []
+        for pat in patterns:
+            inner_parts.append(
+                f"(ei.education_phase ILIKE ${pi} OR ei.type_of_education ILIKE ${pi})"
+            )
+            params.append(f"%{pat}%")
+            pi += 1
+        tag_groups.append("(" + " OR ".join(inner_parts) + ")")
+
+    if not tag_groups:
+        return all_c, all_c
+
+    tag_conditions = " OR ".join(tag_groups)
 
     match_q = f"""
         SELECT COUNT(*)::int AS c
@@ -584,11 +883,25 @@ async def calculate_location_score(
     Score a specific listing against a family's tactical needs using nearby
     schools (educational_institutions), synagogues, and matnasim.
 
+    School matching: family ``essential_education`` tags are often Hebrew (e.g. גן ילדים),
+    while ``educational_institutions.education_phase`` stores English (e.g. kindergarten).
+    The scorer ILIKE-matches each tag against both the Hebrew text and its mapped English
+    phrase so counts align with the database.
+
+    Synagogue/matnas bonuses use tight distance bands; listings farther than **1.5 km** from the
+    macro **cluster center** incur **0.5** points penalty per additional km (capped with the
+    final 0–10 score).
+
     Args:
         listing_id: Primary key of the listing row (uuid string for most tables).
         listing_table: Whitelisted table name (e.g. airbnb_listings).
         family_id: evacuee_family_profiles.uuid as string.
     """
+    logger.info(
+        "Tool calculate_location_score start table=%s listing_id=%s",
+        listing_table,
+        listing_id,
+    )
     try:
         fam_uuid = UUID(str(family_id).strip())
     except ValueError as e:
@@ -596,6 +909,10 @@ async def calculate_location_score(
 
     spec = _resolve_table(listing_table)
     pool = await _get_pool()
+
+    clat: Optional[float] = None
+    clng: Optional[float] = None
+    geo_dist_km: Optional[float] = None
 
     async with pool.acquire() as conn:
         # Fetch listing coordinates (all whitelisted asset tables use UUID PKs)
@@ -678,6 +995,11 @@ async def calculate_location_score(
             lng_col="location_lng",
         )
 
+        cluster_xy = await _fetch_cluster_center_lat_lng(conn, fam_uuid)
+        if cluster_xy:
+            clat, clng = cluster_xy
+            geo_dist_km = _great_circle_distance_km(lat, lng, clat, clng)
+
     # Heuristic 0–10 score (transparent, adjustable)
     score = 5.0
     breakdown: list[str] = []
@@ -688,7 +1010,8 @@ async def calculate_location_score(
             add = min(3.0, weight_edu * match_schools)
             score += add
             breakdown.append(
-                f"Education: +{add:.2f} ({match_schools} phase/type matches within {radius_edu}km; "
+                f"Education: +{add:.2f} ({match_schools} phase/type matches within {radius_edu}km "
+                f"(Hebrew essential_education + English education_phase); "
                 f"{all_schools} schools total nearby)"
             )
         elif all_schools > 0:
@@ -696,7 +1019,8 @@ async def calculate_location_score(
             score += add
             breakdown.append(
                 f"Education: +{add:.2f} ({all_schools} schools within {radius_edu}km, "
-                f"no direct tag match on essential_education)"
+                f"no ILIKE match for essential tags vs education_phase/type "
+                f"(including Hebrew↔English mappings)"
             )
         else:
             score -= 1.0
@@ -715,12 +1039,16 @@ async def calculate_location_score(
     synagogue_relevant = needs_syn or religious in {"religious", "haredi", "traditional"}
     if synagogue_relevant:
         if syn_km is not None:
-            if syn_km <= 0.5:
+            if syn_km <= 0.2:
                 score += 1.8
-                breakdown.append(f"Synagogue: +1.80 (nearest ~{syn_km:.2f}km)")
-            elif syn_km <= 1.5:
+                breakdown.append(
+                    f"Synagogue: +1.80 (nearest ~{syn_km:.2f}km, ≤200m tier)"
+                )
+            elif syn_km <= 0.8:
                 score += 1.0
-                breakdown.append(f"Synagogue: +1.00 (nearest ~{syn_km:.2f}km)")
+                breakdown.append(
+                    f"Synagogue: +1.00 (nearest ~{syn_km:.2f}km, 200m–800m tier)"
+                )
             elif syn_km <= 3.0:
                 score += 0.3
                 breakdown.append(f"Synagogue: +0.30 (nearest ~{syn_km:.2f}km)")
@@ -734,18 +1062,40 @@ async def calculate_location_score(
     community_relevant = matnas_part or needs_comm or social_imp >= 4
     if community_relevant:
         if mat_km is not None:
-            if mat_km <= 1.0:
+            if mat_km <= 0.5:
                 score += 1.5
-                breakdown.append(f"Matnas: +1.50 (nearest ~{mat_km:.2f}km)")
-            elif mat_km <= 2.5:
+                breakdown.append(
+                    f"Matnas: +1.50 (nearest ~{mat_km:.2f}km, ≤500m tier)"
+                )
+            elif mat_km <= 1.5:
                 score += 0.7
-                breakdown.append(f"Matnas: +0.70 (nearest ~{mat_km:.2f}km)")
+                breakdown.append(
+                    f"Matnas: +0.70 (nearest ~{mat_km:.2f}km, 500m–1.5km tier)"
+                )
             else:
                 score -= 0.4
                 breakdown.append(f"Matnas: -0.40 (nearest ~{mat_km:.2f}km)")
         else:
             score -= 0.5
             breakdown.append("Matnas: -0.50 (no matnasim reachable)")
+
+    cluster_penalty = 0.0
+    if geo_dist_km is not None:
+        if geo_dist_km > 1.5:
+            cluster_penalty = 0.5 * (geo_dist_km - 1.5)
+            score -= cluster_penalty
+            breakdown.append(
+                f"Cluster center: -{cluster_penalty:.2f} "
+                f"({geo_dist_km:.2f}km from strategic centroid; 0.5 pts per km beyond 1.5km)"
+            )
+        else:
+            breakdown.append(
+                f"Cluster center: no penalty ({geo_dist_km:.2f}km from strategic centroid, ≤1.5km)"
+            )
+    else:
+        breakdown.append(
+            "Cluster center: no distance penalty (macro centroid unavailable for this profile)"
+        )
 
     score = max(0.0, min(10.0, score))
     score_rounded = round(score, 1)
@@ -756,6 +1106,11 @@ async def calculate_location_score(
         + ("; ".join(breakdown) if breakdown else "baseline only")
     )
 
+    logger.info(
+        "Tool calculate_location_score done score=%s listing=%s",
+        score_rounded,
+        listing_id,
+    )
     return {
         "ok": True,
         "score_out_of_10": score_rounded,
@@ -775,6 +1130,10 @@ async def calculate_location_score(
             "schools_tag_matches_nearby": match_schools,
             "nearest_synagogue_km": syn_km,
             "nearest_matnas_km": mat_km,
+            "distance_km_from_cluster_center": geo_dist_km,
+            "cluster_center_penalty_points": round(cluster_penalty, 1),
+            "cluster_center_lat": clat,
+            "cluster_center_lng": clng,
         },
         "breakdown": breakdown,
     }
