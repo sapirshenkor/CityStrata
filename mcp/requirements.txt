@@ -1,4 +1,6 @@
-# CityStrata tactical MCP server
+# CityStrata tactical MCP server + agent
+# Note: mcp_server.py uses stdlib urllib for embeddings (no openai package needed there).
+# tactical_agent.py uses AsyncOpenAI (gpt-4o) for the grounded generation step.
 mcp>=1.2.0
 asyncpg>=0.29.0
 openai>=1.40.0
