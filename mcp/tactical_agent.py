@@ -1,21 +1,20 @@
 """
 CityStrata Tactical Relocation Agent
 
-Bridges macro cluster assignment to concrete housing options by calling the
-CityStrata MCP server tools (``mcp_server.py``) over stdio — no direct DB access.
+Orchestrates the three MCP tools into a holistic radius-based relocation
+recommendation that considers ALL amenity categories — education, religion,
+community, cafes, restaurants, city facilities, and medical services.
 
 Pipeline
 --------
-1. ``get_family_tactical_context``   — load profile + cluster anchor.
-2. ``search_nearby_amenities``       — discover Airbnb + hotel candidates.
-3. ``calculate_location_score``      — parallel scoring with bounded concurrency.
-4. ``gpt-4o`` generation             — grounded recommendation letter from DB facts.
-5. Markdown report                   — sorted by score DESC, then cluster distance ASC.
+1. get_evacuation_context   — full family profile + assigned cluster boundary
+2. discover_optimal_radius  — PostGIS K-means hubs across ALL amenities
+3. semantic_radius_scoring  — pgvector ranking against holistic family needs
+4. GPT-4o generation        — grounded Markdown recommendation report
 
 Usage
 -----
     python tactical_agent.py --family-id <uuid>
-    # or
     TACTICAL_SAMPLE_FAMILY_ID=<uuid> python tactical_agent.py
 """
 
@@ -29,126 +28,61 @@ import os
 import sys
 from contextlib import AsyncExitStack
 from pathlib import Path
-from typing import Any, Optional, TextIO
+from typing import Any, Optional
 
-from openai import AsyncOpenAI
 from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
-# On Windows, forwarding the MCP child's stderr through the pipe can deadlock
-# if nothing drains it.  Discard by default; use --forward-server-stderr to opt in.
-_MCP_SERVER_STDERR_SINK: TextIO = open(os.devnull, "w", encoding="utf-8")
-
-
-# ---------------------------------------------------------------------------
-# Path helpers
-# ---------------------------------------------------------------------------
-
+# ─── Path helpers ─────────────────────────────────────────────────────────────
 
 def _project_root() -> Path:
-    """Return the CityStrata project root (parent of the ``mcp/`` folder)."""
+    """CityStrata project root (parent of the mcp/ folder)."""
     return Path(__file__).resolve().parent.parent
 
 
 def _default_server_path() -> Path:
-    """Return the default ``mcp_server.py`` path (same directory as this file)."""
-    return (Path(__file__).resolve().parent / "mcp_server.py").resolve()
+    """mcp_server.py sits next to this file."""
+    return Path(__file__).resolve().parent / "mcp_server.py"
 
 
-# ---------------------------------------------------------------------------
-# Progress reporting
-# ---------------------------------------------------------------------------
-
+# ─── Progress output ──────────────────────────────────────────────────────────
 
 def _progress(msg: str) -> None:
-    """Print a progress line to stderr (stdout is reserved for the final report)."""
+    """Write a progress line to stderr (stdout is reserved for the final report)."""
     print(msg, file=sys.stderr, flush=True)
 
 
-# ---------------------------------------------------------------------------
-# Pre-flight smoke test
-# ---------------------------------------------------------------------------
-
-
-async def _smoke_openai_and_db() -> None:
-    """Verify OpenAI connectivity and Postgres access before spawning the MCP child.
-
-    Runs both checks in the parent process so failures are surfaced cleanly,
-    separate from any MCP transport issues.  Uses stdlib ``urllib`` (not httpx)
-    to match the server's behaviour on Windows.
-
-    Raises:
-        RuntimeError: If ``DATABASE_URL`` or ``OPENAI_API_KEY`` are missing,
-            or if either service is unreachable within the timeout.
+def _to_int(value: Any, default: int = 0) -> int:
     """
-    _progress("[tactical] Pre-flight: OpenAI embedding + Postgres (loads project .env)…")
-    root = _project_root()
-    load_dotenv(root / ".env")
-    load_dotenv(root / "mcp" / ".env")
+    Safely coerce a DB value to int.
 
-    dsn = os.getenv("DATABASE_URL", "").strip()
-    key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not dsn:
-        raise RuntimeError("DATABASE_URL missing. Add it to the project .env (same as backend).")
-    if not key:
-        raise RuntimeError("OPENAI_API_KEY missing. Add it to the project .env.")
-
-    def _openai_ping_sync() -> None:
-        import json as _json
-        import urllib.request
-
-        payload = _json.dumps(
-            {"model": "text-embedding-3-small", "input": "ping"}
-        ).encode("utf-8")
-        req = urllib.request.Request(
-            "https://api.openai.com/v1/embeddings",
-            data=payload,
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            _json.loads(resp.read())
-
-    loop = asyncio.get_running_loop()
-    await asyncio.wait_for(loop.run_in_executor(None, _openai_ping_sync), timeout=35.0)
-    _progress("[tactical] Pre-flight: OpenAI OK")
-
-    import asyncpg  # imported here to keep top-level imports minimal
-
-    conn = await asyncpg.connect(dsn=dsn, timeout=30, command_timeout=30, statement_cache_size=0)
+    Postgres numeric columns returned via asyncpg are usually int/float, but
+    some fields (e.g. culture_frequency stored as text) may arrive as strings.
+    Returns `default` for None, empty string, or any unparseable value.
+    """
+    if value is None:
+        return default
     try:
-        await conn.execute("SELECT 1")
-    finally:
-        await conn.close()
-    _progress("[tactical] Pre-flight: Postgres OK")
+        return int(value)
+    except (ValueError, TypeError):
+        return default
 
 
-# ---------------------------------------------------------------------------
-# MCP payload parsing
-# ---------------------------------------------------------------------------
+# ─── MCP response decoder ─────────────────────────────────────────────────────
 
+def _decode(result: Any) -> dict[str, Any]:
+    """
+    Decode an MCP call_tool result into a plain dict.
 
-def _parse_tool_payload(result: Any) -> dict[str, Any]:
-    """Decode an MCP ``call_tool`` result into a plain dict.
-
-    FastMCP may return either ``structuredContent`` (a dict) or a list of
-    text content blocks containing JSON.  Both forms are handled here.
-
-    Args:
-        result: The raw object returned by ``ClientSession.call_tool``.
-
-    Returns:
-        A plain ``dict``.
-
-    Raises:
-        RuntimeError: If the MCP server itself returned an error.
+    FastMCP may return structuredContent (a dict) or a list of text blocks
+    containing JSON — both forms are handled here.
     """
     if getattr(result, "isError", False):
-        msg = getattr(result, "error", None) or "Unknown tool error"
-        raise RuntimeError(f"MCP tool error: {msg}")
+        raise RuntimeError(f"MCP tool error: {getattr(result, 'error', 'unknown error')}")
 
     structured = getattr(result, "structuredContent", None)
     if isinstance(structured, dict):
@@ -157,12 +91,9 @@ def _parse_tool_payload(result: Any) -> dict[str, Any]:
     chunks: list[str] = []
     for block in getattr(result, "content", []) or []:
         btype = getattr(block, "type", None) or (block.get("type") if isinstance(block, dict) else None)
-        if btype == "text":
-            text = getattr(block, "text", None) or (block.get("text") if isinstance(block, dict) else None)
-            if text:
-                chunks.append(str(text))
-        elif isinstance(block, dict) and "text" in block:
-            chunks.append(str(block["text"]))
+        text  = getattr(block, "text",  None) or (block.get("text")  if isinstance(block, dict) else None)
+        if btype == "text" and text:
+            chunks.append(str(text))
 
     raw = "".join(chunks).strip()
     if not raw:
@@ -174,1022 +105,663 @@ def _parse_tool_payload(result: Any) -> dict[str, Any]:
         return {"_raw_text": raw}
 
 
-# ---------------------------------------------------------------------------
-# Formatting helpers
-# ---------------------------------------------------------------------------
+# ─── GPT-4o grounded recommendation ──────────────────────────────────────────
 
+_SYSTEM_PROMPT = """\
+You are a Tactical Relocation Expert at CityStrata, specialising in emergency
+shelter placement for Israeli families displaced by conflict.
 
-def _fmt_distance_km(km: Optional[float]) -> str:
-    """Format a distance in km for human display.
+Your task: synthesise spatial and semantic analysis results into a clear,
+human-readable recommendation of the best relocation zones (neighbourhoods)
+within the family's assigned cluster.
 
-    Args:
-        km: Distance in kilometres, or ``None``.
-
-    Returns:
-        ``"~NNN m"`` for sub-km values, ``"~N.NN km"`` otherwise,
-        or ``"unknown distance"`` if *km* is ``None``.
-    """
-    if km is None:
-        return "unknown distance"
-    return f"~{int(round(km * 1000))} m" if km < 1.0 else f"~{km:.2f} km"
-
-
-def _tiebreak_distance_km(row: dict[str, Any]) -> float:
-    """Extract the cluster-centre distance used for sort tiebreaking.
-
-    Prefers the scoring-tool metric (``metrics.distance_km_from_cluster_center``)
-    because it is computed by the same haversine formula as the cluster penalty.
-    Falls back to the discovery-phase distance if the metric is absent.
-
-    Args:
-        row: A scored candidate dict containing ``score_payload`` and
-            optionally ``distance_km_from_cluster_center``.
-
-    Returns:
-        Distance in km, or ``float("inf")`` if unavailable (sorts last).
-    """
-    metrics = (row.get("score_payload") or {}).get("metrics") or {}
-    d = metrics.get("distance_km_from_cluster_center")
-    if d is not None:
-        return float(d)
-    d2 = row.get("distance_km_from_cluster_center")
-    return float(d2) if d2 is not None else float("inf")
-
-
-# ---------------------------------------------------------------------------
-# AI grounded generation (gpt-4o)
-# ---------------------------------------------------------------------------
-
-_AI_SYSTEM_PROMPT = """\
-You are a compassionate relocation officer at CityStrata, helping Israeli families \
-displaced by conflict find temporary housing in Eilat. Your role is to write a warm, \
-personal recommendation letter to the family summarising the top 3 housing options \
-identified for them.
-
-STRICT RULES — you must follow all of these without exception:
-1. Use ONLY the factual data provided in the user message (scores, distances, school \
-counts, listing names, addresses). Do not invent, estimate, or embellish any numbers.
-2. Do not mention any amenity, school, synagogue, or community centre that is not \
-explicitly listed in the data.
-3. Do not alter any distance or score. If a distance says 137 m, write 137 m.
-4. Write in a warm, human tone that acknowledges the difficulty of displacement while \
-offering practical reassurance grounded in the data.
-5. Address the family by name.
-6. Structure: one opening paragraph acknowledging the situation, then one paragraph per \
-listing (3 total) explaining concretely why it fits their specific needs, then a brief \
-closing paragraph.
-7. Write in the same language the family name implies (Hebrew names → write in Hebrew; \
-otherwise English). When in doubt, write in Hebrew.
-8. Do not add a subject line or sign-off — the output will be embedded in a larger report.
+STRICT RULES — follow without exception:
+1. Use ONLY the numerical facts in the user message (scores, distances, amenity
+   counts). Do not invent, estimate, or assume any data not provided.
+2. Recommend up to 3 zones in order of suitability with specific reasoning per
+   zone tied to the family's stated needs — education (use education_matched for
+   schools that match their supervision type, note education_special if > 0),
+   religion, community, lifestyle (cafes / restaurants), medical access, and mobility.
+3. Structure: one brief situation summary paragraph, then one paragraph per zone
+   explaining concretely why it fits this family, then a short closing paragraph.
+4. Write in the language implied by the family name — Hebrew names → Hebrew,
+   otherwise English.
+5. Tone: warm, empathetic, and professional. Acknowledge the difficulty of
+   displacement.
+6. Do not add a subject line or sign-off; the output is embedded in a larger
+   report.
 """
 
-_AI_GENERATION_TIMEOUT_S = 60.0
-_AI_MODEL = "gpt-4o"
+_AI_MODEL   = "gpt-4o"
+_AI_TIMEOUT = 65.0  # seconds
 
 
 def _build_grounding_context(
     family_needs: dict[str, Any],
-    top_scored: list[dict[str, Any]],
+    cluster: dict[str, Any],
+    ranked_radii: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Serialise the hard DB facts needed for the AI prompt.
-
-    Only numbers and labels that come directly from the MCP tools are included.
-    This is the anti-hallucination boundary: the model receives exactly this dict
-    and nothing else — it cannot invent data that isn't here.
-
-    Args:
-        family_needs: The ``family_needs`` dict from ``get_family_tactical_context``.
-        top_scored: The top-3 scored candidate dicts (each containing ``score_payload``).
-
-    Returns:
-        A plain dict that will be serialised to JSON in the prompt.
     """
-    comp = family_needs.get("composition") or {}
-    edu  = family_needs.get("education") or {}
-    rel  = family_needs.get("religious_and_culture") or {}
-    comm = family_needs.get("community_and_social") or {}
+    Serialise only hard DB facts for the GPT-4o prompt.
 
-    listings_data = []
-    for rank, row in enumerate(top_scored, start=1):
-        sp      = row.get("score_payload") or {}
-        metrics = sp.get("metrics") or {}
-        listing = sp.get("listing") or {}
-        listings_data.append({
-            "rank": rank,
-            "label": listing.get("label") or row.get("label") or "—",
-            "address": listing.get("address") or row.get("address") or "—",
-            "table": row.get("listing_table"),
-            "score_out_of_10": sp.get("score_out_of_10"),
-            "distance_from_cluster_center_km": metrics.get("distance_km_from_cluster_center"),
-            "nearest_synagogue_km": metrics.get("nearest_synagogue_km"),
-            "nearest_matnas_km": metrics.get("nearest_matnas_km"),
-            "schools_total_nearby": metrics.get("schools_total_nearby"),
-            "schools_tag_matches": metrics.get("schools_tag_matches_nearby"),
-            "schools_radius_km": metrics.get("schools_radius_km"),
-            "score_breakdown": sp.get("breakdown") or [],
-        })
+    This is the anti-hallucination boundary: the model receives exactly this
+    dict and cannot mention anything not present here.
+    Includes the full holistic amenity breakdown so GPT-4o can reason about
+    cafes, restaurants, and city facilities alongside anchor institutions.
+    """
+    comp      = family_needs.get("composition") or {}
+    edu       = family_needs.get("education")   or {}
+    rel       = family_needs.get("religion")    or {}
+    comm      = family_needs.get("community")   or {}
+    mob       = family_needs.get("mobility")    or {}
+    lifestyle = family_needs.get("lifestyle")   or {}
+    medical   = family_needs.get("medical")     or {}
 
     return {
-        "family_name": family_needs.get("family_name"),
+        "family_name":    family_needs.get("family_name"),
         "household_size": comp.get("total_people"),
         "children": {
-            "infants": comp.get("infants", 0),
-            "preschool": comp.get("preschool", 0),
-            "elementary": comp.get("elementary", 0),
-            "youth": comp.get("youth", 0),
+            k: v for k, v in comp.items()
+            if k in ("infants", "preschool", "elementary", "youth") and v
         },
-        "essential_education": edu.get("essential_education") or [],
-        "education_importance": edu.get("education_proximity_importance"),
-        "religious_affiliation": rel.get("religious_affiliation"),
-        "needs_synagogue": rel.get("needs_synagogue"),
-        "matnas_participation": comm.get("matnas_participation"),
-        "top_3_listings": listings_data,
+        "education": {
+            "essential_tags":       edu.get("essential_tags") or [],
+            "proximity_importance": edu.get("proximity_importance"),
+        },
+        "religion": {
+            "affiliation":     rel.get("affiliation"),
+            "needs_synagogue": rel.get("needs_synagogue"),
+        },
+        "community": {
+            "matnas_participation":      comm.get("matnas_participation"),
+            "needs_community_proximity": comm.get("needs_community_proximity"),
+            "social_importance":         comm.get("social_importance"),
+        },
+        "lifestyle": {
+            "social_venues_importance": lifestyle.get("social_venues_importance"),
+            "culture_frequency":        lifestyle.get("culture_frequency"),
+        },
+        "medical": {
+            "needs_medical_proximity": medical.get("needs_medical_proximity"),
+            "services_importance":     medical.get("services_importance"),
+        },
+        "mobility": {
+            "has_car":                mob.get("has_car"),
+            "has_mobility_disability": mob.get("has_mobility_disability"),
+        },
+        "cluster_name":      cluster.get("cluster_name"),
+        "cluster_reasoning": cluster.get("reasoning"),
+        "education_supervision_filter": ranked_radii[0].get("education_supervision_filter") if ranked_radii else None,
+        "recommended_zones": [
+            {
+                "rank":               i + 1,
+                "zone_label":         r.get("hub_label"),
+                "center_lat":         r.get("center_lat"),
+                "center_lng":         r.get("center_lng"),
+                "radius_m":           r.get("radius_m"),
+                "semantic_score":     r.get("semantic_score"),
+                "embeddings_matched": r.get("embeddings_matched"),
+                "total_amenities":    r.get("total_amenities"),
+                "amenity_counts":     r.get("amenity_counts") or {},
+                # Education building counts (deduplicated at 3dp coordinate precision)
+                "education_matched":  r.get("education_matched"),   # schools matching supervision type
+                "education_special":  r.get("education_special"),   # special education buildings
+            }
+            for i, r in enumerate(ranked_radii[:3])
+        ],
     }
 
 
-async def _generate_ai_recommendation(
+async def _generate_recommendation(
     family_needs: dict[str, Any],
-    top_scored: list[dict[str, Any]],
+    cluster: dict[str, Any],
+    ranked_radii: list[dict[str, Any]],
 ) -> Optional[str]:
-    """Call ``gpt-4o`` to write a grounded recommendation letter.
-
-    The model receives only the hard DB facts serialised by
-    ``_build_grounding_context`` — no free-form context that could encourage
-    hallucination. If the call fails for any reason the function returns
-    ``None`` so the caller can fall back to the static report.
-
-    Args:
-        family_needs: The ``family_needs`` dict from ``get_family_tactical_context``.
-        top_scored: The top-3 scored candidate dicts.
-
-    Returns:
-        The generated letter as a plain string, or ``None`` on any failure.
     """
-    if not top_scored:
-        return None
-
+    Call GPT-4o with a structured system + user prompt.
+    Returns None on any failure (non-fatal — static report is always returned).
+    """
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
-        logger.warning("AI generation skipped: OPENAI_API_KEY not set.")
+        logger.warning("OPENAI_API_KEY not set — skipping AI generation.")
         return None
 
-    context = _build_grounding_context(family_needs, top_scored[:3])
-    user_message = (
-        "Here is the family profile and the top 3 housing options identified by our "
-        "spatial scoring system. Write the recommendation letter using ONLY this data:\n\n"
+    context     = _build_grounding_context(family_needs, cluster, ranked_radii)
+    user_prompt = (
+        "Below are the family profile and the top relocation zones identified by "
+        "our holistic spatial and semantic analysis pipeline. "
+        "Write your recommendation using ONLY the data provided:\n\n"
         + json.dumps(context, ensure_ascii=False, indent=2)
     )
 
-    _progress("[tactical] Step 4/5: generating AI recommendation letter (gpt-4o)…")
+    _progress("[tactical] Calling GPT-4o for recommendation…")
     try:
-        client = AsyncOpenAI(api_key=api_key, timeout=_AI_GENERATION_TIMEOUT_S)
+        client   = AsyncOpenAI(api_key=api_key, timeout=_AI_TIMEOUT)
         response = await asyncio.wait_for(
             client.chat.completions.create(
                 model=_AI_MODEL,
-                temperature=0.4,   # low — we want reliability over creativity
-                max_tokens=900,
+                temperature=0.3,    # low → reliable, grounded output
+                max_tokens=1_200,
                 messages=[
-                    {"role": "system", "content": _AI_SYSTEM_PROMPT},
-                    {"role": "user",   "content": user_message},
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user",   "content": user_prompt},
                 ],
             ),
-            timeout=_AI_GENERATION_TIMEOUT_S + 5,
+            timeout=_AI_TIMEOUT + 5,
         )
-        letter = response.choices[0].message.content or ""
-        _progress("[tactical] Step 4/5: AI letter generated.")
-        return letter.strip() or None
-    except Exception as exc:  # noqa: BLE001 — intentional broad catch for graceful fallback
-        logger.warning("AI recommendation generation failed (non-fatal): %s", exc)
-        _progress(f"[tactical] Step 4/5: AI generation failed ({exc}), continuing with static report.")
+        letter = (response.choices[0].message.content or "").strip()
+        _progress("[tactical] GPT-4o response received.")
+        return letter or None
+
+    except Exception as exc:  # non-fatal — fall back to static report
+        logger.warning("AI generation failed (non-fatal): %s", exc)
+        _progress(f"[tactical] AI generation skipped ({exc}). Continuing with static report.")
         return None
 
 
-# ---------------------------------------------------------------------------
-# Discovery query builders
-# ---------------------------------------------------------------------------
+# ─── Holistic needs helpers ───────────────────────────────────────────────────
+
+def _extract_needs_tags(family_needs: dict[str, Any]) -> list[str]:
+    """
+    Derive holistic amenity-type tags from the full family profile.
+
+    Tags map 1-to-1 with AMENITY_TABLES categories in mcp_server.py.
+    All detected needs are included; the fallback is every category so that
+    hub discovery always has a complete amenity picture.
+    """
+    tags: list[str] = []
+
+    edu       = family_needs.get("education")  or {}
+    rel       = family_needs.get("religion")   or {}
+    comm      = family_needs.get("community")  or {}
+    lifestyle = family_needs.get("lifestyle")  or {}
+    medical   = family_needs.get("medical")    or {}
+
+    # ── Anchor institutions ────────────────────────────────────────────────
+    if edu.get("essential_tags") or _to_int(edu.get("proximity_importance")) >= 3:
+        tags.append("education")
+
+    if rel.get("needs_synagogue") or rel.get("affiliation") in (
+        "religious", "haredi", "traditional"
+    ):
+        tags.append("synagogue")
+
+    if comm.get("matnas_participation") or comm.get("needs_community_proximity"):
+        tags.append("matnas")
+
+    # ── Lifestyle / commercial ─────────────────────────────────────────────
+    # social_venues_importance >= 3 signals interest in cafes and restaurants.
+    social_imp = _to_int(
+        lifestyle.get("social_venues_importance") or comm.get("social_importance")
+    )
+    if social_imp >= 3:
+        tags.append("cafe")
+        tags.append("restaurant")
+
+    # culture_frequency >= 3 signals interest in city facilities (parks, etc.)
+    culture_freq = _to_int(
+        lifestyle.get("culture_frequency") or comm.get("culture_frequency")
+    )
+    if culture_freq >= 3:
+        tags.append("city_facility")
+
+    # ── Medical / services ────────────────────────────────────────────────
+    if medical.get("needs_medical_proximity") or _to_int(medical.get("services_importance")) >= 4:
+        tags.append("city_facility")  # OSM city facilities include clinics
+
+    # Fallback: include every category so hub discovery is always holistic.
+    if not tags:
+        tags = ["education", "synagogue", "matnas", "cafe", "restaurant", "city_facility"]
+
+    return list(dict.fromkeys(tags))  # deduplicate while preserving order
 
 
-def _build_discovery_queries(
-    pref: str,
-    center_lat: float,
-    center_lng: float,
-    radius_km: float,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Build ``search_nearby_amenities`` argument dicts for Airbnb and hotels.
+def _resolve_education_supervision(family_needs: dict[str, Any]) -> Optional[str]:
+    """
+    Map the family's religious affiliation to the corresponding school
+    supervision type in educational_institutions.type_of_supervision.
 
-    Query text is adjusted based on *pref* (``"airbnb"`` or ``"hotel"``) so the
-    embedding vector reflects the family's primary accommodation preference.
-
-    Args:
-        pref: Normalised ``accommodation_preference`` value from the family profile.
-        center_lat: Cluster centre latitude (WGS84).
-        center_lng: Cluster centre longitude (WGS84).
-        radius_km: Search radius in km.
+    DB values (confirmed): "State" (106), "State Religious" (19), "Ultra-Orthodox" (3).
 
     Returns:
-        ``(airbnb_args, hotels_args)`` — each a dict ready for ``_call_tool_timed``.
+        The DB supervision string to filter on, or None if affiliation is
+        unknown/absent (no filter applied — all supervision types counted).
     """
-    if pref == "hotel":
-        airbnb_query = (
-            "Alternative apartment-style stay if hotel full: serviced apartment "
-            "for families near city amenities in Eilat."
-        )
-        hotel_query = (
-            "Hotel or resort accommodation priority: family suite, breakfast, "
-            "central or accessible location in Eilat."
-        )
-    else:
-        airbnb_query = (
-            "Furnished vacation rental or Airbnb apartment for a displaced family, "
-            "quiet neighborhood, suitable for children, short to medium stay in Eilat."
-        )
-        hotel_query = (
-            "Family-friendly hotel or resort in Eilat, comfortable rooms or suite, "
-            "good location for tourists and relocated families."
-        )
+    affiliation = (family_needs.get("religion") or {}).get("affiliation") or ""
+    mapping = {
+        "secular":     "State",
+        "religious":   "State Religious",
+        "traditional": "State Religious",
+        "haredi":      "Ultra-Orthodox",
+    }
+    return mapping.get(affiliation.lower())
 
-    shared = {"center_lat": center_lat, "center_lng": center_lng, "radius_km": radius_km}
+
+def _build_needs_text(family_needs: dict[str, Any]) -> str:
+    """
+    Build a free-text description of the family's holistic needs for embedding.
+
+    This text is the semantic query vector used in semantic_radius_scoring.
+    The richer the description, the better pgvector can rank zones that match
+    the family's full lifestyle — not just anchor institutions.
+    """
+    parts: list[str] = []
+
+    comp      = family_needs.get("composition") or {}
+    edu       = family_needs.get("education")   or {}
+    rel       = family_needs.get("religion")    or {}
+    comm      = family_needs.get("community")   or {}
+    lifestyle = family_needs.get("lifestyle")   or {}
+    medical   = family_needs.get("medical")     or {}
+    mob       = family_needs.get("mobility")    or {}
+
+    # ── Family composition ────────────────────────────────────────────────
+    if comp.get("total_people"):
+        parts.append(f"Family of {comp['total_people']} people")
+
+    child_parts: list[str] = []
+    if comp.get("infants"):
+        child_parts.append(f"{comp['infants']} infant(s)")
+    if comp.get("preschool"):
+        child_parts.append(f"{comp['preschool']} preschool child(ren)")
+    if comp.get("elementary"):
+        child_parts.append(f"{comp['elementary']} elementary school child(ren)")
+    if comp.get("youth"):
+        child_parts.append(f"{comp['youth']} youth")
+    if child_parts:
+        parts.append("with " + ", ".join(child_parts))
+
+    if comp.get("seniors"):
+        parts.append(f"{comp['seniors']} senior(s) in household")
+
+    # ── Education ─────────────────────────────────────────────────────────
+    edu_tags = edu.get("essential_tags") or []
+    if edu_tags:
+        parts.append(f"education needs: {', '.join(edu_tags)}")
+    elif _to_int(edu.get("proximity_importance")) >= 4:
+        parts.append("high education proximity importance")
+
+    # ── Religion ──────────────────────────────────────────────────────────
+    if rel.get("affiliation"):
+        parts.append(f"religious affiliation: {rel['affiliation']}")
+    if rel.get("needs_synagogue"):
+        parts.append("requires nearby synagogue for daily prayer")
+
+    # ── Community ─────────────────────────────────────────────────────────
+    if comm.get("matnas_participation"):
+        parts.append("active matnas (community centre) participation")
+    if comm.get("needs_community_proximity"):
+        parts.append("needs strong community proximity and social integration")
+
+    # ── Lifestyle: cafes, restaurants, city life ──────────────────────────
+    social_imp = _to_int(
+        lifestyle.get("social_venues_importance") or comm.get("social_importance")
+    )
+    if social_imp >= 4:
+        parts.append("high interest in nearby cafes, restaurants, and social venues")
+    elif social_imp >= 3:
+        parts.append("appreciates access to cafes and dining options")
+
+    culture_freq = _to_int(
+        lifestyle.get("culture_frequency") or comm.get("culture_frequency")
+    )
+    if culture_freq >= 4:
+        parts.append("frequent use of parks, city facilities, and cultural venues")
+    elif culture_freq >= 3:
+        parts.append("occasional use of parks and city amenities")
+
+    # ── Medical / services ────────────────────────────────────────────────
+    if medical.get("needs_medical_proximity"):
+        parts.append("requires proximity to medical services and clinics")
+    if _to_int(medical.get("services_importance")) >= 4:
+        parts.append("high importance placed on access to health and city services")
+
+    # ── Mobility ──────────────────────────────────────────────────────────
+    if mob.get("has_mobility_disability"):
+        parts.append("household member with mobility disability — needs accessible area")
+    if not mob.get("has_car"):
+        parts.append("no private car — walkable neighbourhood preferred")
+
+    # ── Free-form notes ───────────────────────────────────────────────────
+    notes = family_needs.get("notes")
+    if notes:
+        parts.append(notes)
+
     return (
-        {"query_text": airbnb_query, "table_name": "airbnb_listings", **shared},
-        {"query_text": hotel_query,  "table_name": "hotels_listings",  **shared},
+        ". ".join(parts)
+        or "Displaced Israeli family seeking holistic relocation in Eilat"
     )
 
 
-# ---------------------------------------------------------------------------
-# Main agent class
-# ---------------------------------------------------------------------------
-
+# ─── Agent ────────────────────────────────────────────────────────────────────
 
 class TacticalRelocationAgent:
-    """Data-driven tactical planner that communicates exclusively via MCP tools.
+    """
+    Connects to the CityStrata MCP server over stdio and orchestrates the
+    holistic three-step pipeline followed by GPT-4o grounded generation.
 
-    Connects to ``mcp_server.py`` via stdio (the same channel used by Cursor),
-    then executes the four-step pipeline:
-
-    1. Load family context and macro cluster anchor.
-    2. Discover Airbnb and hotel candidates within the configured radius.
-    3. Score every candidate in parallel (bounded by ``score_concurrency``).
-    4. Build and return a Markdown tactical report.
-
-    Args:
-        mcp_server_script: Path to ``mcp_server.py``. Defaults to the sibling file.
-        discovery_radius_km: Radius (km) for ``search_nearby_amenities`` (default 2.5).
-        python_executable: Python interpreter to use for the child process.
-        tool_timeout_s: Per-call timeout in seconds (default 240).
-        score_concurrency: Maximum parallel ``calculate_location_score`` calls (default 4).
-        forward_server_stderr: If ``True``, pipe server stderr to this terminal.
-            Disabled by default to avoid Windows pipe deadlocks.
+    Usage::
+        async with TacticalRelocationAgent() as agent:
+            report = await agent.run_for_family(family_id)
     """
 
     def __init__(
         self,
         mcp_server_script: Optional[Path] = None,
-        *,
-        discovery_radius_km: float = 2.5,
-        python_executable: Optional[str] = None,
         tool_timeout_s: float = 240.0,
-        score_concurrency: int = 4,
         forward_server_stderr: bool = False,
     ) -> None:
         self._server_path = (mcp_server_script or _default_server_path()).resolve()
         if not self._server_path.is_file():
             raise FileNotFoundError(f"MCP server script not found: {self._server_path}")
 
-        self.discovery_radius_km = discovery_radius_km
-        self._python = python_executable or sys.executable
         self.tool_timeout_s = tool_timeout_s
-        self.score_concurrency = max(1, score_concurrency)
-        self._mcp_errlog: TextIO = sys.stderr if forward_server_stderr else _MCP_SERVER_STDERR_SINK
-        self._stack: Optional[AsyncExitStack] = None
-        self._session: Optional[ClientSession] = None
+        # Discard server stderr by default — piping it on Windows can deadlock MCP stdio.
+        self._errlog = (
+            sys.stderr if forward_server_stderr
+            else open(os.devnull, "w", encoding="utf-8")
+        )
+        self._stack:   Optional[AsyncExitStack] = None
+        self._session: Optional[ClientSession]  = None
 
-    # ------------------------------------------------------------------
-    # Context manager / connection lifecycle
-    # ------------------------------------------------------------------
-
-    @property
-    def session(self) -> ClientSession:
-        """Active MCP ``ClientSession``.
-
-        Raises:
-            RuntimeError: If the agent has not been connected yet.
-        """
-        if self._session is None:
-            raise RuntimeError("Agent is not connected; use 'async with agent:'")
-        return self._session
+    # ── Context manager ───────────────────────────────────────────────────
 
     async def __aenter__(self) -> TacticalRelocationAgent:
-        await self.connect()
-        return self
-
-    async def __aexit__(self, *args: Any) -> None:
-        await self.close()
-
-    async def connect(self) -> None:
-        """Spawn the MCP server child process and initialise the session."""
-        if self._session is not None:
-            return
         self._stack = AsyncExitStack()
-        env = {**os.environ, "PYTHONUNBUFFERED": "1"}
-        server_params = StdioServerParameters(
-            command=self._python,
+        params = StdioServerParameters(
+            command=sys.executable,
             args=[str(self._server_path)],
-            env=env,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
             cwd=str(_project_root()),
         )
         read, write = await self._stack.enter_async_context(
-            stdio_client(server_params, errlog=self._mcp_errlog)
+            stdio_client(params, errlog=self._errlog)
         )
-        self._session = await self._stack.enter_async_context(ClientSession(read, write))
+        self._session = await self._stack.enter_async_context(
+            ClientSession(read, write)
+        )
         await self._session.initialize()
-        logger.info("Connected to MCP server: %s", self._server_path)
-        _progress(f"[tactical] Connected to MCP server (timeouts: {self.tool_timeout_s}s per tool call).")
+        _progress(f"[tactical] Connected to MCP server: {self._server_path.name}")
+        return self
 
-    async def close(self) -> None:
-        """Tear down the MCP session and child process."""
-        if self._stack is not None:
+    async def __aexit__(self, *args: Any) -> None:
+        if self._stack:
             await self._stack.aclose()
-            self._stack = None
         self._session = None
+        self._stack   = None
 
-    # ------------------------------------------------------------------
-    # Tool call wrappers
-    # ------------------------------------------------------------------
+    # ── Tool call wrapper ─────────────────────────────────────────────────
 
-    async def _call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Call an MCP tool and decode the response.
-
-        Args:
-            name: Tool name as registered in ``mcp_server.py``.
-            arguments: Keyword arguments for the tool.
-
-        Returns:
-            Decoded response dict.
-        """
-        return _parse_tool_payload(await self.session.call_tool(name, arguments))
-
-    async def _call_tool_timed(
-        self,
-        name: str,
-        arguments: dict[str, Any],
-        *,
-        timeout_s: Optional[float] = None,
-    ) -> dict[str, Any]:
-        """Call an MCP tool with a timeout, logging progress to stderr.
-
-        Args:
-            name: Tool name.
-            arguments: Tool keyword arguments.
-            timeout_s: Override timeout in seconds (uses ``self.tool_timeout_s`` if omitted).
-
-        Returns:
-            Decoded response dict.
-
-        Raises:
-            TimeoutError: If the tool call exceeds the timeout.
-        """
-        t = timeout_s if timeout_s is not None else self.tool_timeout_s
-        _progress(f"[tactical] → {name} …")
+    async def _call(self, tool: str, **kwargs: Any) -> dict[str, Any]:
+        """Call a named MCP tool with keyword arguments and decode the response."""
+        assert self._session is not None, "Agent not connected. Use 'async with agent:'."
+        _progress(f"[tactical] → {tool} …")
         try:
-            return await asyncio.wait_for(self._call_tool(name, arguments), timeout=t)
+            raw = await asyncio.wait_for(
+                self._session.call_tool(tool, kwargs),
+                timeout=self.tool_timeout_s,
+            )
         except asyncio.TimeoutError as exc:
             raise TimeoutError(
-                f"MCP tool {name!r} timed out after {t}s. "
-                "Check DATABASE_URL (network/SSL/VPN), OpenAI API, or increase --tool-timeout."
+                f"MCP tool {tool!r} timed out after {self.tool_timeout_s}s. "
+                "Check DATABASE_URL, network, and OpenAI API availability."
             ) from exc
+        return _decode(raw)
 
-    # ------------------------------------------------------------------
-    # Pipeline steps
-    # ------------------------------------------------------------------
-
-    async def _step_load_context(self, family_id: str) -> dict[str, Any]:
-        """Step 1 — Load family profile and macro cluster context.
-
-        Args:
-            family_id: ``evacuee_family_profiles.uuid`` string.
-
-        Returns:
-            Raw ``get_family_tactical_context`` tool response.
-        """
-        _progress("[tactical] Step 1/5: loading family + macro cluster context…")
-        result = await self._call_tool_timed("get_family_tactical_context", {"family_id": family_id})
-        _progress("[tactical] Step 1/5: done.")
-        return result
-
-    async def _step_discover_listings(
-        self, pref: str, center_lat: float, center_lng: float
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Step 2 — Sequential discovery of Airbnb and hotel candidates.
-
-        Sequential (not parallel) to keep the MCP stdio stack stable.
-
-        Args:
-            pref: Normalised ``accommodation_preference`` from the family profile.
-            center_lat: Cluster centre latitude.
-            center_lng: Cluster centre longitude.
-
-        Returns:
-            ``(airbnb_result, hotels_result)`` — raw tool responses.
-        """
-        airbnb_args, hotels_args = _build_discovery_queries(
-            pref, center_lat, center_lng, self.discovery_radius_km
-        )
-        _progress(
-            "[tactical] Step 2/5: discovering Airbnb listings "
-            "(OpenAI embedding + PostGIS/pgvector; first call can take ~15–90s)…"
-        )
-        airbnb_res = await self._call_tool_timed("search_nearby_amenities", airbnb_args)
-        _progress("[tactical] Step 2/5: discovering hotels…")
-        hotels_res = await self._call_tool_timed("search_nearby_amenities", hotels_args)
-        _progress("[tactical] Step 2/5: done.")
-        return airbnb_res, hotels_res
-
-    async def _step_score_candidates(
-        self, candidates: list[dict[str, Any]], family_id: str
-    ) -> tuple[list[dict[str, Any]], list[str]]:
-        """Step 3 — Score each candidate with bounded parallel concurrency.
-
-        Args:
-            candidates: List of candidate dicts from step 2.
-            family_id: ``evacuee_family_profiles.uuid`` string.
-
-        Returns:
-            ``(scored, warnings)`` where *scored* contains candidates enriched
-            with ``score_payload`` and *warnings* contains error messages for
-            any failed scoring calls.
-        """
-        _progress(
-            f"[tactical] Step 3/5: scoring {len(candidates)} listing(s) "
-            f"(concurrency={self.score_concurrency})…"
-        )
-        sem = asyncio.Semaphore(self.score_concurrency)
-        score_timeout = min(120.0, self.tool_timeout_s)
-
-        async def _score_one(c: dict[str, Any]) -> Any:
-            async with sem:
-                return await self._call_tool_timed(
-                    "calculate_location_score",
-                    {
-                        "listing_id": c["listing_id"],
-                        "listing_table": c["listing_table"],
-                        "family_id": family_id,
-                    },
-                    timeout_s=score_timeout,
-                )
-
-        outcomes = await asyncio.gather(
-            *[_score_one(c) for c in candidates], return_exceptions=True
-        )
-        _progress("[tactical] Step 3/5: done.")
-
-        scored: list[dict[str, Any]] = []
-        warnings: list[str] = []
-        for cand, outcome in zip(candidates, outcomes):
-            ref = f"{cand['listing_table']}/{cand['listing_id']}"
-            if isinstance(outcome, BaseException):
-                warnings.append(f"Scoring failed for {ref}: {outcome}")
-            elif not outcome.get("ok", False):
-                warnings.append(
-                    f"calculate_location_score not ok for {ref}: {outcome.get('error', outcome)}"
-                )
-            else:
-                scored.append({**cand, "score_payload": outcome})
-
-        # Sort: score DESC, then distance to cluster centre ASC (tiebreaker).
-        scored.sort(
-            key=lambda x: (
-                -float((x.get("score_payload") or {}).get("score_out_of_10") or 0.0),
-                _tiebreak_distance_km(x),
-            )
-        )
-        return scored, warnings
-
-    # ------------------------------------------------------------------
-    # Full pipeline
-    # ------------------------------------------------------------------
+    # ── Pipeline ──────────────────────────────────────────────────────────
 
     async def run_for_family(self, family_id: str) -> str:
-        """Execute the full four-step tactical pipeline.
-
-        Args:
-            family_id: ``evacuee_family_profiles.uuid`` as a string.
-
-        Returns:
-            A Markdown-formatted tactical report.
         """
-        family_id = str(family_id).strip()
+        Execute the full holistic tactical pipeline and return a Markdown report.
 
-        # Step 1 — context
-        ctx = await self._step_load_context(family_id)
-        if not ctx.get("ok", False):
-            return self._report_no_context(family_id, ctx)
+        Steps:
+            1. Load evacuation context (full family profile + cluster).
+            2. Discover K-means hubs across ALL amenity types.
+            3. Score hubs by semantic similarity to holistic family needs.
+            4. Generate a GPT-4o grounded recommendation.
+        """
+        family_id = family_id.strip()
 
-        family_needs: dict[str, Any] = ctx.get("family_needs") or {}
-        matching: Optional[dict[str, Any]] = ctx.get("matching_result")
-        cluster_center: Optional[dict[str, Any]] = ctx.get("cluster_center")
-        warnings: list[str] = list(ctx.get("warnings") or [])
+        # ── Step 1: Family profile + cluster ──────────────────────────────
+        _progress("[tactical] Step 1/4: Loading evacuation context…")
+        ctx = await self._call("get_evacuation_context", family_id=family_id)
+        if not ctx.get("ok"):
+            return f"# Error — Context Load Failed\n\n{ctx.get('error', 'Unknown error.')}"
 
-        lat = (cluster_center or {}).get("center_lat")
-        lng = (cluster_center or {}).get("center_lng")
-        if not cluster_center or lat is None or lng is None:
-            return self._report_no_anchor(family_id, family_needs, matching, warnings)
+        family_needs: dict[str, Any]      = ctx["family_needs"]
+        cluster: Optional[dict[str, Any]] = ctx.get("cluster")
 
-        center_lat, center_lng = float(lat), float(lng)
-
-        # Step 2 — discovery
-        housing = family_needs.get("housing") or {}
-        pref = (housing.get("accommodation_preference") or "airbnb").lower()
-        airbnb_res, hotels_res = await self._step_discover_listings(pref, center_lat, center_lng)
-
-        candidates: list[dict[str, Any]] = []
-        for table_key, res in (("airbnb_listings", airbnb_res), ("hotels_listings", hotels_res)):
-            if not res.get("ok", False):
-                warnings.append(f"search_nearby_amenities failed for {table_key}: {res}")
-                continue
-            for row in res.get("results") or []:
-                lid = row.get("listing_id")
-                if lid:
-                    candidates.append({
-                        "listing_id": str(lid),
-                        "listing_table": table_key,
-                        "label": row.get("label") or "",
-                        "address": row.get("address") or "",
-                        "distance_km_from_cluster_center": row.get("distance_km"),
-                        "cosine_distance": row.get("cosine_distance"),
-                    })
-
-        if not candidates:
-            return self._report_no_listings(
-                family_id, family_needs, matching, cluster_center, warnings, airbnb_res, hotels_res
+        if not cluster or not cluster.get("run_id"):
+            return (
+                "# No Cluster Assignment\n\n"
+                f"Family `{family_id}` has not been matched to a cluster yet. "
+                "Run the macro matching agent first, then link the result."
             )
 
-        # Step 3 — scoring
-        scored, score_warnings = await self._step_score_candidates(candidates, family_id)
-        warnings.extend(score_warnings)
-
-        # Step 4 — AI grounded generation (graceful fallback to None on failure)
-        ai_letter = await _generate_ai_recommendation(family_needs, scored[:3])
-
-        # Step 5 — report
-        _progress("[tactical] Step 5/5: building Markdown report…")
-        return self._build_markdown_report(
-            family_id=family_id,
-            family_needs=family_needs,
-            matching=matching,
-            cluster_center=cluster_center,
-            center_lat=center_lat,
-            center_lng=center_lng,
-            candidates=candidates,
-            scored=scored,
-            warnings=warnings,
-            ai_letter=ai_letter,
+        # ── Step 2: Holistic K-means hub discovery ────────────────────────
+        _progress("[tactical] Step 2/4: Discovering K-means hubs across all amenities…")
+        needs_tags  = _extract_needs_tags(family_needs)
+        supervision = _resolve_education_supervision(family_needs)
+        if supervision:
+            _progress(f"[tactical]   Education filter: {supervision} schools only")
+        radii_result = await self._call(
+            "discover_optimal_radius",
+            run_id=cluster["run_id"],
+            cluster_number=cluster["cluster_number"],
+            education_supervision=supervision,
+            needs_tags=needs_tags,
         )
 
-    # ------------------------------------------------------------------
-    # Fallback reports
-    # ------------------------------------------------------------------
+        if not radii_result.get("ok") or not radii_result.get("radii"):
+            return (
+                "# No Radii Found\n\n"
+                f"Could not identify service hubs in cluster "
+                f"`{cluster.get('cluster_name')}` (#{cluster['cluster_number']}).\n\n"
+                f"Reason: {radii_result.get('error', 'No amenities found within boundary.')}"
+            )
 
-    def _report_no_context(self, family_id: str, ctx: dict[str, Any]) -> str:
-        """Return a minimal error report when the family profile cannot be loaded."""
-        err = ctx.get("error", "Unknown error")
-        return "\n".join([
-            "# CityStrata Tactical Match Report",
-            "",
-            f"**Family ID:** `{family_id}`",
-            "",
-            "## Status",
-            "",
-            f"Could not load tactical context: **{err}**",
-            "",
-            "_The Tactical Agent needs a valid `evacuee_family_profiles.uuid` and, "
-            "ideally, a macro matching result linked via `selected_matching_result_id`._",
-        ])
+        radii: list[dict[str, Any]] = radii_result["radii"]
+        logger.info("Discovered %d hub(s). Tags used: %s", len(radii), needs_tags)
 
-    def _report_no_anchor(
-        self,
-        family_id: str,
-        family_needs: dict[str, Any],
-        matching: Optional[dict[str, Any]],
-        warnings: list[str],
-    ) -> str:
-        """Return a report explaining that no cluster anchor is available."""
-        lines = [
-            "# CityStrata Tactical Match Report",
-            "",
-            f"**Family:** {family_needs.get('family_name', 'Unknown')} (`{family_id}`)",
-            "",
-            "## Status",
-            "",
-            "**No usable cluster anchor** — missing `cluster_center` (lat/lng).",
-            "",
-            "This usually means:",
-            "- `selected_matching_result_id` is not set on the profile yet, or",
-            "- the matching result has no `run_id` / cluster number, or",
-            "- no statistical areas were found for that cluster.",
-            "",
-        ]
-        if matching:
-            lines += [
-                "### Macro assignment (partial)",
-                "",
-                f"- **Recommended cluster:** {matching.get('recommended_cluster')}",
-                f"- **Confidence:** {matching.get('confidence')}",
-                "",
-            ]
-        if warnings:
-            lines.append("### Warnings")
-            lines += [f"- {w}" for w in warnings]
+        # ── Step 3: Holistic semantic scoring ─────────────────────────────
+        _progress("[tactical] Step 3/4: Holistic semantic scoring (pgvector across all amenities)…")
+        needs_text   = _build_needs_text(family_needs)
+        score_result = await self._call(
+            "semantic_radius_scoring",
+            radii=radii,
+            family_needs_text=needs_text,
+            education_supervision=supervision,
+        )
+        ranked_radii: list[dict[str, Any]] = (
+            score_result.get("ranked_radii") or radii  # fallback to unranked on failure
+        )
+
+        # ── Step 4: GPT-4o grounded recommendation ────────────────────────
+        _progress("[tactical] Step 4/4: Generating GPT-4o recommendation…")
+        ai_letter = await _generate_recommendation(family_needs, cluster, ranked_radii)
+
+        return _format_report(family_needs, cluster, ranked_radii, ai_letter)
+
+
+# ─── Report formatter ─────────────────────────────────────────────────────────
+
+# Human-readable labels for all amenity categories (mirrors AMENITY_TABLES).
+_CATEGORY_LABELS: dict[str, str] = {
+    "education":    "Schools / Education",
+    "synagogue":    "Synagogues",
+    "matnas":       "Community Centres (Matnas)",
+    "cafe":         "Cafés",
+    "restaurant":   "Restaurants",
+    "city_facility": "City Facilities / Parks",
+}
+
+
+def _format_report(
+    family_needs: dict[str, Any],
+    cluster: dict[str, Any],
+    ranked_radii: list[dict[str, Any]],
+    ai_letter: Optional[str],
+) -> str:
+    """Build the final Markdown tactical report from pipeline outputs."""
+    name         = family_needs.get("family_name") or "Unknown Family"
+    comp         = family_needs.get("composition") or {}
+    cluster_name = cluster.get("cluster_name") or f"Cluster {cluster.get('cluster_number')}"
+
+    lines: list[str] = [
+        f"# CityStrata Tactical Report — {name}",
+        "",
+        f"**Assigned cluster:** {cluster_name}  ",
+        f"**Household size:** {comp.get('total_people', '?')}  ",
+        f"**Cluster confidence:** {cluster.get('confidence', '—')}  ",
+        "",
+        "---",
+        "",
+    ]
+
+    # AI-generated recommendation letter (if available)
+    if ai_letter:
+        lines += ["## AI Recommendation", "", ai_letter, "", "---", ""]
+
+    # Ranked zone cards — full holistic amenity breakdown
+    lines += ["## Ranked Relocation Zones", ""]
+
+    for i, zone in enumerate(ranked_radii[:3], start=1):
+        counts  = zone.get("amenity_counts") or {}
+        label   = (zone.get("hub_label") or "zone").replace("_", " ").title()
+        lat     = zone.get("center_lat", 0.0)
+        lng     = zone.get("center_lng", 0.0)
+        radius  = zone.get("radius_m", 0)
+        score   = zone.get("semantic_score", 0.0)
+        matched = zone.get("embeddings_matched", 0)
+        total   = zone.get("total_amenities", sum(counts.values()))
+
+        education_matched = zone.get("education_matched")
+        education_special = zone.get("education_special")
+        edu_filter        = zone.get("education_supervision_filter")
+
         lines += [
-            "",
-            "_Next step: run the macro matching flow and persist `selected_matching_result_id`, "
-            "then re-run tactical discovery._",
-        ]
-        return "\n".join(lines)
-
-    def _report_no_listings(
-        self,
-        family_id: str,
-        family_needs: dict[str, Any],
-        matching: Optional[dict[str, Any]],
-        cluster_center: dict[str, Any],
-        warnings: list[str],
-        airbnb_res: dict[str, Any],
-        hotels_res: dict[str, Any],
-    ) -> str:
-        """Return a report explaining that no listings were found within the radius."""
-        lines = [
-            "# CityStrata Tactical Match Report",
-            "",
-            f"**Family:** {family_needs.get('family_name', 'Unknown')} (`{family_id}`)",
-            "",
-            "## Cluster anchor",
-            "",
-            f"- **Center (approx.):** `{cluster_center.get('center_lat')}, {cluster_center.get('center_lng')}`",
-            f"- **Areas used in centroid:** {cluster_center.get('areas_used', '—')}",
-            "",
-            "## Discovery",
-            "",
-            f"No listings with embeddings were found within **{self.discovery_radius_km} km** "
-            "of the cluster center in `airbnb_listings` or `hotels_listings`.",
-            "",
-            "### Raw search counts",
-            "",
-            f"- **Airbnb tool:** count={airbnb_res.get('count', '—')}, ok={airbnb_res.get('ok')}",
-            f"- **Hotels tool:** count={hotels_res.get('count', '—')}, ok={hotels_res.get('ok')}",
-            "",
-        ]
-        if matching:
-            lines += ["## Macro context", "", f"- **Cluster:** {matching.get('recommended_cluster')}", ""]
-        if warnings:
-            lines.append("## Warnings")
-            lines += [f"- {w}" for w in warnings]
-        lines += [
-            "",
-            "_Hint: confirm `embedding` is populated (vector ingestion) and listings exist "
-            "near this cluster._",
-        ]
-        return "\n".join(lines)
-
-    # ------------------------------------------------------------------
-    # Main report builder
-    # ------------------------------------------------------------------
-
-    def _build_markdown_report(
-        self,
-        *,
-        family_id: str,
-        family_needs: dict[str, Any],
-        matching: Optional[dict[str, Any]],
-        cluster_center: dict[str, Any],
-        center_lat: float,
-        center_lng: float,
-        candidates: list[dict[str, Any]],
-        scored: list[dict[str, Any]],
-        warnings: list[str],
-        ai_letter: Optional[str] = None,
-    ) -> str:
-        """Assemble the full Markdown tactical report.
-
-        Args:
-            family_id: Profile UUID string.
-            family_needs: Nested dict from ``get_family_tactical_context``.
-            matching: Macro matching result dict, or ``None``.
-            cluster_center: Cluster centre metadata dict.
-            center_lat: Cluster centre latitude.
-            center_lng: Cluster centre longitude.
-            candidates: All discovered listing candidates.
-            scored: Candidates enriched with ``score_payload``, sorted.
-            warnings: Accumulated warning strings from the pipeline.
-            ai_letter: Optional grounded recommendation letter from ``gpt-4o``.
-                Injected between the discovery summary and the ranked table.
-                If ``None``, this section is omitted silently.
-
-        Returns:
-            A multi-section Markdown string.
-        """
-        name = family_needs.get("family_name", "Family")
-        comp = family_needs.get("composition") or {}
-        edu  = family_needs.get("education") or {}
-        rel  = family_needs.get("religious_and_culture") or {}
-
-        lines: list[str] = [
-            "# CityStrata Tactical Match Report",
-            "",
-            "> *You are not alone in this move — we use your real needs (education, faith, "
-            "community) together with data from Eilat to shortlist places that fit your daily life, "
-            "while staying aligned with the macro cluster plan. Rankings prioritize **tactical score** "
-            "(amenity proximity, education fit, cluster alignment) and use **distance to the strategic "
-            "cluster center** as a tiebreaker when scores are equal.*",
-            "",
-            f"## Family overview — **{name}**",
+            f"### Zone {i} — {label}",
             "",
             "| Field | Value |",
-            "|------|-------|",
-            f"| Profile UUID | `{family_id}` |",
-            f"| Household size | **{comp.get('total_people', '—')}** people |",
-            f"| Children (infant→youth) | {comp.get('infants', 0)} / {comp.get('preschool', 0)} / "
-            f"{comp.get('elementary', 0)} / {comp.get('youth', 0)} |",
-            f"| Education focus | {edu.get('essential_education') or '—'} "
-            f"(importance **{edu.get('education_proximity_importance', '—')}/5**) |",
-            f"| Religious affiliation | **{rel.get('religious_affiliation', '—')}** |",
-            f"| Needs synagogue | **{rel.get('needs_synagogue', False)}** |",
-            "",
-            "## Macro plan (cluster)",
-            "",
+            "|-------|-------|",
+            f"| **Centre** | `{lat:.5f}, {lng:.5f}` |",
+            f"| **Radius** | {radius} m |",
+            f"| **Semantic score** | {score:.4f} ({matched} embeddings matched) |",
+            f"| **Total amenities** | {total} |",
         ]
 
-        if matching:
-            reasoning = str(matching.get("reasoning", ""))
-            lines += [
-                f"- **Assigned cluster:** {matching.get('recommended_cluster')}",
-                f"- **Cluster #:** {matching.get('recommended_cluster_number')}",
-                f"- **Confidence:** {matching.get('confidence')}",
-                f"- **Rationale (macro):** {reasoning[:400]}" + ("…" if len(reasoning) > 400 else ""),
-                "",
-            ]
-        else:
-            lines += ["_No matching_result joined (unexpected if cluster_center exists)._", ""]
+        # Holistic amenity breakdown
+        for cat, human_label in _CATEGORY_LABELS.items():
+            if cat == "education":
+                # Show matched schools (filtered by supervision) + total from UNION ALL
+                all_edu = counts.get("education", 0)
+                if education_matched is not None and edu_filter:
+                    lines.append(
+                        f"| **{human_label}** | "
+                        f"{education_matched} matching ({edu_filter}) "
+                        f"/ {all_edu} total |"
+                    )
+                else:
+                    if all_edu:
+                        lines.append(f"| **{human_label}** | {all_edu} |")
+                # Special education row — always show if > 0
+                if education_special:
+                    lines.append(f"| **Special Education Schools** | {education_special} |")
+            else:
+                count = counts.get(cat, 0)
+                if count:
+                    lines.append(f"| **{_CATEGORY_LABELS[cat]}** | {count} |")
 
-        lines += [
-            "## Tactical anchor (cluster center)",
-            "",
-            f"- **Approx. center:** `{center_lat:.6f}, {center_lng:.6f}`",
-            f"- **Based on:** {cluster_center.get('method', 'statistical areas')}",
-            f"- **Areas aggregated:** {cluster_center.get('areas_used', '—')}",
-            "",
-            f"## Discovery ({self.discovery_radius_km} km radius)",
-            "",
-            f"- **Candidate pool:** {len(candidates)} listings (vector-ranked top 5 per table: Airbnb + hotels).",
-            "",
-        ]
-
-        if not scored:
-            lines += [
-                "## Scoring",
-                "",
-                "**No successful scores** — all `calculate_location_score` calls failed.",
-                "",
-            ]
-            if warnings:
-                lines.append("### Warnings")
-                lines += [f"- {w}" for w in warnings]
-            return "\n".join(lines)
-
-        # AI-generated recommendation letter (grounded on DB facts; omitted if generation failed).
-        if ai_letter:
-            lines += [
-                "## Recommendation letter",
-                "",
-                "> *Generated by gpt-4o strictly from the spatial and scoring data above. "
-                "No information has been added beyond what was retrieved from the database.*",
-                "",
-                ai_letter,
-                "",
-            ]
-
-        lines += [
-            "## Ranked listings (score, then cluster proximity)",
-            "",
-            "Sorted by **score (highest first)**; when scores tie, **closer to the cluster center** ranks higher.",
-            "",
-            "| Rank | Score /10 | Table | Label | Distance from cluster center |",
-            "|-----:|----------:|-------|-------|------------------------------|",
-        ]
-        for i, row in enumerate(scored, start=1):
-            sp = row.get("score_payload") or {}
-            score = sp.get("score_out_of_10", "—")
-            dclus = ((sp.get("metrics") or {}).get("distance_km_from_cluster_center")
-                     or row.get("distance_km_from_cluster_center"))
-            dclus_s = f"{float(dclus):.2f} km" if dclus is not None else "—"
-            lines.append(
-                f"| {i} | **{score}** | `{row['listing_table']}` | "
-                f"{(row.get('label') or '—')[:48]} | {dclus_s} |"
-            )
-
-        lines += ["", "## Top 3 recommendations (justified)", ""]
-        for i, row in enumerate(scored[:3], start=1):
-            lines += self._format_recommendation(i, row)
-
-        lines += ["## Full tactical summaries (tool)", ""]
-        for row in scored[:3]:
-            summ = (row.get("score_payload") or {}).get("summary")
-            if summ:
-                lines.append(f"- **{row.get('listing_id')}:** {summ}")
         lines.append("")
 
-        if warnings:
-            lines += ["## Warnings", ""]
-            lines += [f"- {w}" for w in warnings]
-            lines.append("")
-
-        lines += [
-            "---",
-            "",
-            "*CityStrata Tactical Agent — preserving routine (education, religion, community) "
-            "within your strategically assigned Eilat cluster.*",
-        ]
-        return "\n".join(lines)
-
-    def _format_recommendation(self, rank: int, row: dict[str, Any]) -> list[str]:
-        """Format one top-3 recommendation section.
-
-        Args:
-            rank: 1-based rank number.
-            row: Scored candidate dict containing ``score_payload``.
-
-        Returns:
-            A list of Markdown lines for this recommendation.
-        """
-        sp = row.get("score_payload") or {}
-        metrics = sp.get("metrics") or {}
-        breakdown = sp.get("breakdown") or []
-        listing = sp.get("listing") or {}
-
-        syn_km = metrics.get("nearest_synagogue_km")
-        mat_km = metrics.get("nearest_matnas_km")
-        schools_n = metrics.get("schools_total_nearby")
-        school_match = metrics.get("schools_tag_matches_nearby")
-        radius_edu = metrics.get("schools_radius_km")
-
-        narrative: list[str] = [f"This option scores **{sp.get('score_out_of_10')}/10**."]
-        if school_match and int(school_match) > 0:
-            narrative.append(
-                f"It is well supported for education: **{school_match}** school(s) within "
-                f"**{radius_edu} km** closely match your stated essential education needs "
-                f"({schools_n} schools nearby in total)."
-            )
-        elif schools_n:
-            narrative.append(
-                f"There are **{schools_n}** school(s) within **{radius_edu} km**; "
-                f"overlap with your exact education tags is **{school_match or 0}** — "
-                "worth confirming phases/types with the placement officer."
-            )
-        else:
-            narrative.append(
-                f"**No schools** were found within the **{radius_edu} km** scoring radius — "
-                "critical if you have school-age children."
-            )
-        if syn_km is not None:
-            narrative.append(f"Nearest synagogue is about **{_fmt_distance_km(float(syn_km))}** away.")
-        if mat_km is not None:
-            narrative.append(f"Nearest community center (matnas) is about **{_fmt_distance_km(float(mat_km))}** away.")
-
-        label = listing.get("label") or row.get("label") or "Listing"
-        address = listing.get("address") or row.get("address")
-
-        lines: list[str] = [
-            f"### {rank}. {label}",
-            "",
-            f"- **Table:** `{row['listing_table']}` · **ID:** `{row['listing_id']}`",
-        ]
-        if address:
-            lines.append(f"- **Address / area:** {address}")
-        lines += [
-            "",
-            " ".join(narrative),
-            "",
-        ]
-        if breakdown:
-            lines.append("**Score breakdown (tool):**")
-            lines += [f"- {b}" for b in breakdown[:6]]
-            lines.append("")
-        return lines
+    lines += [
+        "---",
+        "",
+        "*CityStrata Tactical Agent — holistic cluster-bound radius recommendations "
+        "for displaced families in Eilat.*",
+    ]
+    return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# Public pipeline entry point
-# ---------------------------------------------------------------------------
+# ─── Pipeline entry point ─────────────────────────────────────────────────────
 
-
-async def run_tactical_pipeline(
+async def run_pipeline(
     family_id: str,
     *,
     server_path: Optional[Path] = None,
-    radius_km: float = 2.5,
     tool_timeout_s: float = 240.0,
-    score_concurrency: int = 4,
-    skip_preflight: bool = False,
     forward_server_stderr: bool = False,
 ) -> str:
-    """Run the full tactical pipeline for a single family.
-
-    This is the main async entry point used by ``main()`` and any callers that
-    want to embed the agent in a larger async application.
-
-    Args:
-        family_id: ``evacuee_family_profiles.uuid`` string.
-        server_path: Override path to ``mcp_server.py``.
-        radius_km: Discovery radius in km.
-        tool_timeout_s: Per-tool-call timeout in seconds.
-        score_concurrency: Max parallel scoring calls.
-        skip_preflight: Skip the OpenAI + Postgres smoke test.
-        forward_server_stderr: Forward child process stderr (risks deadlock on Windows).
-
-    Returns:
-        A Markdown tactical report string.
-    """
+    """Async entry point — loads .env and runs the agent for one family."""
     load_dotenv(_project_root() / ".env")
     load_dotenv(_project_root() / "mcp" / ".env")
-    if not skip_preflight:
-        await _smoke_openai_and_db()
 
     async with TacticalRelocationAgent(
         mcp_server_script=server_path,
-        discovery_radius_km=radius_km,
         tool_timeout_s=tool_timeout_s,
-        score_concurrency=score_concurrency,
         forward_server_stderr=forward_server_stderr,
     ) as agent:
         return await agent.run_for_family(family_id)
 
 
-# ---------------------------------------------------------------------------
-# CLI entry point
-# ---------------------------------------------------------------------------
-
+# ─── CLI ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    """Parse CLI arguments and run the tactical pipeline."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
+
     parser = argparse.ArgumentParser(
-        description="CityStrata Tactical Agent — MCP-driven housing shortlist + report",
+        description="CityStrata Tactical Agent — holistic radius-based relocation planner",
     )
     parser.add_argument(
         "--family-id",
         default=os.getenv("TACTICAL_SAMPLE_FAMILY_ID", "").strip(),
-        help="evacuee_family_profiles.uuid (or set TACTICAL_SAMPLE_FAMILY_ID env var)",
+        help="evacuee_family_profiles.uuid (or set TACTICAL_SAMPLE_FAMILY_ID)",
     )
     parser.add_argument(
-        "--server", type=Path, default=None,
-        help="Path to mcp_server.py (default: sibling mcp_server.py)",
+        "--server",
+        type=Path,
+        default=None,
+        help="Override path to mcp_server.py (default: sibling file)",
     )
     parser.add_argument(
-        "--radius-km", type=float, default=2.5,
-        help="Discovery radius around cluster center in km (default: 2.5)",
+        "--tool-timeout",
+        type=float,
+        default=240.0,
+        help="Per-tool-call timeout in seconds (default: 240)",
     )
     parser.add_argument(
-        "--tool-timeout", type=float, default=240.0,
-        help="Max seconds per MCP tool call (default: 240)",
-    )
-    parser.add_argument(
-        "--score-concurrency", type=int, default=4,
-        help="Parallel calculate_location_score calls (default: 4)",
-    )
-    parser.add_argument(
-        "--skip-preflight", action="store_true",
-        help="Skip OpenAI + Postgres smoke test before MCP (not recommended)",
-    )
-    parser.add_argument(
-        "--forward-server-stderr", action="store_true",
-        help="Forward mcp_server.py stderr to this terminal (may deadlock on Windows)",
+        "--forward-server-stderr",
+        action="store_true",
+        help="Pipe mcp_server.py stderr to this terminal (may deadlock on Windows)",
     )
     args = parser.parse_args()
 
     if not args.family_id:
-        print("Error: provide --family-id <uuid> or set TACTICAL_SAMPLE_FAMILY_ID.", file=sys.stderr)
+        print(
+            "Error: supply --family-id <uuid> or set TACTICAL_SAMPLE_FAMILY_ID.",
+            file=sys.stderr,
+        )
         sys.exit(2)
 
     try:
         report = asyncio.run(
-            run_tactical_pipeline(
+            run_pipeline(
                 args.family_id,
                 server_path=args.server,
-                radius_km=args.radius_km,
                 tool_timeout_s=args.tool_timeout,
-                score_concurrency=args.score_concurrency,
-                skip_preflight=args.skip_preflight,
                 forward_server_stderr=args.forward_server_stderr,
             )
         )
         print(report, flush=True)
+
     except TimeoutError as exc:
-        print(f"\nTimed out: {exc}", file=sys.stderr, flush=True)
+        print(f"\nTimed out: {exc}", file=sys.stderr)
         sys.exit(124)
     except (RuntimeError, OSError) as exc:
-        print(f"\nFailed: {exc}", file=sys.stderr, flush=True)
+        print(f"\nFailed: {exc}", file=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:
         sys.exit(130)
