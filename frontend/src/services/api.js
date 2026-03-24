@@ -2,11 +2,34 @@ import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+const TOKEN_KEY = 'citystrata_access_token'
+
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+})
+
+export function getAuthToken() {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+/** Persist JWT for Authorization header on API calls. Pass null to clear. */
+export function setAuthToken(token) {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token)
+  } else {
+    localStorage.removeItem(TOKEN_KEY)
+  }
+}
+
+api.interceptors.request.use((config) => {
+  const token = getAuthToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 // Statistical Areas

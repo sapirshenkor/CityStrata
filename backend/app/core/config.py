@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # supabase API credentials
     ENV: str = "dev"
     DATABASE_URL: str
+    SUPABASE_URL: str
+    SUPABASE_ANON_KEY: str
+    SUPABASE_SERVICE_ROLE_KEY: str
 
     # OpenAI (for matching agent); optional so app starts without it
     openai_api_key: str | None = None
