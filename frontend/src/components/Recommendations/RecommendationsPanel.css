@@ -1,0 +1,232 @@
+/* ── State messages ──────────────────────────────────────────────────────── */
+.rec-state {
+  padding: 24px 16px;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.rec-state--error {
+  color: #e74c3c;
+}
+
+.rec-state--empty {
+  color: #999;
+}
+
+/* ── Family list ─────────────────────────────────────────────────────────── */
+.rec-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rec-item {
+  padding: 10px 12px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.rec-item:hover {
+  background: #eef1ff;
+  border-color: #667eea;
+}
+
+.rec-item--active {
+  background: #eef1ff;
+  border-color: #667eea;
+  border-inline-start: 3px solid #667eea;
+}
+
+.rec-family-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.rec-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rec-zone-count {
+  font-size: 11px;
+  color: #888;
+}
+
+/* ── Confidence badges ───────────────────────────────────────────────────── */
+.rec-confidence {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.conf-high    { background: #d4edda; color: #155724; }
+.conf-medium  { background: #fff3cd; color: #856404; }
+.conf-low     { background: #f8d7da; color: #721c24; }
+.conf-unknown { background: #e2e3e5; color: #383d41; }
+
+/* ── Detail panel ────────────────────────────────────────────────────────── */
+.rec-detail {
+  background: #fff;
+  border: 1px solid #d0d7ff;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.rec-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: #f0f4ff;
+  border-bottom: 1px solid #d0d7ff;
+  gap: 8px;
+}
+
+.rec-detail-name {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+}
+
+.rec-detail-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #888;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+}
+
+.rec-detail-close:hover {
+  color: #333;
+  background: #dde3f7;
+}
+
+/* ── Zone badges ─────────────────────────────────────────────────────────── */
+.rec-zones-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e8ecff;
+}
+
+.rec-zone-badge {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rec-zone-badge--0 { background: #e8ebff; color: #3d52c4; }
+.rec-zone-badge--1 { background: #fde8d0; color: #a04000; }
+.rec-zone-badge--2 { background: #d5f5e3; color: #1d6a3a; }
+
+/* ── Markdown content ────────────────────────────────────────────────────── */
+.rec-markdown {
+  padding: 14px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #333;
+  max-height: 420px;
+  overflow-y: auto;
+
+  /* RTL: Hebrew agent output reads right-to-left */
+  direction: rtl;
+  text-align: right;
+}
+
+.rec-markdown h1,
+.rec-markdown h2,
+.rec-markdown h3 {
+  margin: 12px 0 6px;
+  font-size: 14px;
+  color: #222;
+  text-align: right;
+}
+
+.rec-markdown h1 { font-size: 15px; }
+
+.rec-markdown p {
+  margin: 0 0 8px;
+}
+
+.rec-markdown strong {
+  font-weight: 700;
+}
+
+/* Bullet lists: indent from the right in RTL */
+.rec-markdown ul,
+.rec-markdown ol {
+  padding-inline-start: 0;
+  padding-inline-end: 20px;
+  margin: 0 0 8px;
+}
+
+.rec-markdown li {
+  margin-bottom: 4px;
+  text-align: right;
+}
+
+.rec-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.rec-markdown th,
+.rec-markdown td {
+  padding: 5px 8px;
+  border: 1px solid #d0d7e8;
+  text-align: right;
+}
+
+.rec-markdown th {
+  background: #f0f4ff;
+  font-weight: 600;
+}
+
+.rec-markdown hr {
+  border: none;
+  border-top: 1px solid #e0e4f0;
+  margin: 10px 0;
+}
+
+.rec-markdown code {
+  background: #f0f4ff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 12px;
+  /* Code snippets (coordinates) read LTR even inside an RTL container */
+  direction: ltr;
+  unicode-bidi: embed;
+}

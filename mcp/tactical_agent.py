@@ -30,6 +30,7 @@ from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any, Optional
 
+import asyncpg
 from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -72,6 +73,86 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
+# ─── Education phase mapping ──────────────────────────────────────────────────
+# Maps raw `education_phase` DB values to canonical stage keys and human labels.
+# The DB stores CBS-style English labels; Hebrew fallback keywords are included
+# for robustness if the source data ever changes.
+
+_PHASE_CANONICAL: dict[str, str] = {
+    "pre-primary":  "kindergarten",
+    "preprimary":   "kindergarten",
+    "kindergarten":  "kindergarten",
+    "preschool":     "kindergarten",
+    "גן":           "kindergarten",
+    "קדם יסודי":    "kindergarten",
+    "קדם-יסודי":    "kindergarten",
+    "elementary":    "elementary",
+    "primary":       "elementary",
+    "יסודי":        "elementary",
+    "post-primary":  "high_school",
+    "postprimary":   "high_school",
+    "secondary":     "high_school",
+    "high school":   "high_school",
+    "על יסודי":     "high_school",
+    "על-יסודי":     "high_school",
+    "תיכון":        "high_school",
+    "חט\"ב":        "high_school",
+    "חט\"ע":        "high_school",
+}
+
+_PHASE_LABELS: dict[str, str] = {
+    "kindergarten": "Kindergartens",
+    "elementary":   "Elementary Schools",
+    "high_school":  "High Schools",
+}
+
+# Maps family composition keys → canonical education phase.
+_CHILD_TO_PHASE: dict[str, str] = {
+    "infants":    "kindergarten",
+    "preschool":  "kindergarten",
+    "elementary": "elementary",
+    "youth":      "high_school",
+}
+
+
+def _classify_phase(raw_phase: str) -> Optional[str]:
+    """Map a raw education_phase DB string to a canonical stage key."""
+    normalised = raw_phase.strip().lower()
+    for keyword, canonical in _PHASE_CANONICAL.items():
+        if keyword in normalised:
+            return canonical
+    return None
+
+
+def _needed_education_phases(family_needs: dict[str, Any]) -> list[str]:
+    """
+    Return the canonical education phase keys the family actually needs,
+    based on which child-age buckets have a non-zero count.
+    """
+    comp = family_needs.get("composition") or {}
+    phases: list[str] = []
+    for child_key, phase in _CHILD_TO_PHASE.items():
+        if comp.get(child_key) and phase not in phases:
+            phases.append(phase)
+    return phases
+
+
+def _aggregate_phase_counts(
+    raw_phase_counts: dict[str, int],
+) -> dict[str, int]:
+    """
+    Re-key a raw {education_phase: count} dict into canonical
+    {kindergarten|elementary|high_school: count}, merging any DB-value
+    synonyms into the same bucket.
+    """
+    agg: dict[str, int] = {}
+    for raw_phase, cnt in raw_phase_counts.items():
+        canonical = _classify_phase(raw_phase)
+        if canonical:
+            agg[canonical] = agg.get(canonical, 0) + cnt
+    return agg
+
+
 # ─── MCP response decoder ─────────────────────────────────────────────────────
 
 def _decode(result: Any) -> dict[str, Any]:
@@ -112,23 +193,116 @@ You are a Tactical Relocation Expert at CityStrata, specialising in emergency
 shelter placement for Israeli families displaced by conflict.
 
 Your task: synthesise spatial and semantic analysis results into a clear,
-human-readable recommendation of the best relocation zones (neighbourhoods)
+professional, and human-friendly recommendation of the best relocation zones
 within the family's assigned cluster.
 
 STRICT RULES — follow without exception:
-1. Use ONLY the numerical facts in the user message (scores, distances, amenity
-   counts). Do not invent, estimate, or assume any data not provided.
-2. Recommend up to 3 zones in order of suitability with specific reasoning per
-   zone tied to the family's stated needs — education (use education_matched for
-   schools that match their supervision type, note education_special if > 0),
-   religion, community, lifestyle (cafes / restaurants), medical access, and mobility.
-3. Structure: one brief situation summary paragraph, then one paragraph per zone
-   explaining concretely why it fits this family, then a short closing paragraph.
-4. Write in the language implied by the family name — Hebrew names → Hebrew,
-   otherwise English.
-5. Tone: warm, empathetic, and professional. Acknowledge the difficulty of
-   displacement.
-6. Do not add a subject line or sign-off; the output is embedded in a larger
+
+1. **Data integrity & priority ranking:**
+   Use ONLY the numerical facts in the user message (amenity counts, distances,
+   education phases). Do not invent, estimate, or assume data not provided.
+
+   Your task is to **rank** the zones as:
+   - **"עדיפות ראשונה"** — the zone that best matches the family's needs.
+   - **"עדיפות שנייה"** — a solid alternative with minor trade-offs.
+   - **"עדיפות שלישית"** — viable but with notable compromises.
+
+   Decision criteria (in order of weight):
+     (a) **Education** — does the zone contain schools matching the children's
+         exact age phases *and* the family's required supervision type?  A zone
+         missing an entire required phase (e.g. no kindergartens when the family
+         has toddlers) is a major weakness.
+     (b) **Religion / Community** — presence of synagogues, Matnasim.
+     (c) **Personal Requests** — address the family's `notes` (e.g. "quiet
+         place") as a tie-breaker between otherwise similar zones.
+
+   For each zone ranked below "עדיפות ראשונה", you **must** explain clearly
+   why it was ranked lower, e.g. "אזור זה דורג בעדיפות שלישית בשל היעדר
+   מוסדות חינוך לגיל היסודי".  Use an encouraging, balanced tone — frame
+   gaps as *trade-offs*, not failures.
+
+   Do **NOT** mention numerical scores or "ציון" — present the ranking as a
+   consultant's professional recommendation based on the data.
+
+2. **Relevance filter — mention ONLY what matters to THIS family:**
+   - Education: mention only if the family has school-age children or education
+     essential_tags are present.
+
+     **Age-appropriate matching:** The data includes `needed_education_phases`
+     (the stages the family's children actually need, e.g. ["kindergarten",
+     "elementary"]) and per-zone `education_phase_counts` (how many schools of
+     each stage exist in the zone). Mention ONLY the stages that appear in
+     `needed_education_phases`. If the family only has a high-schooler, do NOT
+     mention kindergartens — even if the data shows them nearby.
+
+     **Sector-specific Hebrew terminology:** Use the supervision label from
+     `education_supervision_filter` to choose the correct Hebrew phrasing, and
+     combine it with the age stage. The exact mapping is:
+       • `education_supervision_filter` = "State Religious"  (religious / traditional)
+         → stage label: "גני ילדים שמתאימים לחינוך הממלכתי-דתי" (preschool/infants)
+                         "בתי ספר שמתאימים לחינוך הממלכתי-דתי" (elementary/youth)
+       • `education_supervision_filter` = "Ultra-Orthodox"  (haredi)
+         → stage label: "מוסדות חינוך חרדיים" (any stage)
+       • `education_supervision_filter` = "State"  (secular)  or absent
+         → stage label: "גני ילדים ממלכתיים" (preschool/infants)
+                         "בתי ספר ממלכתיים" (elementary/youth)
+     Example output: "נמצאו 5 גני ילדים שמתאימים לחינוך הממלכתי-דתי ו-2 בתי ספר
+     שמתאימים לחינוך הממלכתי-דתי."
+     If `education_supervision_filter` is absent and the language is Hebrew,
+     fall back to the secular Hebrew labels.
+
+   - Special Education: mention ONLY if `has_mobility_disability` is true OR the
+     `notes` field explicitly references special needs / special education. If
+     neither condition holds, do NOT mention special education at all — even if
+     the data shows special-education schools nearby.
+   - Synagogues / Religion: mention only if the family has a religious affiliation
+     or needs_synagogue is true.
+   - Community Centres (Matnas): mention only if matnas_participation is true or
+     needs_community_proximity is true.
+   - Cafés / Restaurants: mention only if social_venues_importance >= 3 or the
+     notes suggest social or dining needs.
+   - City Facilities / Parks: mention only if culture_frequency >= 3 or the notes
+     reference parks, green space, or outdoor needs.
+   - Medical: mention only if needs_medical_proximity is true or
+     services_importance >= 4.
+
+3. **Prioritise the `notes` field:** The `notes` field contains the family's own
+   words or caseworker instructions. Treat it as a HIGH-PRIORITY requirement:
+   - Analyse the notes and explicitly address them in your reasoning.
+   - If the notes request a "quiet place" (e.g. "זקוקים למקום שקט"), favour zones
+     with fewer noisy commercial venues or explain why a zone still fits despite
+     nearby restaurants / cafes.
+   - If the notes mention specific needs (medical, accessibility, schooling, etc.)
+     make sure your recommendation directly responds to them.
+
+4. **Structure:** Recommend up to 3 zones in order of suitability:
+   - One brief opening paragraph acknowledging the family's situation and any
+     special requests from the notes.
+   - Per zone: a concise paragraph explaining why it fits this family, referencing
+     only the amenity categories that are relevant (see rule 2).
+   - A short closing paragraph with an overall recommendation.
+
+5. **Language & zone naming:** Write the ENTIRE output in the language implied
+   by the family name.
+   - Hebrew family name → write everything in Hebrew, including ALL section
+     headers, labels, and bullet-point keys. Use these exact Hebrew labels:
+       • Zone names: "אזור אלפא", "אזור בטא", "אזור גמא" (matching zone_alpha,
+         zone_beta, zone_gamma from the data). Any other zone → "אזור [מספר]".
+       • "מיקום וכיסוי:" instead of "Location & Coverage:"
+       • "ציון התאמה:" instead of "The Match:"
+       • "מתקנים עיקריים באזור:" instead of "Key Amenities found:"
+       • "חינוך:", "דת:", "אורח חיים:", "קהילה:", "מתקנים עירוניים:"
+         for the amenity sub-bullets
+   - Refer to zones by their Hebrew names ("אזור אלפא" etc.) consistently
+     throughout all reasoning paragraphs — never mix Hebrew headers with
+     English zone names.
+   - Non-Hebrew family name → write entirely in English using the English
+     labels ("Zone Alpha", "Zone Beta", "Zone Gamma").
+
+6. **Tone:** Clear, empathetic, and professional. Acknowledge the difficulty of
+   displacement without being melodramatic.
+
+7. Do not add a subject line or sign-off; the output is embedded in a larger
    report.
 """
 
@@ -189,6 +363,8 @@ def _build_grounding_context(
             "has_car":                mob.get("has_car"),
             "has_mobility_disability": mob.get("has_mobility_disability"),
         },
+        "notes": family_needs.get("notes"),
+        "needed_education_phases": _needed_education_phases(family_needs),
         "cluster_name":      cluster.get("cluster_name"),
         "cluster_reasoning": cluster.get("reasoning"),
         "education_supervision_filter": ranked_radii[0].get("education_supervision_filter") if ranked_radii else None,
@@ -203,9 +379,11 @@ def _build_grounding_context(
                 "embeddings_matched": r.get("embeddings_matched"),
                 "total_amenities":    r.get("total_amenities"),
                 "amenity_counts":     r.get("amenity_counts") or {},
-                # Education building counts (deduplicated at 3dp coordinate precision)
-                "education_matched":  r.get("education_matched"),   # schools matching supervision type
-                "education_special":  r.get("education_special"),   # special education buildings
+                "education_matched":  r.get("education_matched"),
+                "education_special":  r.get("education_special"),
+                "education_phase_counts": _aggregate_phase_counts(
+                    r.get("education_phase_counts") or {}
+                ),
             }
             for i, r in enumerate(ranked_radii[:3])
         ],
@@ -241,7 +419,7 @@ async def _generate_recommendation(
             client.chat.completions.create(
                 model=_AI_MODEL,
                 temperature=0.3,    # low → reliable, grounded output
-                max_tokens=1_200,
+                max_tokens=1_600,
                 messages=[
                     {"role": "system", "content": _SYSTEM_PROMPT},
                     {"role": "user",   "content": user_prompt},
@@ -433,6 +611,86 @@ def _build_needs_text(family_needs: dict[str, Any]) -> str:
     )
 
 
+# ─── DB persistence ───────────────────────────────────────────────────────────
+
+async def _save_tactical_result(
+    family_id: str,
+    report: str,
+    confidence: Any,
+    radii_data: Optional[list] = None,
+) -> None:
+    """
+    Persist (upsert) the tactical report to the database inside a single
+    transaction.
+
+    Strategy — INSERT … ON CONFLICT (profile_uuid) DO UPDATE:
+        • First run  → inserts a fresh row and back-links the family profile.
+        • Re-run     → updates agent_output, confidence, radii_data, and
+                       updated_at in place; the row id and created_at are
+                       preserved so existing references stay valid.
+
+    Requires migration 0022 (UNIQUE constraint on profile_uuid + updated_at
+    column) to have been applied before calling this function.
+
+    radii_data is stored as JSONB so the frontend API can return hub
+    coordinates and scores without a separate join.
+
+    Non-fatal: any DB error is logged and swallowed so the caller always
+    receives the report string regardless of persistence failures.
+    """
+    db_url = os.getenv("DATABASE_URL", "").strip()
+    if not db_url:
+        _progress("[tactical] DATABASE_URL not set — skipping DB save.")
+        return
+
+    radii_json    = json.dumps(radii_data) if radii_data else None
+    confidence_str = str(confidence) if confidence is not None else None
+
+    try:
+        conn = await asyncpg.connect(dsn=db_url, statement_cache_size=0)
+        try:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO tactical_agent_response
+                        (profile_uuid, agent_output, confidence, radii_data)
+                    VALUES ($1::uuid, $2, $3, $4::jsonb)
+                    ON CONFLICT (profile_uuid) DO UPDATE
+                        SET agent_output = EXCLUDED.agent_output,
+                            confidence   = EXCLUDED.confidence,
+                            radii_data   = EXCLUDED.radii_data,
+                            updated_at   = NOW()
+                    RETURNING id
+                    """,
+                    family_id,
+                    report,
+                    confidence_str,
+                    radii_json,
+                )
+                response_id = row["id"]
+                # Keep the back-reference on the family profile current.
+                # On first insert this sets the FK; on upsert (same id) it
+                # is a no-op but ensures consistency if the column was NULL.
+                await conn.execute(
+                    """
+                    UPDATE evacuee_family_profiles
+                    SET    tactical_agent_response_id = $1
+                    WHERE  uuid = $2::uuid
+                    """,
+                    response_id,
+                    family_id,
+                )
+        finally:
+            await conn.close()
+        _progress(
+            f"[tactical] Report upserted to DB "
+            f"(tactical_agent_response.id={response_id})."
+        )
+    except Exception as exc:
+        logger.warning("DB save failed (non-fatal): %s", exc)
+        _progress(f"[tactical] DB save skipped ({exc}).")
+
+
 # ─── Agent ────────────────────────────────────────────────────────────────────
 
 class TacticalRelocationAgent:
@@ -566,6 +824,7 @@ class TacticalRelocationAgent:
         # ── Step 3: Holistic semantic scoring ─────────────────────────────
         _progress("[tactical] Step 3/4: Holistic semantic scoring (pgvector across all amenities)…")
         needs_text   = _build_needs_text(family_needs)
+
         score_result = await self._call(
             "semantic_radius_scoring",
             radii=radii,
@@ -580,20 +839,98 @@ class TacticalRelocationAgent:
         _progress("[tactical] Step 4/4: Generating GPT-4o recommendation…")
         ai_letter = await _generate_recommendation(family_needs, cluster, ranked_radii)
 
-        return _format_report(family_needs, cluster, ranked_radii, ai_letter)
+        report = _format_report(family_needs, cluster, ranked_radii, ai_letter)
+        await _save_tactical_result(family_id, report, cluster.get("confidence"), ranked_radii)
+        return report
 
 
 # ─── Report formatter ─────────────────────────────────────────────────────────
 
-# Human-readable labels for all amenity categories (mirrors AMENITY_TABLES).
-_CATEGORY_LABELS: dict[str, str] = {
-    "education":    "Schools / Education",
-    "synagogue":    "Synagogues",
-    "matnas":       "Community Centres (Matnas)",
-    "cafe":         "Cafés",
-    "restaurant":   "Restaurants",
-    "city_facility": "City Facilities / Parks",
+
+def _relevant_categories(family_needs: dict[str, Any]) -> set[str]:
+    """
+    Determine which amenity categories are relevant to this family's profile.
+
+    Returns a set of category keys (matching AMENITY_TABLES) plus the
+    pseudo-key "education_special" when special-education schools should be
+    mentioned.  The static report and the AI prompt both use this to avoid
+    surfacing amenities the family never asked for.
+    """
+    relevant: set[str] = set()
+
+    comp      = family_needs.get("composition") or {}
+    edu       = family_needs.get("education")   or {}
+    rel       = family_needs.get("religion")    or {}
+    comm      = family_needs.get("community")   or {}
+    mob       = family_needs.get("mobility")    or {}
+    lifestyle = family_needs.get("lifestyle")   or {}
+    medical   = family_needs.get("medical")     or {}
+    notes     = (family_needs.get("notes") or "").lower()
+
+    has_children = any(
+        comp.get(k) for k in ("infants", "preschool", "elementary", "youth")
+    )
+    if has_children or edu.get("essential_tags") or _to_int(edu.get("proximity_importance")) >= 3:
+        relevant.add("education")
+
+    if mob.get("has_mobility_disability") or "חינוך מיוחד" in notes or "special" in notes:
+        relevant.add("education_special")
+
+    if rel.get("needs_synagogue") or rel.get("affiliation") in (
+        "religious", "haredi", "traditional",
+    ):
+        relevant.add("synagogue")
+
+    if comm.get("matnas_participation") or comm.get("needs_community_proximity"):
+        relevant.add("matnas")
+
+    social_imp = _to_int(
+        lifestyle.get("social_venues_importance") or comm.get("social_importance")
+    )
+    if social_imp >= 3:
+        relevant.add("cafe")
+        relevant.add("restaurant")
+
+    culture_freq = _to_int(
+        lifestyle.get("culture_frequency") or comm.get("culture_frequency")
+    )
+    if culture_freq >= 3:
+        relevant.add("city_facility")
+
+    if medical.get("needs_medical_proximity") or _to_int(medical.get("services_importance")) >= 4:
+        relevant.add("city_facility")
+
+    return relevant
+
+
+# Hebrew translations for the fixed zone hub labels produced by the pipeline.
+_HUB_LABEL_HE: dict[str, str] = {
+    "zone_alpha": "אזור אלפא",
+    "zone_beta":  "אזור בטא",
+    "zone_gamma": "אזור גמא",
 }
+
+# Hebrew labels for the education phase keys (parallel to _PHASE_LABELS in English).
+_PHASE_LABELS_HE: dict[str, str] = {
+    "kindergarten": "גני ילדים",
+    "elementary":   "בתי ספר יסודיים",
+    "high_school":  "בתי ספר תיכוניים",
+}
+
+
+def _he_zone_label(hub_label: str) -> str:
+    """
+    Return the Hebrew-friendly zone name for a hub_label string.
+
+    Known labels (zone_alpha/beta/gamma) map to Hebrew letter names.
+    Any other pattern falls back to "אזור <N>" where N is the numeric index
+    extracted from the label, or the raw label if no number is present.
+    """
+    raw = (hub_label or "").strip().lower()
+    if raw in _HUB_LABEL_HE:
+        return _HUB_LABEL_HE[raw]
+    # Generic fallback: replace "zone" with "אזור", capitalise remainder.
+    return raw.replace("zone_", "אזור ").replace("zone ", "אזור ").strip().title()
 
 
 def _format_report(
@@ -603,82 +940,128 @@ def _format_report(
     ai_letter: Optional[str],
 ) -> str:
     """Build the final Markdown tactical report from pipeline outputs."""
-    name         = family_needs.get("family_name") or "Unknown Family"
+    name         = family_needs.get("family_name") or "משפחה לא ידועה"
     comp         = family_needs.get("composition") or {}
-    cluster_name = cluster.get("cluster_name") or f"Cluster {cluster.get('cluster_number')}"
+    cluster_name = cluster.get("cluster_name") or f"אשכול {cluster.get('cluster_number')}"
+
+    # RTL Unicode marker ensures renderers that honour the BOM/marker apply
+    # right-to-left text flow even before any CSS is applied.
+    RTL = "\u200F"  # RIGHT-TO-LEFT MARK (invisible, no width)
 
     lines: list[str] = [
-        f"# CityStrata Tactical Report — {name}",
+        f"{RTL} דו״ח מיקום טקטי — CityStrata | {name}",
         "",
-        f"**Assigned cluster:** {cluster_name}  ",
-        f"**Household size:** {comp.get('total_people', '?')}  ",
-        f"**Cluster confidence:** {cluster.get('confidence', '—')}  ",
-        "",
-        "---",
+        f"**אשכול מוקצה:** {cluster_name}  ",
+        f"**גודל משק בית:** {comp.get('total_people', '?')}  ",
+        f"**רמת וודאות:** {cluster.get('confidence', '—')}  ",
         "",
     ]
 
-    # AI-generated recommendation letter (if available)
+    notes = family_needs.get("notes")
+    if notes:
+        lines += [f"**הערות המשפחה:** {notes}  ", ""]
+
+    lines += ["---", ""]
+
     if ai_letter:
-        lines += ["## AI Recommendation", "", ai_letter, "", "---", ""]
+        lines += ["## המלצת המערכת", "", ai_letter, "", "---", ""]
 
-    # Ranked zone cards — full holistic amenity breakdown
-    lines += ["## Ranked Relocation Zones", ""]
+    relevant      = _relevant_categories(family_needs)
+    needed_phases = _needed_education_phases(family_needs)
 
-    for i, zone in enumerate(ranked_radii[:3], start=1):
+    lines += ["## אזורי מגורים מומלצים", ""]
+
+    _PRIORITY_LABELS = ["עדיפות ראשונה", "עדיפות שנייה", "עדיפות שלישית"]
+
+    for i, zone in enumerate(ranked_radii[:3]):
         counts  = zone.get("amenity_counts") or {}
-        label   = (zone.get("hub_label") or "zone").replace("_", " ").title()
+        hub_raw = zone.get("hub_label") or f"zone_{i}"
+        label   = _he_zone_label(hub_raw)
         lat     = zone.get("center_lat", 0.0)
         lng     = zone.get("center_lng", 0.0)
         radius  = zone.get("radius_m", 0)
-        score   = zone.get("semantic_score", 0.0)
-        matched = zone.get("embeddings_matched", 0)
-        total   = zone.get("total_amenities", sum(counts.values()))
 
-        education_matched = zone.get("education_matched")
         education_special = zone.get("education_special")
         edu_filter        = zone.get("education_supervision_filter")
+        raw_phase_counts  = zone.get("education_phase_counts") or {}
+        phase_counts      = _aggregate_phase_counts(raw_phase_counts)
+
+        priority = _PRIORITY_LABELS[i] if i < len(_PRIORITY_LABELS) else f"עדיפות {i + 1}"
 
         lines += [
-            f"### Zone {i} — {label}",
+            f"### {priority}: {label}",
             "",
-            "| Field | Value |",
-            "|-------|-------|",
-            f"| **Centre** | `{lat:.5f}, {lng:.5f}` |",
-            f"| **Radius** | {radius} m |",
-            f"| **Semantic score** | {score:.4f} ({matched} embeddings matched) |",
-            f"| **Total amenities** | {total} |",
+            f"* **מיקום וכיסוי:** `{lat:.5f}, {lng:.5f}` (רדיוס: {radius} מ׳)",
         ]
 
-        # Holistic amenity breakdown
-        for cat, human_label in _CATEGORY_LABELS.items():
-            if cat == "education":
-                # Show matched schools (filtered by supervision) + total from UNION ALL
-                all_edu = counts.get("education", 0)
-                if education_matched is not None and edu_filter:
-                    lines.append(
-                        f"| **{human_label}** | "
-                        f"{education_matched} matching ({edu_filter}) "
-                        f"/ {all_edu} total |"
-                    )
-                else:
-                    if all_edu:
-                        lines.append(f"| **{human_label}** | {all_edu} |")
-                # Special education row — always show if > 0
-                if education_special:
-                    lines.append(f"| **Special Education Schools** | {education_special} |")
+        amenity_bullets: list[str] = []
+
+        if "education" in relevant:
+            phase_parts: list[str] = []
+            for phase_key in ("kindergarten", "elementary", "high_school"):
+                if phase_key in needed_phases:
+                    cnt = phase_counts.get(phase_key, 0)
+                    if cnt:
+                        phase_parts.append(f"{cnt} {_PHASE_LABELS_HE[phase_key]}")
+
+            if phase_parts:
+                amenity_bullets.append(
+                    f"  - **חינוך:** {', '.join(phase_parts)}."
+                )
             else:
-                count = counts.get(cat, 0)
-                if count:
-                    lines.append(f"| **{_CATEGORY_LABELS[cat]}** | {count} |")
+                all_edu = counts.get("education", 0)
+                if all_edu:
+                    amenity_bullets.append(
+                        f"  - **חינוך:** {all_edu} מוסדות חינוך בסביבה."
+                    )
+
+        if "education_special" in relevant and education_special:
+            amenity_bullets.append(
+                f"  - **חינוך מיוחד:** {education_special} בתי ספר לחינוך מיוחד."
+            )
+
+        if "synagogue" in relevant:
+            syn_count = counts.get("synagogue", 0)
+            if syn_count:
+                amenity_bullets.append(f"  - **דת:** {syn_count} בתי כנסת בסביבה.")
+
+        if "cafe" in relevant or "restaurant" in relevant:
+            cafe_count = counts.get("cafe", 0) if "cafe" in relevant else 0
+            rest_count = counts.get("restaurant", 0) if "restaurant" in relevant else 0
+            parts: list[str] = []
+            if rest_count:
+                parts.append(f"{rest_count} מסעדות")
+            if cafe_count:
+                parts.append(f"{cafe_count} בתי קפה")
+            if parts:
+                amenity_bullets.append(
+                    f"  - **אורח חיים:** {' ו-'.join(parts)} לצרכים חברתיים."
+                )
+
+        if "matnas" in relevant:
+            matnas_count = counts.get("matnas", 0)
+            if matnas_count:
+                amenity_bullets.append(
+                    f"  - **קהילה:** {matnas_count} מתנ״ס בסביבה."
+                )
+
+        if "city_facility" in relevant:
+            cf_count = counts.get("city_facility", 0)
+            if cf_count:
+                amenity_bullets.append(
+                    f"  - **מתקנים עירוניים:** {cf_count} פארקים, שירותים ומוסדות."
+                )
+
+        if amenity_bullets:
+            lines.append("* **מתקנים עיקריים באזור:**")
+            lines.extend(amenity_bullets)
 
         lines.append("")
 
     lines += [
         "---",
         "",
-        "*CityStrata Tactical Agent — holistic cluster-bound radius recommendations "
-        "for displaced families in Eilat.*",
+        f"*{RTL} CityStrata — המלצות מבוססות בינה מלאכותית לקהילות מפונות.*",
     ]
     return "\n".join(lines)
 

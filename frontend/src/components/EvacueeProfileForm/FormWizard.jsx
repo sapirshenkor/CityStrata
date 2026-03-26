@@ -65,13 +65,13 @@ const initialData = {
 export default function FormWizard() {
   const steps = useMemo(
     () => [
-      { key: 'step1', title: 'Contact Info', Component: Step1ContactInfo },
-      { key: 'step2', title: 'Family Composition', Component: Step2FamilyComposition },
-      { key: 'step3', title: 'Education', Component: Step3Education },
-      { key: 'step4', title: 'Religious & Culture', Component: Step4ReligiousCultural },
-      { key: 'step5', title: 'Community', Component: Step5Community },
-      { key: 'step6', title: 'Housing', Component: Step6Housing },
-      { key: 'step7', title: 'Extra', Component: Step7Extra },
+      { key: 'step1', title: 'פרטי קשר', Component: Step1ContactInfo },
+      { key: 'step2', title: 'הרכב משפחה', Component: Step2FamilyComposition },
+      { key: 'step3', title: 'חינוך', Component: Step3Education },
+      { key: 'step4', title: 'דת ותרבות', Component: Step4ReligiousCultural },
+      { key: 'step5', title: 'קהילה', Component: Step5Community },
+      { key: 'step6', title: 'דיור', Component: Step6Housing },
+      { key: 'step7', title: 'מידע נוסף', Component: Step7Extra },
     ],
     []
   )
@@ -151,12 +151,12 @@ export default function FormWizard() {
   const isLast = stepIdx === steps.length - 1
 
   return (
-    <div className="evpf-card">
+    <div className="evpf-card" dir="rtl">
       <div className="evpf-header">
         <div>
           <div className="evpf-title">{current.title}</div>
           <div className="evpf-stepinfo">
-            Step {stepIdx + 1} of {steps.length}
+            שלב {stepIdx + 1} מתוך {steps.length}
           </div>
         </div>
 
@@ -172,9 +172,9 @@ export default function FormWizard() {
 
       {submitState.status === 'success' ? (
         <div className="evpf-success-banner">
-          {submitState.message}
+          הפרופיל נשלח בהצלחה.
           <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700 }}>
-            UUID: {submitState.result?.uuid ? String(submitState.result.uuid) : '(n/a)'}
+            מזהה: {submitState.result?.uuid ? String(submitState.result.uuid) : '(לא זמין)'}
           </div>
         </div>
       ) : null}
@@ -192,7 +192,7 @@ export default function FormWizard() {
           onClick={goBack}
           disabled={stepIdx === 0 || submitState.status === 'submitting'}
         >
-          Back
+          חזור
         </button>
 
         {!isLast ? (
@@ -202,7 +202,7 @@ export default function FormWizard() {
             onClick={goNext}
             disabled={submitState.status === 'submitting'}
           >
-            Next
+            הבא
           </button>
         ) : (
           <button
@@ -211,7 +211,7 @@ export default function FormWizard() {
             onClick={handleSubmit}
             disabled={submitState.status === 'submitting'}
           >
-            {submitState.status === 'submitting' ? 'Submitting...' : 'Submit'}
+            {submitState.status === 'submitting' ? 'שולח...' : 'שלח'}
           </button>
         )}
       </div>

@@ -1,52 +1,50 @@
 """
-CityStrata Tactical MCP Server — Holistic Radius-Based Evacuee Relocation
-==========================================================================
+CityStrata Tactical MCP Server — Holistic Radius-Based Evacuee Relocation:
 
-Exposes three FastMCP tools that transform a family's pre-assigned statistical
-cluster into concrete "relocation radii" (service-hub zones), ranked by spatial
-density and pgvector semantic similarity across ALL meaningful amenity categories.
+    Exposes three FastMCP tools that transform a family's pre-assigned statistical
+    cluster into concrete "relocation radii" (service-hub zones), ranked by spatial
+    density and pgvector semantic similarity across ALL meaningful amenity categories.
 
-Architecture overview
----------------------
-No distinction is made between "anchor" amenities (schools, synagogues) and
-"secondary" amenities (cafes, parks, supermarkets).  Every table in
-AMENITY_TABLES contributes equally to:
-    1. K-means hub discovery  (PostGIS ST_ClusterKMeans within cluster polygon)
-    2. Adaptive radius sizing (P75 distance to all nearby amenities)
-    3. Semantic zone scoring  (pgvector cosine similarity, all embeddings pooled)
+    Architecture overview
+    ---------------------
+    No distinction is made between "anchor" amenities (schools, synagogues) and
+    "secondary" amenities (cafes, parks, supermarkets).  Every table in
+    AMENITY_TABLES contributes equally to:
+        1. K-means hub discovery  (PostGIS ST_ClusterKMeans within cluster polygon)
+        2. Adaptive radius sizing (P75 distance to all nearby amenities)
+        3. Semantic zone scoring  (pgvector cosine similarity, all embeddings pooled)
 
-Data quality fixes (derived from Pydantic model inspection)
------------------------------------------------------------
-educational_institutions:
-    The table stores one row per education programme, not per building.
-    A single school (institution_code) may appear multiple times with different
-    education_phase / type_of_education values.  All queries deduplicate by
-    institution_code so counts represent physical school buildings.
+    Data quality fixes (derived from Pydantic model inspection)
+    -----------------------------------------------------------
+    educational_institutions:
+        The table stores one row per education programme, not per building.
+        A single school (institution_code) may appear multiple times with different
+        education_phase / type_of_education values.  All queries deduplicate by
+        institution_code so counts represent physical school buildings.
 
-coffee_shops / restaurants:
-    Both tables carry permanently_closed and temporarily_closed boolean columns.
-    Closed venues are excluded from all spatial and semantic queries via
-    extra_filter so they do not distort hub positions or amenity counts.
+    coffee_shops / restaurants:
+        Both tables carry permanently_closed and temporarily_closed boolean columns.
+        Closed venues are excluded from all spatial and semantic queries via
+        extra_filter so they do not distort hub positions or amenity counts.
 
-OSM filtering
--------------
-osm_city_facilities is a large catch-all table.  A curated whitelist
-(OSM_FACILITY_WHITELIST) keeps only facility types that meaningfully affect a
-displaced family's day-to-day quality of life.  See the whitelist comment block
-for the full exclusion rationale.
+    OSM filtering
+    -------------
+    osm_city_facilities is a large catch-all table.  A curated whitelist
+    (OSM_FACILITY_WHITELIST) keeps only facility types that meaningfully affect a
+    displaced family's day-to-day quality of life.  See the whitelist comment block
+    for the full exclusion rationale.
 
-Extensibility
--------------
-To add a new amenity source:  append one entry to AMENITY_TABLES.
-To update the OSM filter:     edit OSM_FACILITY_WHITELIST.
-To deduplicate a table:       set dedup_col to the unique business-key column.
-To filter a table:            set extra_filter to a valid SQL AND fragment.
-No other code changes are required for any of the above.
+    Extensibility
+    -------------
+    To add a new amenity source:  append one entry to AMENITY_TABLES.
+    To update the OSM filter:     edit OSM_FACILITY_WHITELIST.
+    To filter a table:            set extra_filter to a valid SQL AND fragment.
+    No other code changes are required for any of the above.
 
-Transport:  stdio (Cursor / Claude Desktop MCP protocol).
-Environment variables:
-    DATABASE_URL   — AsyncPG-compatible PostgreSQL URL (PostGIS + pgvector)
-    OPENAI_API_KEY — OpenAI API key for text-embedding-3-small
+    Transport:  stdio (Cursor / Claude Desktop MCP protocol).
+    Environment variables:
+        DATABASE_URL   — AsyncPG-compatible PostgreSQL URL (PostGIS + pgvector)
+        OPENAI_API_KEY — OpenAI API key for text-embedding-3-small
 """
 
 from __future__ import annotations
@@ -54,6 +52,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import sys
 import urllib.error
@@ -188,19 +187,20 @@ def _embed_sync(text: str) -> list[float]:
     Raises:
         RuntimeError: On HTTP errors from the OpenAI API.
     """
-    payload = json.dumps({"model": "text-embedding-3-small", "input": text}).encode()
-    req = urllib.request.Request(
-        "https://api.openai.com/v1/embeddings",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {_require_env('OPENAI_API_KEY')}",
-            "Content-Type": "application/json",
+    payload = json.dumps({"model": "text-embedding-3-small", "input": text}).encode() # dumps convert dict to json 
+    # and encode the payload to bytes
+    req = urllib.request.Request( # create a request object
+        "https://api.openai.com/v1/embeddings", # the url to send the request to openai api endpoint
+        data=payload, # the payload to send
+        headers={ # the headers to send
+            "Authorization": f"Bearer {_require_env('OPENAI_API_KEY')}", # the authorization header
+            "Content-Type": "application/json", # the content type header
         },
-        method="POST",
+        method="POST", # the method to use
     )
     try:
         with urllib.request.urlopen(req, timeout=90) as resp:
-            return json.loads(resp.read())["data"][0]["embedding"]
+            return json.loads(resp.read())["data"][0]["embedding"] # loads the response and returns only the embedding like "embedding": [0.123, 0.456, ...]
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"OpenAI embeddings HTTP {exc.code}: {body[:400]}") from exc
@@ -228,31 +228,31 @@ async def _embed(text: str) -> list[float]:
 
 
 # ─── OSM facility whitelist ───────────────────────────────────────────────────
-# osm_city_facilities is a large OSM catch-all table (~1 150 rows for Eilat).
-# Raw, it is dominated by infrastructure noise: bus stops (259), parking (176),
-# swimming pools (84), pitch (61), etc.
-#
-# This whitelist keeps only facility_type values that meaningfully affect a
-# displaced family's daily quality of life.
-#
-# Exclusion rationale:
-#   transport infrastructure : bus_stop (259), bus_station, parking (176),
-#       fuel, charging_station, bicycle  → don't affect liveability decisions
-#   leisure (high volume, low daily relevance): swimming_pool (84), pitch (61)
-#       → distort K-means; not a housing selection factor
-#   retail / personal services : clothes, shoes, hairdresser, electronics,
-#       mobile_phone, hardware, electrical, jewelry, optician, florist,
-#       computer, gift, baby_goods, bureau_de_change, kiosk, variety_store
-#   tourism / entertainment : marina, bird_hide, scuba_diving, ice_rink,
-#       water_park, beach_resort, tattoo, erotic, massage, outdoor, track,
-#       deli, bakery (covered by restaurants table), bar, pub, alcohol
-#   miscellaneous / bad data : yes, recycling
-#
-# After filtering, effective OSM rows drop from ~1 150 to ~100–110, which is
-# proportionate to other tables (schools ~15–20, synagogues 27, matnasim 7,
-# cafes ~50, restaurants ~180).
-#
-# To update: edit this set only — AMENITY_TABLES picks it up automatically.
+    # osm_city_facilities is a large OSM catch-all table (~1 150 rows for Eilat).
+    # Raw, it is dominated by infrastructure noise: bus stops (259), parking (176),
+    # swimming pools (84), pitch (61), etc.
+    #
+    # This whitelist keeps only facility_type values that meaningfully affect a
+    # displaced family's daily quality of life.
+    #
+    # Exclusion rationale:
+    #   transport infrastructure : bus_stop (259), bus_station, parking (176),
+    #       fuel, charging_station, bicycle  → don't affect liveability decisions
+    #   leisure (high volume, low daily relevance): swimming_pool (84), pitch (61)
+    #       → distort K-means; not a housing selection factor
+    #   retail / personal services : clothes, shoes, hairdresser, electronics,
+    #       mobile_phone, hardware, electrical, jewelry, optician, florist,
+    #       computer, gift, baby_goods, bureau_de_change, kiosk, variety_store
+    #   tourism / entertainment : marina, bird_hide, scuba_diving, ice_rink,
+    #       water_park, beach_resort, tattoo, erotic, massage, outdoor, track,
+    #       deli, bakery (covered by restaurants table), bar, pub, alcohol
+    #   miscellaneous / bad data : yes, recycling
+    #
+    # After filtering, effective OSM rows drop from ~1 150 to ~100–110, which is
+    # proportionate to other tables (schools ~15–20, synagogues 27, matnasim 7,
+    # cafes ~50, restaurants ~180).
+    #
+    # To update: edit this set only — AMENITY_TABLES picks it up automatically.
 
 OSM_FACILITY_WHITELIST: frozenset[str] = frozenset({
     # Green space — daily-life anchors for families with young children
@@ -269,44 +269,37 @@ OSM_FACILITY_WHITELIST: frozenset[str] = frozenset({
     # Civic and government services — displaced families deal with paperwork
     "government", "post_office", "townhall", "police",
     # Education and culture (supplementary to educational_institutions table)
-    "school", "library", "arts_centre", "university", "college",
+    "library", "arts_centre", "university", "college", 
     # Practical household need for families without in-unit laundry
     "laundry",
 })
 
 # Pre-built SQL array literal — constructed once at module load.
 # Used in the extra_filter for osm_city_facilities:
-#   AND facility_type = ANY(ARRAY['arts_centre','atm',...])
+# create string for usage in the query like: facility_type = ANY(ARRAY['arts_centre','atm',...])
 _OSM_WHITELIST_SQL_LITERAL: str = (
     "ARRAY[" + ",".join(f"'{f}'" for f in sorted(OSM_FACILITY_WHITELIST)) + "]"
 )
 
 
 # ─── Amenity registry ─────────────────────────────────────────────────────────
-# AMENITY_TABLES is the single source of truth for every amenity data source.
-#
-# Schema per entry:
-#   table         — PostgreSQL table name (never interpolated from user input)
-#   category      — Label used in amenity_counts output and SQL FILTER expressions
-#   location      — Name of the PostGIS geography/geometry column
-#   has_embedding — True if the table has an 'embedding' vector column
-#   dedup_col     — Optional column name for DISTINCT ON deduplication.
-#                   Use when a table has multiple rows per real-world entity
-#                   (e.g. educational_institutions has one row per programme,
-#                   not per building; dedup_col='institution_code' collapses
-#                   them to one row per physical school).
-#                   The SQL builders wrap the SELECT in DISTINCT ON (dedup_col)
-#                   with a matching ORDER BY automatically.
-#   extra_filter  — Optional SQL AND fragment appended to the WHERE clause
-#                   (e.g. OSM whitelist, closed-venue exclusion).
-#                   Must be valid SQL with no unbound parameters.
-#
-# Data quality notes derived from Pydantic model inspection:
-#   educational_institutions : institution_code is the unique school identifier.
-#       Multiple rows per code exist (different education_phase/type_of_education).
-#       dedup_col='institution_code' ensures counts reflect physical buildings.
-#   coffee_shops / restaurants : permanently_closed and temporarily_closed
-#       boolean columns exist.  extra_filter excludes them from all queries.
+    # AMENITY_TABLES is the single source of truth for every amenity data source.
+    #
+    # Schema per entry:
+    #   table         — PostgreSQL table name (never interpolated from user input)
+    #   category      — Label used in amenity_counts output and SQL FILTER expressions
+    #   location      — Name of the PostGIS geography/geometry column
+    #   has_embedding — True if the table has an 'embedding' vector column
+    #   extra_filter  — Optional SQL AND fragment appended to the WHERE clause
+    #                   (e.g. OSM whitelist, closed-venue exclusion).
+    #                   Must be valid SQL with no unbound parameters.
+    #
+    # Data quality notes derived from Pydantic model inspection:
+    #   educational_institutions : institution_code is the unique school identifier.
+    #       Multiple rows per code exist (different education_phase/type_of_education).
+    #       Step C education queries use COUNT(DISTINCT institution_code) directly.
+    #   coffee_shops / restaurants : permanently_closed and temporarily_closed
+    #       boolean columns exist.  extra_filter excludes them from all queries.
 
 AMENITY_TABLES: list[dict[str, Any]] = [
     {
@@ -314,15 +307,7 @@ AMENITY_TABLES: list[dict[str, Any]] = [
         "category":     "education",
         "location":     "location",
         "has_embedding": True,
-        # educational_institutions has multiple rows per physical building:
-        # different kindergartens/programmes share the same address.
-        # Diagnostic query confirmed: 65 rows → 36 distinct physical locations
-        # at 3-decimal-place coordinate precision (≈111 m grid).
-        # We dedup on ROUND(lat,3), ROUND(lon,3) so each building contributes
-        # exactly one point to K-means and one count to the census.
-        # Note: lat/lon are plain float columns (confirmed in Pydantic model),
-        # not the PostGIS geometry column — safe to use directly in DISTINCT ON.
-        "dedup_col":    "ROUND(lat::numeric, 3), ROUND(lon::numeric, 3)",
+        "dedup_col":    None,
         "extra_filter": None,
     },
     {
@@ -347,9 +332,6 @@ AMENITY_TABLES: list[dict[str, Any]] = [
         "location":     "location",
         "has_embedding": True,
         "dedup_col":    None,
-        # Exclude venues that are no longer operating.
-        # permanently_closed and temporarily_closed are boolean columns
-        # confirmed in the CoffeeShopBase Pydantic model.
         "extra_filter": "AND permanently_closed = FALSE AND temporarily_closed = FALSE",
     },
     {
@@ -358,12 +340,11 @@ AMENITY_TABLES: list[dict[str, Any]] = [
         "location":     "location",
         "has_embedding": True,
         "dedup_col":    None,
-        # Same closure logic as coffee_shops — confirmed in RestaurantBase model.
         "extra_filter": "AND permanently_closed = FALSE AND temporarily_closed = FALSE",
     },
     {
         # OSM filtered to the curated whitelist.
-        # Raw: ~1 150 rows.  After whitelist: ~100–110 rows.
+        # Raw: ~1150 rows.  After whitelist: ~100–110 rows.
         "table":        "osm_city_facilities",
         "category":     "city_facility",
         "location":     "location",
@@ -378,23 +359,23 @@ AMENITY_TABLES: list[dict[str, Any]] = [
 ALL_CATEGORIES: list[str] = [t["category"] for t in AMENITY_TABLES]
 
 # ─── Education supervision mapping ────────────────────────────────────────────
-# Maps a family's religious_affiliation value to the corresponding
-# type_of_supervision label in educational_institutions.
-#
-# DB values confirmed by query:
-#   State (106 rows), State Religious (19), Ultra-Orthodox (3)
-#
-# Mapping rationale:
-#   secular     → State            (standard state-secular schools)
-#   religious   → State Religious  (Mamlachti Dati — national-religious)
-#   traditional → State Religious  (closest fit; traditional families use dati schools)
-#   haredi      → Ultra-Orthodox   (independent haredi network)
-#   None / other → no filter       (count all supervision types)
-#
-# Used in discover_optimal_radius and semantic_radius_scoring to:
-#   1. Filter the K-means point cloud to relevant school buildings only
-#   2. Report education_matched (schools the family can use) alongside
-#      education_total (all schools) and education_special (special ed)
+    # Maps a family's religious_affiliation value to the corresponding
+    # type_of_supervision label in educational_institutions.
+    #
+    # DB values confirmed by query:
+    #   State (106 rows), State Religious (19), Ultra-Orthodox (3)
+    #
+    # Mapping rationale:
+    #   secular     → State            (standard state-secular schools)
+    #   religious   → State Religious  (Mamlachti Dati — national-religious)
+    #   traditional → State Religious  (closest fit; traditional families use dati schools)
+    #   haredi      → Ultra-Orthodox   (independent haredi network)
+    #   None / other → no filter       (count all supervision types)
+    #
+    # Used in discover_optimal_radius and semantic_radius_scoring to:
+    #   1. Filter the K-means point cloud to relevant school buildings only
+    #   2. Report education_matched (schools the family can use) alongside
+    #      education_total (all schools) and education_special (special ed)
 
 SUPERVISION_MAP: dict[str, str] = {
     "secular":     "State",
@@ -406,61 +387,80 @@ SUPERVISION_MAP: dict[str, str] = {
 # Allowed supervision values (whitelist for SQL safety).
 _VALID_SUPERVISION_VALUES: frozenset[str] = frozenset(SUPERVISION_MAP.values())
 
+# ─── Education phase classifier (used by semantic_radius_scoring) ─────────────
+# Mirrors the canonical mapping in tactical_agent._PHASE_CANONICAL so that the
+# scoring tool can resolve raw DB education_phase strings without importing the
+# agent module.  Keys are substrings; first match wins.
+
+_SCORE_PHASE_CANONICAL: dict[str, str] = {
+    "pre-primary":  "kindergarten",
+    "preprimary":   "kindergarten",
+    "kindergarten": "kindergarten",
+    "preschool":    "kindergarten",
+    "elementary":   "elementary",
+    "primary":      "elementary",
+    "post-primary": "high_school",
+    "postprimary":  "high_school",
+    "secondary":    "high_school",
+    "high school":  "high_school",
+}
+
+
+def _canonical_phase_score(raw: str) -> Optional[str]:
+    """Map a raw education_phase DB string to a canonical stage key."""
+    norm = raw.strip().lower()
+    for keyword, canon in _SCORE_PHASE_CANONICAL.items():
+        if keyword in norm:
+            return canon
+    return None
+
 
 # ─── SQL fragment builders ────────────────────────────────────────────────────
-# These three functions generate the UNION ALL blocks used in Tools 2 and 3.
-# They read AMENITY_TABLES at call time, so any registry change is automatically
-# reflected in all queries.
-#
-# Deduplication (when t["dedup_col"] is set):
-#   DISTINCT ON (dedup_col) is injected inline into the SELECT, collapsing
-#   multiple rows with the same business key to one representative row.
-#   ORDER BY <dedup_col> is appended (required by PostgreSQL's DISTINCT ON).
-#   No subquery wrapper is used — see _build_table_block docstring for rationale.
-#
-# Parameter conventions (positional, asyncpg style):
-#   _sql_all_amenities_in_cluster : no extra params — uses cluster_boundary CTE
-#   _sql_all_amenities_near_hub   : $1=hub_lat  $2=hub_lng  $3=radius_m
-#   _sql_all_embeddings_near_hub  : $1=vec_lit  $2=hub_lat  $3=hub_lng  $4=radius_m
+    # These three functions generate the UNION ALL blocks used in Tools 2 and 3.
+    # They read AMENITY_TABLES at call time, so any registry change is automatically
+    # reflected in all queries.
+    #
+    # Parameter conventions (positional, asyncpg style):
+    #   _sql_all_amenities_in_cluster : no extra params — uses cluster_boundary CTE
+    #   _sql_all_amenities_near_hub   : $1=hub_lat  $2=hub_lng  $3=radius_m
+    #   _sql_all_embeddings_near_hub  : $1=vec_lit  $2=hub_lat  $3=hub_lng  $4=radius_m
 
 
 def _build_table_block(
     t: dict[str, Any],
-    spatial_clause: str,
+    spatial_clause: str, # complete SQL spatial condition like ST_Within(location::geometry, (SELECT geom FROM cluster_boundary))
     select_cols: str,
-    extra_filter_override: Optional[str] = None,
-) -> str:
+    extra_filter_override: Optional[str] = None, # optional extra SQL AND fragment to merge with t["extra_filter"] for this call only.
+    ) -> str:
     """
     Build a single SELECT block for one amenity table entry.
 
-    Handles two optional fields from AMENITY_TABLES:
-        extra_filter — appended as an AND condition in the WHERE clause
-        dedup_col    — adds DISTINCT ON (dedup_col) directly in the SELECT
-                       to collapse multiple rows per business key into one.
+        Handles two optional fields from AMENITY_TABLES:
+            extra_filter — appended as an AND condition in the WHERE clause
 
-    The optional extra_filter_override is merged with t["extra_filter"] so
-    per-request filters (e.g. education supervision type) can be injected
-    without modifying the shared AMENITY_TABLES registry.
+        The optional extra_filter_override is merged with t["extra_filter"] so
+        per-request filters (e.g. education supervision type) can be injected
+        without modifying the shared AMENITY_TABLES registry.
 
-    DISTINCT ON design note:
-        We use DISTINCT ON inline (not a subquery wrapper) because the outer
-        SELECT would otherwise re-evaluate raw column expressions against
-        already-aliased subquery columns, which PostgreSQL rejects.
-        DISTINCT ON requires ORDER BY to begin with the same column — we append
-        ORDER BY <dedup_col> at the end of the statement.
+        DISTINCT ON design note:
+            We use DISTINCT ON inline (not a subquery wrapper) because the outer
+            SELECT would otherwise re-evaluate raw column expressions against
+            already-aliased subquery columns, which PostgreSQL rejects.
+            DISTINCT ON requires ORDER BY to begin with the same column — we append
+            ORDER BY <dedup_col> at the end of the statement.
 
-    Args:
-        t:                    One AMENITY_TABLES entry dict.
-        spatial_clause:       Complete SQL spatial condition (no leading AND).
-        select_cols:          SELECT list expressions.
-        extra_filter_override: Optional extra AND fragment to merge with
-                               t["extra_filter"] for this call only.
+        Args:
+            t:                    One AMENITY_TABLES entry dict.
+            spatial_clause:       Complete SQL spatial condition (no leading AND).
+            select_cols:          SELECT list expressions.
+            extra_filter_override: Optional extra AND fragment to merge with
+                                t["extra_filter"] for this call only.
 
-    Returns:
-        A complete SQL SELECT block ready to join with UNION ALL.
-    """
+        Returns:
+            A complete SQL SELECT block ready to join with UNION ALL.
+        """
     # Merge the registry filter with the per-request override
-    parts = [t["extra_filter"] or "", extra_filter_override or ""]
+    parts = [t["extra_filter"] or "", extra_filter_override or ""] 
     combined = " ".join(p for p in parts if p).strip()
     extra    = f"\n          {combined}" if combined else ""
     distinct = f"DISTINCT ON ({t['dedup_col']}) " if t["dedup_col"] else ""
@@ -482,7 +482,7 @@ def _build_table_block(
 
 def _sql_all_amenities_in_cluster(
     table_filter_overrides: Optional[dict[str, str]] = None,
-) -> str:
+    ) -> str:
     """
     Build a UNION ALL selecting (category TEXT, geom GEOMETRY) for every amenity
     table, restricted to points that lie strictly inside the cluster polygon.
@@ -508,7 +508,7 @@ def _sql_all_amenities_in_cluster(
 
 def _sql_all_amenities_near_hub(
     table_filter_overrides: Optional[dict[str, str]] = None,
-) -> str:
+    ) -> str:
     """
     Build a UNION ALL selecting (category TEXT, location GEOGRAPHY) for every
     amenity table, restricted to points within a given radius of a hub centre.
@@ -541,7 +541,7 @@ def _sql_all_amenities_near_hub(
 
 def _sql_all_embeddings_near_hub(
     table_filter_overrides: Optional[dict[str, str]] = None,
-) -> str:
+    ) -> str:
     """
     Build a UNION ALL selecting (embedding VECTOR) for every table with embeddings,
     restricted to points within a given radius of a hub centre.
@@ -607,6 +607,27 @@ def _sql_count_filters() -> str:
         f"COUNT(*) FILTER (WHERE category = '{cat}') AS {cat}"
         for cat in ALL_CATEGORIES
     )
+
+
+# ─── Hub radius geometry helpers ──────────────────────────────────────────────
+
+# Hard cap applied to every hub radius regardless of P75 distance.
+_MAX_RADIUS_M: float = 450.0
+
+
+def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """
+    Return the great-circle distance in metres between two WGS-84 points.
+
+    Uses the haversine formula — accurate to < 0.5 % for city-scale distances
+    (up to ~10 km).  No third-party dependency required; stdlib math only.
+    """
+    R = 6_371_000.0  # Earth mean radius in metres
+    φ1, φ2 = math.radians(lat1), math.radians(lat2)
+    dφ = math.radians(lat2 - lat1)
+    dλ = math.radians(lng2 - lng1)
+    a = math.sin(dφ / 2) ** 2 + math.cos(φ1) * math.cos(φ2) * math.sin(dλ / 2) ** 2
+    return 2.0 * R * math.asin(math.sqrt(a))
 
 
 # ─── MCP application ──────────────────────────────────────────────────────────
@@ -812,44 +833,45 @@ async def discover_optimal_radius(
     cluster_number: int,
     needs_tags: list[str],
     education_supervision: Optional[str] = None,
-) -> dict[str, Any]:
+    ) -> dict[str, Any]:
     """
     Identify up to 3 spatially distinct relocation "service-hub" radii within
     the assigned cluster boundary.
 
-    Algorithm
-    ---------
-    Phase 1 — K-means hub discovery (PostGIS):
-        All amenity points from AMENITY_TABLES that lie inside the cluster polygon
-        (ST_Within) are collected into a single point cloud.  When education_supervision
-        is supplied, educational_institutions are pre-filtered to that supervision type
-        so hubs are positioned closer to schools the family can actually use.
-        coffee_shops / restaurants are filtered to open venues only.
-        osm_city_facilities are filtered to the curated whitelist.
-        ST_ClusterKMeans partitions the point cloud into k ≤ 3 groups.
+        Algorithm
+        ---------
+        Phase 1 — K-means hub discovery (PostGIS):
+            All amenity points from AMENITY_TABLES that lie inside the cluster polygon
+            (ST_Within) are collected into a single point cloud.  When education_supervision
+            is supplied, educational_institutions are pre-filtered to that supervision type
+            so hubs are positioned closer to schools the family can actually use.
+            coffee_shops / restaurants are filtered to open venues only.
+            osm_city_facilities are filtered to the curated whitelist.
+            ST_ClusterKMeans partitions the point cloud into k ≤ 3 groups.
 
-    Phase 2 — Per-hub census and adaptive radius:
-        Step A: compute P75 distance over a wide 1 500 m discovery window → radius_m
-        Step B: count all amenities strictly within radius_m (counts match the map circle)
-        Step C: query educational_institutions directly for:
-                  education_matched — school buildings matching the family's supervision
-                                      type (deduplicated by ROUND(lat,3), ROUND(lon,3))
-                  education_special — special education school buildings nearby
+        Phase 2 — Per-hub census and adaptive radius:
+            Step A: compute P75 distance over a wide 1 500 m discovery window → radius_m
+            Step B: count all amenities strictly within radius_m (counts match the map circle)
+            Step C: query educational_institutions directly for:
+                    education_matched — school buildings matching the family's supervision
+                                        type (deduplicated by institution_code)
+                    education_special — special education school buildings nearby
 
-    Args:
-        run_id:               matching_results.run_id UUID string.
-        cluster_number:       Integer cluster ID from the macro ML agent.
-        needs_tags:           Holistic need tags (informational).
-        education_supervision: Optional supervision type from SUPERVISION_MAP values:
-                               "State", "State Religious", or "Ultra-Orthodox".
-                               None → no education filter (counts all supervision types).
+        Args:
+            run_id:               matching_results.run_id UUID string.
+            cluster_number:       Integer cluster ID from the macro ML agent.
+            needs_tags:           Holistic need tags (informational).
+            education_supervision: Optional supervision type from SUPERVISION_MAP values:
+                                "State", "State Religious", or "Ultra-Orthodox".
+                                None → no education filter (counts all supervision types).
 
-    Returns:
-        dict with keys:
-            ok    : bool
-            radii : list of up to 3 hub dicts — hub_label, center_lat, center_lng,
-                    radius_m, total_amenities, amenity_counts (ALL_CATEGORIES),
-                    education_matched (int), education_special (int)
+        Returns:
+            dict with keys:
+                ok    : bool
+                radii : list of up to 3 hub dicts — hub_label, center_lat, center_lng,
+                        radius_m, total_amenities, amenity_counts (ALL_CATEGORIES),
+                        education_matched (int), education_special (int),
+                        education_phase_counts (dict[str, int])
     """
     try:
         rid = UUID(run_id.strip())
@@ -955,6 +977,12 @@ async def discover_optimal_radius(
         zone_labels                = ["zone_alpha", "zone_beta", "zone_gamma"]
         radii: list[dict[str, Any]] = []
 
+        # Pre-extract all hub coordinates so the no-overlap constraint can
+        # compute distances to every neighbour without an extra DB round-trip.
+        hub_coords: list[tuple[float, float]] = [
+            (float(h["hub_lat"]), float(h["hub_lng"])) for h in hub_rows
+        ]
+
         for i, hub in enumerate(hub_rows):
             hlat = float(hub["hub_lat"])
             hlng = float(hub["hub_lng"])
@@ -981,7 +1009,25 @@ async def discover_optimal_radius(
                 hlng,    # $2
                 1500.0,  # $3 — wide discovery window
             )
-            radius_m = max(400.0, min(1_500.0, float(p75_row["p75_dist_m"] or 500.0)))
+            p75_dist = float(p75_row["p75_dist_m"] or 500.0)
+
+            # Constraint 1 — hard cap: never exceed _MAX_RADIUS_M.
+            # Constraint 2 — no-overlap: radius ≤ half the distance to the
+            #   nearest neighbouring hub minus a 5 m visual gap.
+            #   Skipped when this is the only hub (no neighbours to avoid).
+            if len(hub_coords) > 1:
+                nearest_dist_m = min(
+                    _haversine_m(hlat, hlng, olat, olng)
+                    for j, (olat, olng) in enumerate(hub_coords)
+                    if j != i
+                )
+                no_overlap_limit = nearest_dist_m / 2.0 - 5.0
+                radius_m = min(p75_dist, _MAX_RADIUS_M, max(50.0, no_overlap_limit))
+            else:
+                radius_m = min(p75_dist, _MAX_RADIUS_M)
+
+            # Floor: never produce a degenerate circle smaller than 50 m.
+            radius_m = max(50.0, radius_m)
 
             # Step B: count amenities strictly within radius_m.
             # Uses the supervision-filtered SQL so education count reflects
@@ -1003,21 +1049,15 @@ async def discover_optimal_radius(
 
             # Step C: education breakdown — query educational_institutions directly
             # so we have access to type_of_supervision and type_of_education columns.
-            # Deduplicated at 3dp coordinate precision (one count per building).
+            # Deduplicated by institution_code (one count per physical school).
             if education_supervision:
                 edu_row = await conn.fetchrow(
                     """
                     SELECT
-                        COUNT(DISTINCT CONCAT(
-                            ROUND(lat::numeric, 3)::text, ',',
-                            ROUND(lon::numeric, 3)::text
-                        )) FILTER (
+                        COUNT(DISTINCT institution_code) FILTER (
                             WHERE type_of_supervision = $4
                         ) AS education_matched,
-                        COUNT(DISTINCT CONCAT(
-                            ROUND(lat::numeric, 3)::text, ',',
-                            ROUND(lon::numeric, 3)::text
-                        )) FILTER (
+                        COUNT(DISTINCT institution_code) FILTER (
                             WHERE type_of_education = 'special education'
                         ) AS education_special
                     FROM educational_institutions
@@ -1031,18 +1071,11 @@ async def discover_optimal_radius(
                     hlat, hlng, radius_m, education_supervision,
                 )
             else:
-                # No supervision filter — matched = total deduplicated buildings
                 edu_row = await conn.fetchrow(
                     """
                     SELECT
-                        COUNT(DISTINCT CONCAT(
-                            ROUND(lat::numeric, 3)::text, ',',
-                            ROUND(lon::numeric, 3)::text
-                        )) AS education_matched,
-                        COUNT(DISTINCT CONCAT(
-                            ROUND(lat::numeric, 3)::text, ',',
-                            ROUND(lon::numeric, 3)::text
-                        )) FILTER (
+                        COUNT(DISTINCT institution_code) AS education_matched,
+                        COUNT(DISTINCT institution_code) FILTER (
                             WHERE type_of_education = 'special education'
                         ) AS education_special
                     FROM educational_institutions
@@ -1059,6 +1092,48 @@ async def discover_optimal_radius(
             education_matched = int(edu_row["education_matched"] or 0)
             education_special = int(edu_row["education_special"] or 0)
 
+            # Step C2: education phase breakdown (for age-appropriate recommendations).
+            # Returns a dict like {"Pre-Primary": 2, "Elementary": 3, "Post-Primary": 1}.
+            if education_supervision:
+                phase_rows = await conn.fetch(
+                    """
+                    SELECT education_phase, COUNT(DISTINCT institution_code) AS cnt
+                    FROM educational_institutions
+                    WHERE location IS NOT NULL
+                      AND type_of_supervision = $4
+                      AND ST_DWithin(
+                            location::geography,
+                            geography(ST_SetSRID(ST_MakePoint($2, $1), 4326)),
+                            $3
+                          )
+                    GROUP BY education_phase
+                    ORDER BY education_phase
+                    """,
+                    hlat, hlng, radius_m, education_supervision,
+                )
+            else:
+                phase_rows = await conn.fetch(
+                    """
+                    SELECT education_phase, COUNT(DISTINCT institution_code) AS cnt
+                    FROM educational_institutions
+                    WHERE location IS NOT NULL
+                      AND ST_DWithin(
+                            location::geography,
+                            geography(ST_SetSRID(ST_MakePoint($2, $1), 4326)),
+                            $3
+                          )
+                    GROUP BY education_phase
+                    ORDER BY education_phase
+                    """,
+                    hlat, hlng, radius_m,
+                )
+
+            education_phase_counts: dict[str, int] = {
+                row["education_phase"]: int(row["cnt"])
+                for row in phase_rows
+                if row["education_phase"]
+            }
+
             radii.append({
                 "hub_label":          zone_labels[i] if i < len(zone_labels) else f"zone_{i}",
                 "center_lat":         hlat,
@@ -1070,13 +1145,15 @@ async def discover_optimal_radius(
                 "education_matched":  education_matched,
                 "education_special":  education_special,
                 "education_supervision_filter": education_supervision,
+                "education_phase_counts": education_phase_counts,
             })
 
             logger.info(
                 "Hub %s: lat=%.5f lng=%.5f radius_m=%d total=%d "
-                "edu_matched=%d edu_special=%d",
+                "edu_matched=%d edu_special=%d phases=%s",
                 radii[-1]["hub_label"], hlat, hlng, round(radius_m),
                 total_amenities, education_matched, education_special,
+                education_phase_counts,
             )
 
     logger.info(
@@ -1107,7 +1184,11 @@ async def semantic_radius_scoring(
        filtered to the family's supervision type so semantically irrelevant schools
        do not dilute the score.
     3. Rank by cosine distance to the family vector and take the top-20.
-    4. semantic_score = mean(1 - cosine_distance) over the top-20.
+    4. semantic_score = raw mean cosine-similarity (0–1 float, 4 decimals).
+
+    The score is used exclusively for **sorting** — the LLM decides the final
+    priority ranking and writes qualitative justifications.  No 0-100 mapping
+    or penalty arithmetic is applied here.
 
     Args:
         radii:                List of hub dicts from discover_optimal_radius.
@@ -1118,7 +1199,8 @@ async def semantic_radius_scoring(
         dict with keys:
             ok           : bool
             ranked_radii : hub list sorted by semantic_score descending, enriched
-                           with semantic_score (0–1) and embeddings_matched (int).
+                           with semantic_score (0–1 float) and
+                           embeddings_matched (int).
     """
     if not radii:
         return {"ok": False, "error": "radii list is empty."}
@@ -1161,11 +1243,11 @@ async def semantic_radius_scoring(
                 radius_m,  # $4 — search radius in metres
             )
 
-        similarities   = [float(r["similarity"]) for r in rows]
-        semantic_score = (
-            round(sum(similarities) / len(similarities), 4)
-            if similarities else 0.0
-        )
+        similarities = [float(r["similarity"]) for r in rows]
+        if similarities:
+            semantic_score = round(sum(similarities) / len(similarities), 4)
+        else:
+            semantic_score = 0.0
 
         scored.append({
             **hub,

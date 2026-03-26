@@ -18,14 +18,14 @@ export default function EducationListInput({ items, onChange, error }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ fontWeight: 800, color: '#333' }}>Essential education</div>
+      <div style={{ fontWeight: 800, color: '#333' }}>דרישות חינוך חיוניות</div>
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <input
           className="evpf-input"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Type then press Enter"
+          placeholder="הקלד/י ולחץ/י Enter"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
@@ -34,7 +34,7 @@ export default function EducationListInput({ items, onChange, error }) {
           }}
         />
         <button className="evpf-btn primary" type="button" onClick={add}>
-          Add
+          הוסף
         </button>
       </div>
 

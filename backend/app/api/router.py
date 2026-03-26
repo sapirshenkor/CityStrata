@@ -17,6 +17,7 @@ from app.api.endpoints import (
     clustering,
     matching,
     evacuee_family_profiles,
+    recommendations,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -36,3 +37,4 @@ api_router.include_router(synagogues.router)
 api_router.include_router(clustering.router)
 api_router.include_router(matching.router)
 api_router.include_router(evacuee_family_profiles.router)
+api_router.include_router(recommendations.router)

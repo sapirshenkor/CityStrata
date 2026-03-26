@@ -8,6 +8,7 @@ function App() {
   const [selectedArea, setSelectedArea] = useState(null)
   const [areaFilter, setAreaFilter] = useState(null) // Filter to show only one area
   const { data: clusterAssignments, refetch: refetchClusterAssignments } = useClusterAssignments()
+  const [selectedRecommendation, setSelectedRecommendation] = useState(null)
   const [layerVisibility, setLayerVisibility] = useState({
     statisticalAreas: true,
     institutions: false,
@@ -44,6 +45,8 @@ function App() {
         onUpdateFilters={setFilters}
         clusterAssignments={clusterAssignments}
         onRunClustering={refetchClusterAssignments}
+        selectedRecommendation={selectedRecommendation}
+        onSelectRecommendation={setSelectedRecommendation}
       />
       <div className="map-container">
         <LeafletMap
@@ -54,6 +57,7 @@ function App() {
           filters={filters}
           showClusters={layerVisibility.clusters}
           clusterAssignments={clusterAssignments}
+          selectedRecommendation={selectedRecommendation}
         />
       </div>
     </div>

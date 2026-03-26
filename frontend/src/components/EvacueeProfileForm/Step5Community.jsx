@@ -17,7 +17,7 @@ export default function Step5Community({ data, onChange, errors }) {
               checked={data.matnas_participation}
               onChange={(e) => onChange({ matnas_participation: e.target.checked })}
             />
-            <span>Matnas participation</span>
+            <span>השתתפות בפעילויות מתנ״ס</span>
           </div>
           <FieldError errors={errors} name="matnas_participation" />
         </div>
@@ -29,14 +29,14 @@ export default function Step5Community({ data, onChange, errors }) {
               checked={data.needs_community_proximity}
               onChange={(e) => onChange({ needs_community_proximity: e.target.checked })}
             />
-            <span>Needs community proximity</span>
+            <span>חשוב לגור ליד קהילה</span>
           </div>
           <FieldError errors={errors} name="needs_community_proximity" />
         </div>
       </div>
 
       <ImportanceSlider
-        label="Social venues importance"
+        label="חשיבות קרבה למקומות בילוי חברתיים"
         value={data.social_venues_importance}
         onChange={(v) => onChange({ social_venues_importance: v })}
         error={errors?.social_venues_importance}

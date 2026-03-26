@@ -95,5 +95,14 @@ export const getClusterProfiles = (runId = null) => {
   return api.get('/api/clustering/profiles', { params })
 }
 
+// Tactical Recommendations
+export const getRecommendations = () => {
+  return api.get('/api/recommendations')
+}
+
+export const getRecommendationByProfile = (profileUuid) => {
+  return api.get(`/api/recommendations/${profileUuid}`)
+}
+
 export default api
 

@@ -9,7 +9,7 @@ export default function Step1ContactInfo({ data, onChange, errors }) {
   return (
     <div className="evpf-grid sm2">
       <div className="evpf-field">
-        <label>Family name</label>
+        <label>שם משפחה</label>
         <input
           className="evpf-input"
           value={data.family_name}
@@ -19,7 +19,7 @@ export default function Step1ContactInfo({ data, onChange, errors }) {
       </div>
 
       <div className="evpf-field">
-        <label>Contact name</label>
+        <label>שם איש קשר</label>
         <input
           className="evpf-input"
           value={data.contact_name}
@@ -29,7 +29,7 @@ export default function Step1ContactInfo({ data, onChange, errors }) {
       </div>
 
       <div className="evpf-field">
-        <label>Contact phone</label>
+        <label>טלפון</label>
         <input
           className="evpf-input"
           value={data.contact_phone}
@@ -39,7 +39,7 @@ export default function Step1ContactInfo({ data, onChange, errors }) {
       </div>
 
       <div className="evpf-field">
-        <label>Contact email</label>
+        <label>דוא״ל</label>
         <input
           className="evpf-input"
           type="email"
@@ -50,7 +50,7 @@ export default function Step1ContactInfo({ data, onChange, errors }) {
       </div>
 
       <div className="evpf-field">
-        <label>Home stat 2022 (optional)</label>
+        <label>קוד סטטיסטי (אופציונלי)</label>
         <input
           className="evpf-input"
           type="number"
@@ -64,7 +64,7 @@ export default function Step1ContactInfo({ data, onChange, errors }) {
       </div>
 
       <div className="evpf-field">
-        <label>City name</label>
+        <label>עיר מגורים</label>
         <input
           className="evpf-input"
           value={data.city_name}
@@ -74,7 +74,7 @@ export default function Step1ContactInfo({ data, onChange, errors }) {
       </div>
 
       <div className="evpf-field evpf-span2">
-        <label>Home address</label>
+        <label>כתובת בית</label>
         <input
           className="evpf-input"
           value={data.home_address}

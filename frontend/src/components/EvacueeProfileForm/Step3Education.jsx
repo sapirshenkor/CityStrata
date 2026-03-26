@@ -12,7 +12,7 @@ export default function Step3Education({ data, onChange, errors }) {
       />
 
       <ImportanceSlider
-        label="Education proximity importance"
+        label="חשיבות הקרבה למוסד חינוך"
         value={data.education_proximity_importance}
         onChange={(v) => onChange({ education_proximity_importance: v })}
         error={errors?.education_proximity_importance}
