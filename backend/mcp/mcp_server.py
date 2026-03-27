@@ -85,12 +85,17 @@ def _load_env() -> None:
     """
     Load environment variables from a .env file.
 
-    Search order: mcp/.env → project root .env → current working directory .env.
+    Search order: backend/mcp/.env → backend/.env → project root .env → cwd .env.
     The first file found wins; subsequent candidates are ignored.
     Falls back to load_dotenv() with no path if no .env file is found anywhere.
     """
     here = Path(__file__).resolve().parent
-    for candidate in [here / ".env", here.parent / ".env", Path.cwd() / ".env"]:
+    for candidate in [
+        here / ".env",
+        here.parent / ".env",
+        here.parent.parent / ".env",
+        Path.cwd() / ".env",
+    ]:
         if candidate.is_file():
             load_dotenv(candidate, override=False)
             logger.info("Loaded environment from %s", candidate)

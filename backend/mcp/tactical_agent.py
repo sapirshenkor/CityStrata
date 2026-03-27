@@ -41,8 +41,8 @@ logger = logging.getLogger(__name__)
 # ─── Path helpers ─────────────────────────────────────────────────────────────
 
 def _project_root() -> Path:
-    """CityStrata project root (parent of the mcp/ folder)."""
-    return Path(__file__).resolve().parent.parent
+    """CityStrata repository root (parent of the backend/ folder)."""
+    return Path(__file__).resolve().parent.parent.parent
 
 
 def _default_server_path() -> Path:
@@ -1076,8 +1076,9 @@ async def run_pipeline(
     forward_server_stderr: bool = False,
 ) -> str:
     """Async entry point — loads .env and runs the agent for one family."""
+    mcp_dir = Path(__file__).resolve().parent
     load_dotenv(_project_root() / ".env")
-    load_dotenv(_project_root() / "mcp" / ".env")
+    load_dotenv(mcp_dir / ".env")
 
     async with TacticalRelocationAgent(
         mcp_server_script=server_path,
