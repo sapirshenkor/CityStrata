@@ -556,30 +556,16 @@
   color: #888;
 }
 
-/* ── Layout: list + detail ───────────────────────────────────────────────── */
+/* ── Layout: list + detail (stacked: list first, detail below at all breakpoints) ─ */
 .rec-layout {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-@media (min-width: 960px) {
-  .rec-layout {
-    display: grid;
-    grid-template-columns: minmax(300px, 1fr) minmax(340px, 1.15fr);
-    align-items: start;
-    gap: 20px;
-  }
-
-  .rec-layout-list {
-    min-width: 0;
-  }
-
-  .rec-layout-detail {
-    position: sticky;
-    top: 12px;
-    min-width: 0;
-  }
+.rec-layout-list,
+.rec-layout-detail {
+  min-width: 0;
 }
 
 /* ── Confidence badges ─────────────────────────────────────────────────────── */
