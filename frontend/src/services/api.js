@@ -127,5 +127,14 @@ export const runTacticalForProfile = (profileUuid) => {
   })
 }
 
+/** Community tactical: merge families + centroid pipeline; creates a new merged profile. */
+export const runCommunityTactical = (familyUuids) => {
+  return api.post(
+    '/api/recommendations/community/run',
+    { family_uuids: familyUuids },
+    { timeout: 600_000 },
+  )
+}
+
 export default api
 

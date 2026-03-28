@@ -3,20 +3,32 @@
 Exposes:
     GET /recommendations/overview — all families + matching/tactical flags (for Recommendations UI)
     GET /recommendations          — list all families that have a tactical response
+    POST /recommendations/community/run — merged community profile + community tactical pipeline
     GET /recommendations/{uuid}   — latest recommendation for a specific family
 """
 
 import json
-from fastapi import APIRouter, HTTPException
 from uuid import UUID
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 from app.core.database import get_pool
 from app.models.tactical_agent_response import TacticalAgentResponse
 from app.models.recommendations_overview import FamilyRecommendationOverview
-from app.services.tactical_pipeline import execute_tactical_pipeline
+from app.services.tactical_pipeline import (
+    execute_community_tactical_pipeline,
+    execute_tactical_pipeline,
+)
 
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
+
+
+class CommunityRunRequest(BaseModel):
+    """Two or more profile UUIDs that share the same macro cluster (matching result)."""
+
+    family_uuids: list[UUID] = Field(min_length=2)
 
 
 # ── SQL ───────────────────────────────────────────────────────────────────────
@@ -41,10 +53,14 @@ _OVERVIEW_SQL = """
         efp.family_name,
         (efp.selected_matching_result_id IS NOT NULL) AS has_matching,
         (tar.id IS NOT NULL) AS has_tactical,
-        tar.created_at AS tactical_created_at
+        tar.created_at AS tactical_created_at,
+        mr.recommended_cluster_number AS cluster_number,
+        (efp.family_name LIKE 'Community:%') AS is_merged_profile
     FROM evacuee_family_profiles efp
     LEFT JOIN tactical_agent_response tar
         ON tar.profile_uuid = efp.uuid
+    LEFT JOIN matching_results mr
+        ON mr.id = efp.selected_matching_result_id
 """
 
 
@@ -57,6 +73,8 @@ def _row_to_overview(row) -> FamilyRecommendationOverview:
         has_matching=row["has_matching"],
         has_tactical=row["has_tactical"],
         tactical_created_at=row["tactical_created_at"],
+        cluster_number=row["cluster_number"],
+        is_merged_profile=row["is_merged_profile"],
     )
 
 
@@ -167,6 +185,44 @@ async def run_tactical_recommendation(profile_uuid: UUID):
             raise HTTPException(
                 status_code=500,
                 detail="Tactical run finished but no tactical_agent_response row was found.",
+            )
+        return _row_to_recommendation(rec_row)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Database error: {exc}") from exc
+
+
+@router.post("/community/run", response_model=TacticalAgentResponse)
+async def run_community_tactical_recommendation(body: CommunityRunRequest):
+    """
+    Merge selected families into one community evacuee profile, run the community
+    tactical MCP pipeline, persist the report on the new profile, and return it.
+    """
+    try:
+        new_uuid = await execute_community_tactical_pipeline(body.family_uuids)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail="Community tactical pipeline timed out. Check DATABASE_URL, OpenAI, and MCP.",
+        ) from exc
+    except (RuntimeError, OSError) as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    pool = get_pool()
+    try:
+        async with pool.acquire() as conn:
+            rec_row = await conn.fetchrow(
+                _SELECT_SQL
+                + " WHERE tar.profile_uuid = $1 ORDER BY tar.created_at DESC LIMIT 1",
+                new_uuid,
+            )
+        if not rec_row:
+            raise HTTPException(
+                status_code=500,
+                detail="Community tactical run finished but no tactical_agent_response row.",
             )
         return _row_to_recommendation(rec_row)
     except HTTPException:
