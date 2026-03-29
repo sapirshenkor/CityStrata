@@ -15,6 +15,7 @@ Pipeline
 Usage
 -----
     python tactical_agent.py --family-id <uuid>
+    python tactical_agent.py --community-ids <uuid> <uuid> [<uuid> ...]
     TACTICAL_SAMPLE_FAMILY_ID=<uuid> python tactical_agent.py
 """
 
@@ -26,6 +27,7 @@ import json
 import logging
 import os
 import sys
+from dataclasses import dataclass
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any, Optional
@@ -38,7 +40,19 @@ from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
+
+@dataclass
+class CommunityTacticalResult:
+    """Outcome of ``run_for_community`` (for API persistence and CLI)."""
+
+    ok: bool
+    report: str
+    ranked_radii: list[dict[str, Any]]
+    confidence: Optional[str] = None
+
+
 # ─── Path helpers ─────────────────────────────────────────────────────────────
+
 
 def _project_root() -> Path:
     """CityStrata repository root (parent of the backend/ folder)."""
@@ -51,6 +65,7 @@ def _default_server_path() -> Path:
 
 
 # ─── Progress output ──────────────────────────────────────────────────────────
+
 
 def _progress(msg: str) -> None:
     """Write a progress line to stderr (stdout is reserved for the final report)."""
@@ -79,39 +94,39 @@ def _to_int(value: Any, default: int = 0) -> int:
 # for robustness if the source data ever changes.
 
 _PHASE_CANONICAL: dict[str, str] = {
-    "pre-primary":  "kindergarten",
-    "preprimary":   "kindergarten",
-    "kindergarten":  "kindergarten",
-    "preschool":     "kindergarten",
-    "גן":           "kindergarten",
-    "קדם יסודי":    "kindergarten",
-    "קדם-יסודי":    "kindergarten",
-    "elementary":    "elementary",
-    "primary":       "elementary",
-    "יסודי":        "elementary",
-    "post-primary":  "high_school",
-    "postprimary":   "high_school",
-    "secondary":     "high_school",
-    "high school":   "high_school",
-    "על יסודי":     "high_school",
-    "על-יסודי":     "high_school",
-    "תיכון":        "high_school",
-    "חט\"ב":        "high_school",
-    "חט\"ע":        "high_school",
+    "pre-primary": "kindergarten",
+    "preprimary": "kindergarten",
+    "kindergarten": "kindergarten",
+    "preschool": "kindergarten",
+    "גן": "kindergarten",
+    "קדם יסודי": "kindergarten",
+    "קדם-יסודי": "kindergarten",
+    "elementary": "elementary",
+    "primary": "elementary",
+    "יסודי": "elementary",
+    "post-primary": "high_school",
+    "postprimary": "high_school",
+    "secondary": "high_school",
+    "high school": "high_school",
+    "על יסודי": "high_school",
+    "על-יסודי": "high_school",
+    "תיכון": "high_school",
+    'חט"ב': "high_school",
+    'חט"ע': "high_school",
 }
 
 _PHASE_LABELS: dict[str, str] = {
     "kindergarten": "Kindergartens",
-    "elementary":   "Elementary Schools",
-    "high_school":  "High Schools",
+    "elementary": "Elementary Schools",
+    "high_school": "High Schools",
 }
 
 # Maps family composition keys → canonical education phase.
 _CHILD_TO_PHASE: dict[str, str] = {
-    "infants":    "kindergarten",
-    "preschool":  "kindergarten",
+    "infants": "kindergarten",
+    "preschool": "kindergarten",
     "elementary": "elementary",
-    "youth":      "high_school",
+    "youth": "high_school",
 }
 
 
@@ -155,6 +170,7 @@ def _aggregate_phase_counts(
 
 # ─── MCP response decoder ─────────────────────────────────────────────────────
 
+
 def _decode(result: Any) -> dict[str, Any]:
     """
     Decode an MCP call_tool result into a plain dict.
@@ -163,7 +179,9 @@ def _decode(result: Any) -> dict[str, Any]:
     containing JSON — both forms are handled here.
     """
     if getattr(result, "isError", False):
-        raise RuntimeError(f"MCP tool error: {getattr(result, 'error', 'unknown error')}")
+        raise RuntimeError(
+            f"MCP tool error: {getattr(result, 'error', 'unknown error')}"
+        )
 
     structured = getattr(result, "structuredContent", None)
     if isinstance(structured, dict):
@@ -171,8 +189,12 @@ def _decode(result: Any) -> dict[str, Any]:
 
     chunks: list[str] = []
     for block in getattr(result, "content", []) or []:
-        btype = getattr(block, "type", None) or (block.get("type") if isinstance(block, dict) else None)
-        text  = getattr(block, "text",  None) or (block.get("text")  if isinstance(block, dict) else None)
+        btype = getattr(block, "type", None) or (
+            block.get("type") if isinstance(block, dict) else None
+        )
+        text = getattr(block, "text", None) or (
+            block.get("text") if isinstance(block, dict) else None
+        )
         if btype == "text" and text:
             chunks.append(str(text))
 
@@ -282,22 +304,17 @@ STRICT RULES — follow without exception:
      only the amenity categories that are relevant (see rule 2).
    - A short closing paragraph with an overall recommendation.
 
-5. **Language & zone naming:** Write the ENTIRE output in the language implied
-   by the family name.
-   - Hebrew family name → write everything in Hebrew, including ALL section
-     headers, labels, and bullet-point keys. Use these exact Hebrew labels:
-       • Zone names: "אזור אלפא", "אזור בטא", "אזור גמא" (matching zone_alpha,
-         zone_beta, zone_gamma from the data). Any other zone → "אזור [מספר]".
-       • "מיקום וכיסוי:" instead of "Location & Coverage:"
-       • "ציון התאמה:" instead of "The Match:"
-       • "מתקנים עיקריים באזור:" instead of "Key Amenities found:"
-       • "חינוך:", "דת:", "אורח חיים:", "קהילה:", "מתקנים עירוניים:"
-         for the amenity sub-bullets
-   - Refer to zones by their Hebrew names ("אזור אלפא" etc.) consistently
-     throughout all reasoning paragraphs — never mix Hebrew headers with
-     English zone names.
-   - Non-Hebrew family name → write entirely in English using the English
-     labels ("Zone Alpha", "Zone Beta", "Zone Gamma").
+5. **Language & zone naming (mandatory — Hebrew only):** Write the **entire**
+   recommendation **only in Hebrew** (modern Israeli Hebrew). Do not use English
+   sentences, headings, or labels in the output. If `family_name` is in Latin
+   script, still write all narrative and headings in Hebrew; you may mention the
+   family name as stored in the data.
+   - Zone names: "אזור אלפא", "אזור בטא", "אזור גמא" (matching zone_alpha,
+     zone_beta, zone_gamma). Any other zone → "אזור [מספר]".
+   - Use Hebrew labels consistently: "מיקום וכיסוי", "מתקנים עיקריים",
+     "חינוך:", "דת:", "אורח חיים:", "קהילה:", "מתקנים עירוניים:".
+   - Never mix English zone labels ("Zone Alpha") with Hebrew — use only the
+     Hebrew names above.
 
 6. **Tone:** Clear, empathetic, and professional. Acknowledge the difficulty of
    displacement without being melodramatic.
@@ -306,7 +323,24 @@ STRICT RULES — follow without exception:
    report.
 """
 
-_AI_MODEL   = "gpt-4o"
+_COMMUNITY_SYSTEM_PROMPT = """\
+You are a Tactical Relocation Expert at CityStrata, specialising in **community
+relocation** — multiple displaced families moving together within one assigned cluster.
+
+**Output language:** Write the **entire** recommendation **only in Hebrew**
+(modern Israeli Hebrew). No English paragraphs, headings, or bullet labels.
+
+Explain trade-offs between families (e.g. which zone answers one household's
+education needs and another's medical access). Use ONLY facts from the JSON.
+Address each household by **family_name** when attributing needs (names may stay
+as in the data). Rank up to three zones and explain why lower ranks are weaker
+for the group. Do not cite raw semantic scores.
+
+Use Hebrew zone names only: אזור אלפא, אזור בטא, אזור גמא (matching the JSON
+zone_label values zone_alpha / zone_beta / zone_gamma).
+"""
+
+_AI_MODEL = "gpt-4o"
 _AI_TIMEOUT = 65.0  # seconds
 
 
@@ -323,64 +357,69 @@ def _build_grounding_context(
     Includes the full holistic amenity breakdown so GPT-4o can reason about
     cafes, restaurants, and city facilities alongside anchor institutions.
     """
-    comp      = family_needs.get("composition") or {}
-    edu       = family_needs.get("education")   or {}
-    rel       = family_needs.get("religion")    or {}
-    comm      = family_needs.get("community")   or {}
-    mob       = family_needs.get("mobility")    or {}
-    lifestyle = family_needs.get("lifestyle")   or {}
-    medical   = family_needs.get("medical")     or {}
+    comp = family_needs.get("composition") or {}
+    edu = family_needs.get("education") or {}
+    rel = family_needs.get("religion") or {}
+    comm = family_needs.get("community") or {}
+    mob = family_needs.get("mobility") or {}
+    lifestyle = family_needs.get("lifestyle") or {}
+    medical = family_needs.get("medical") or {}
 
     return {
-        "family_name":    family_needs.get("family_name"),
+        "family_name": family_needs.get("family_name"),
         "household_size": comp.get("total_people"),
         "children": {
-            k: v for k, v in comp.items()
+            k: v
+            for k, v in comp.items()
             if k in ("infants", "preschool", "elementary", "youth") and v
         },
         "education": {
-            "essential_tags":       edu.get("essential_tags") or [],
+            "essential_tags": edu.get("essential_tags") or [],
             "proximity_importance": edu.get("proximity_importance"),
         },
         "religion": {
-            "affiliation":     rel.get("affiliation"),
+            "affiliation": rel.get("affiliation"),
             "needs_synagogue": rel.get("needs_synagogue"),
         },
         "community": {
-            "matnas_participation":      comm.get("matnas_participation"),
+            "matnas_participation": comm.get("matnas_participation"),
             "needs_community_proximity": comm.get("needs_community_proximity"),
-            "social_importance":         comm.get("social_importance"),
+            "social_importance": comm.get("social_importance"),
         },
         "lifestyle": {
             "social_venues_importance": lifestyle.get("social_venues_importance"),
-            "culture_frequency":        lifestyle.get("culture_frequency"),
+            "culture_frequency": lifestyle.get("culture_frequency"),
         },
         "medical": {
             "needs_medical_proximity": medical.get("needs_medical_proximity"),
-            "services_importance":     medical.get("services_importance"),
+            "services_importance": medical.get("services_importance"),
         },
         "mobility": {
-            "has_car":                mob.get("has_car"),
+            "has_car": mob.get("has_car"),
             "has_mobility_disability": mob.get("has_mobility_disability"),
         },
         "notes": family_needs.get("notes"),
         "needed_education_phases": _needed_education_phases(family_needs),
-        "cluster_name":      cluster.get("cluster_name"),
+        "cluster_name": cluster.get("cluster_name"),
         "cluster_reasoning": cluster.get("reasoning"),
-        "education_supervision_filter": ranked_radii[0].get("education_supervision_filter") if ranked_radii else None,
+        "education_supervision_filter": (
+            ranked_radii[0].get("education_supervision_filter")
+            if ranked_radii
+            else None
+        ),
         "recommended_zones": [
             {
-                "rank":               i + 1,
-                "zone_label":         r.get("hub_label"),
-                "center_lat":         r.get("center_lat"),
-                "center_lng":         r.get("center_lng"),
-                "radius_m":           r.get("radius_m"),
-                "semantic_score":     r.get("semantic_score"),
+                "rank": i + 1,
+                "zone_label": r.get("hub_label"),
+                "center_lat": r.get("center_lat"),
+                "center_lng": r.get("center_lng"),
+                "radius_m": r.get("radius_m"),
+                "semantic_score": r.get("semantic_score"),
                 "embeddings_matched": r.get("embeddings_matched"),
-                "total_amenities":    r.get("total_amenities"),
-                "amenity_counts":     r.get("amenity_counts") or {},
-                "education_matched":  r.get("education_matched"),
-                "education_special":  r.get("education_special"),
+                "total_amenities": r.get("total_amenities"),
+                "amenity_counts": r.get("amenity_counts") or {},
+                "education_matched": r.get("education_matched"),
+                "education_special": r.get("education_special"),
                 "education_phase_counts": _aggregate_phase_counts(
                     r.get("education_phase_counts") or {}
                 ),
@@ -404,25 +443,24 @@ async def _generate_recommendation(
         logger.warning("OPENAI_API_KEY not set — skipping AI generation.")
         return None
 
-    context     = _build_grounding_context(family_needs, cluster, ranked_radii)
+    context = _build_grounding_context(family_needs, cluster, ranked_radii)
     user_prompt = (
-        "Below are the family profile and the top relocation zones identified by "
-        "our holistic spatial and semantic analysis pipeline. "
-        "Write your recommendation using ONLY the data provided:\n\n"
+        "להלן פרופיל המשפחה ואזורי המגורים המומלצים (ניתוח מרחבי וסמנטי). "
+        "חובה לכתוב את כל המלצת המערכת בעברית בלבד, ולהשתמש רק בנתונים הבאים:\n\n"
         + json.dumps(context, ensure_ascii=False, indent=2)
     )
 
     _progress("[tactical] Calling GPT-4o for recommendation…")
     try:
-        client   = AsyncOpenAI(api_key=api_key, timeout=_AI_TIMEOUT)
+        client = AsyncOpenAI(api_key=api_key, timeout=_AI_TIMEOUT)
         response = await asyncio.wait_for(
             client.chat.completions.create(
                 model=_AI_MODEL,
-                temperature=0.3,    # low → reliable, grounded output
+                temperature=0.3,  # low → reliable, grounded output
                 max_tokens=1_600,
                 messages=[
                     {"role": "system", "content": _SYSTEM_PROMPT},
-                    {"role": "user",   "content": user_prompt},
+                    {"role": "user", "content": user_prompt},
                 ],
             ),
             timeout=_AI_TIMEOUT + 5,
@@ -433,11 +471,145 @@ async def _generate_recommendation(
 
     except Exception as exc:  # non-fatal — fall back to static report
         logger.warning("AI generation failed (non-fatal): %s", exc)
-        _progress(f"[tactical] AI generation skipped ({exc}). Continuing with static report.")
+        _progress(
+            f"[tactical] AI generation skipped ({exc}). Continuing with static report."
+        )
+        return None
+
+
+def _community_resolve_education_supervision(
+    member_families: list[dict[str, Any]],
+) -> Optional[str]:
+    """Same DB supervision filter for all members only; else None (mixed sectors)."""
+    vals: list[str] = []
+    for m in member_families:
+        fn = m.get("family_needs") or {}
+        v = _resolve_education_supervision(fn)
+        if v is not None:
+            vals.append(v)
+    if not vals:
+        return None
+    if len(set(vals)) == 1:
+        return vals[0]
+    return None
+
+
+def _build_community_grounding_context(
+    member_families: list[dict[str, Any]],
+    community_needs: dict[str, Any],
+    cluster: dict[str, Any],
+    ranked_radii: list[dict[str, Any]],
+) -> dict[str, Any]:
+    members_out: list[dict[str, Any]] = []
+    for m in member_families:
+        fn = m.get("family_needs") or {}
+        comp = fn.get("composition") or {}
+        members_out.append(
+            {
+                "family_name": fn.get("family_name"),
+                "family_uuid": fn.get("family_uuid"),
+                "household_size": comp.get("total_people"),
+                "children": {
+                    k: v
+                    for k, v in comp.items()
+                    if k in ("infants", "preschool", "elementary", "youth") and v
+                },
+                "education": (fn.get("education") or {}),
+                "religion": fn.get("religion") or {},
+                "community": fn.get("community") or {},
+                "lifestyle": fn.get("lifestyle") or {},
+                "medical": fn.get("medical") or {},
+                "mobility": fn.get("mobility") or {},
+                "notes": fn.get("notes"),
+                "needed_education_phases": _needed_education_phases(fn),
+            }
+        )
+
+    return {
+        "mode": "community_relocation",
+        "community_summary": {
+            "label": community_needs.get("family_name"),
+            "total_people": (community_needs.get("composition") or {}).get(
+                "total_people"
+            ),
+            "merged_notes": community_needs.get("notes"),
+        },
+        "families": members_out,
+        "cluster_name": cluster.get("cluster_name"),
+        "cluster_reasoning": cluster.get("reasoning"),
+        "education_supervision_filter": (
+            ranked_radii[0].get("education_supervision_filter")
+            if ranked_radii
+            else None
+        ),
+        "recommended_zones": [
+            {
+                "rank": i + 1,
+                "zone_label": r.get("hub_label"),
+                "center_lat": r.get("center_lat"),
+                "center_lng": r.get("center_lng"),
+                "radius_m": r.get("radius_m"),
+                "semantic_score": r.get("semantic_score"),
+                "embeddings_matched": r.get("embeddings_matched"),
+                "total_amenities": r.get("total_amenities"),
+                "amenity_counts": r.get("amenity_counts") or {},
+                "education_matched": r.get("education_matched"),
+                "education_special": r.get("education_special"),
+                "education_phase_counts": _aggregate_phase_counts(
+                    r.get("education_phase_counts") or {}
+                ),
+            }
+            for i, r in enumerate(ranked_radii[:3])
+        ],
+    }
+
+
+async def _generate_community_recommendation(
+    member_families: list[dict[str, Any]],
+    community_needs: dict[str, Any],
+    cluster: dict[str, Any],
+    ranked_radii: list[dict[str, Any]],
+) -> Optional[str]:
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        logger.warning("OPENAI_API_KEY not set — skipping community AI generation.")
+        return None
+
+    context = _build_community_grounding_context(
+        member_families, community_needs, cluster, ranked_radii
+    )
+    user_prompt = (
+        "הסבר על קהילה — פרופילים לפי משפחה ואזורים מומלצים. "
+        "חובה לכתוב את כל ההמלצה בעברית בלבד. השתמש רק בנתוני ה-JSON הבאים:\n\n"
+        + json.dumps(context, ensure_ascii=False, indent=2)
+    )
+
+    _progress("[tactical] Calling GPT-4o for community recommendation…")
+    try:
+        client = AsyncOpenAI(api_key=api_key, timeout=_AI_TIMEOUT)
+        response = await asyncio.wait_for(
+            client.chat.completions.create(
+                model=_AI_MODEL,
+                temperature=0.3,
+                max_tokens=2_000,
+                messages=[
+                    {"role": "system", "content": _COMMUNITY_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+            ),
+            timeout=_AI_TIMEOUT + 5,
+        )
+        letter = (response.choices[0].message.content or "").strip()
+        _progress("[tactical] GPT-4o community response received.")
+        return letter or None
+    except Exception as exc:
+        logger.warning("Community AI generation failed (non-fatal): %s", exc)
+        _progress(f"[tactical] Community AI skipped ({exc}).")
         return None
 
 
 # ─── Holistic needs helpers ───────────────────────────────────────────────────
+
 
 def _extract_needs_tags(family_needs: dict[str, Any]) -> list[str]:
     """
@@ -449,18 +621,20 @@ def _extract_needs_tags(family_needs: dict[str, Any]) -> list[str]:
     """
     tags: list[str] = []
 
-    edu       = family_needs.get("education")  or {}
-    rel       = family_needs.get("religion")   or {}
-    comm      = family_needs.get("community")  or {}
-    lifestyle = family_needs.get("lifestyle")  or {}
-    medical   = family_needs.get("medical")    or {}
+    edu = family_needs.get("education") or {}
+    rel = family_needs.get("religion") or {}
+    comm = family_needs.get("community") or {}
+    lifestyle = family_needs.get("lifestyle") or {}
+    medical = family_needs.get("medical") or {}
 
     # ── Anchor institutions ────────────────────────────────────────────────
     if edu.get("essential_tags") or _to_int(edu.get("proximity_importance")) >= 3:
         tags.append("education")
 
     if rel.get("needs_synagogue") or rel.get("affiliation") in (
-        "religious", "haredi", "traditional"
+        "religious",
+        "haredi",
+        "traditional",
     ):
         tags.append("synagogue")
 
@@ -484,12 +658,22 @@ def _extract_needs_tags(family_needs: dict[str, Any]) -> list[str]:
         tags.append("city_facility")
 
     # ── Medical / services ────────────────────────────────────────────────
-    if medical.get("needs_medical_proximity") or _to_int(medical.get("services_importance")) >= 4:
+    if (
+        medical.get("needs_medical_proximity")
+        or _to_int(medical.get("services_importance")) >= 4
+    ):
         tags.append("city_facility")  # OSM city facilities include clinics
 
     # Fallback: include every category so hub discovery is always holistic.
     if not tags:
-        tags = ["education", "synagogue", "matnas", "cafe", "restaurant", "city_facility"]
+        tags = [
+            "education",
+            "synagogue",
+            "matnas",
+            "cafe",
+            "restaurant",
+            "city_facility",
+        ]
 
     return list(dict.fromkeys(tags))  # deduplicate while preserving order
 
@@ -507,10 +691,10 @@ def _resolve_education_supervision(family_needs: dict[str, Any]) -> Optional[str
     """
     affiliation = (family_needs.get("religion") or {}).get("affiliation") or ""
     mapping = {
-        "secular":     "State",
-        "religious":   "State Religious",
+        "secular": "State",
+        "religious": "State Religious",
         "traditional": "State Religious",
-        "haredi":      "Ultra-Orthodox",
+        "haredi": "Ultra-Orthodox",
     }
     return mapping.get(affiliation.lower())
 
@@ -525,13 +709,13 @@ def _build_needs_text(family_needs: dict[str, Any]) -> str:
     """
     parts: list[str] = []
 
-    comp      = family_needs.get("composition") or {}
-    edu       = family_needs.get("education")   or {}
-    rel       = family_needs.get("religion")    or {}
-    comm      = family_needs.get("community")   or {}
-    lifestyle = family_needs.get("lifestyle")   or {}
-    medical   = family_needs.get("medical")     or {}
-    mob       = family_needs.get("mobility")    or {}
+    comp = family_needs.get("composition") or {}
+    edu = family_needs.get("education") or {}
+    rel = family_needs.get("religion") or {}
+    comm = family_needs.get("community") or {}
+    lifestyle = family_needs.get("lifestyle") or {}
+    medical = family_needs.get("medical") or {}
+    mob = family_needs.get("mobility") or {}
 
     # ── Family composition ────────────────────────────────────────────────
     if comp.get("total_people"):
@@ -596,7 +780,9 @@ def _build_needs_text(family_needs: dict[str, Any]) -> str:
 
     # ── Mobility ──────────────────────────────────────────────────────────
     if mob.get("has_mobility_disability"):
-        parts.append("household member with mobility disability — needs accessible area")
+        parts.append(
+            "household member with mobility disability — needs accessible area"
+        )
     if not mob.get("has_car"):
         parts.append("no private car — walkable neighbourhood preferred")
 
@@ -612,6 +798,7 @@ def _build_needs_text(family_needs: dict[str, Any]) -> str:
 
 
 # ─── DB persistence ───────────────────────────────────────────────────────────
+
 
 async def _save_tactical_result(
     family_id: str,
@@ -643,7 +830,7 @@ async def _save_tactical_result(
         _progress("[tactical] DATABASE_URL not set — skipping DB save.")
         return
 
-    radii_json    = json.dumps(radii_data) if radii_data else None
+    radii_json = json.dumps(radii_data) if radii_data else None
     confidence_str = str(confidence) if confidence is not None else None
 
     try:
@@ -693,14 +880,16 @@ async def _save_tactical_result(
 
 # ─── Agent ────────────────────────────────────────────────────────────────────
 
+
 class TacticalRelocationAgent:
     """
     Connects to the CityStrata MCP server over stdio and orchestrates the
-    holistic three-step pipeline followed by GPT-4o grounded generation.
+    holistic pipeline (single-family or community centroid variant).
 
     Usage::
         async with TacticalRelocationAgent() as agent:
             report = await agent.run_for_family(family_id)
+            report = await agent.run_for_community([id1, id2, ...])
     """
 
     def __init__(
@@ -716,11 +905,12 @@ class TacticalRelocationAgent:
         self.tool_timeout_s = tool_timeout_s
         # Discard server stderr by default — piping it on Windows can deadlock MCP stdio.
         self._errlog = (
-            sys.stderr if forward_server_stderr
+            sys.stderr
+            if forward_server_stderr
             else open(os.devnull, "w", encoding="utf-8")
         )
-        self._stack:   Optional[AsyncExitStack] = None
-        self._session: Optional[ClientSession]  = None
+        self._stack: Optional[AsyncExitStack] = None
+        self._session: Optional[ClientSession] = None
 
     # ── Context manager ───────────────────────────────────────────────────
 
@@ -746,13 +936,15 @@ class TacticalRelocationAgent:
         if self._stack:
             await self._stack.aclose()
         self._session = None
-        self._stack   = None
+        self._stack = None
 
     # ── Tool call wrapper ─────────────────────────────────────────────────
 
     async def _call(self, tool: str, **kwargs: Any) -> dict[str, Any]:
         """Call a named MCP tool with keyword arguments and decode the response."""
-        assert self._session is not None, "Agent not connected. Use 'async with agent:'."
+        assert (
+            self._session is not None
+        ), "Agent not connected. Use 'async with agent:'."
         _progress(f"[tactical] → {tool} …")
         try:
             raw = await asyncio.wait_for(
@@ -784,9 +976,11 @@ class TacticalRelocationAgent:
         _progress("[tactical] Step 1/4: Loading evacuation context…")
         ctx = await self._call("get_evacuation_context", family_id=family_id)
         if not ctx.get("ok"):
-            return f"# Error — Context Load Failed\n\n{ctx.get('error', 'Unknown error.')}"
+            return (
+                f"# Error — Context Load Failed\n\n{ctx.get('error', 'Unknown error.')}"
+            )
 
-        family_needs: dict[str, Any]      = ctx["family_needs"]
+        family_needs: dict[str, Any] = ctx["family_needs"]
         cluster: Optional[dict[str, Any]] = ctx.get("cluster")
 
         if not cluster or not cluster.get("run_id"):
@@ -798,7 +992,7 @@ class TacticalRelocationAgent:
 
         # ── Step 2: Holistic K-means hub discovery ────────────────────────
         _progress("[tactical] Step 2/4: Discovering K-means hubs across all amenities…")
-        needs_tags  = _extract_needs_tags(family_needs)
+        needs_tags = _extract_needs_tags(family_needs)
         supervision = _resolve_education_supervision(family_needs)
         if supervision:
             _progress(f"[tactical]   Education filter: {supervision} schools only")
@@ -822,8 +1016,10 @@ class TacticalRelocationAgent:
         logger.info("Discovered %d hub(s). Tags used: %s", len(radii), needs_tags)
 
         # ── Step 3: Holistic semantic scoring ─────────────────────────────
-        _progress("[tactical] Step 3/4: Holistic semantic scoring (pgvector across all amenities)…")
-        needs_text   = _build_needs_text(family_needs)
+        _progress(
+            "[tactical] Step 3/4: Holistic semantic scoring (pgvector across all amenities)…"
+        )
+        needs_text = _build_needs_text(family_needs)
 
         score_result = await self._call(
             "semantic_radius_scoring",
@@ -840,8 +1036,108 @@ class TacticalRelocationAgent:
         ai_letter = await _generate_recommendation(family_needs, cluster, ranked_radii)
 
         report = _format_report(family_needs, cluster, ranked_radii, ai_letter)
-        await _save_tactical_result(family_id, report, cluster.get("confidence"), ranked_radii)
+        await _save_tactical_result(
+            family_id, report, cluster.get("confidence"), ranked_radii
+        )
         return report
+
+    async def run_for_community(self, family_ids: list[str]) -> CommunityTacticalResult:
+        """
+        Community pipeline: ``get_community_context`` → ``discover_optimal_radius``
+        → ``community_semantic_scoring`` (centroid) → group-centric report.
+
+        Persistence is optional (callers e.g. API may insert a merged profile and
+        call ``_save_tactical_result``).
+        """
+        ids = [x.strip() for x in family_ids if x and str(x).strip()]
+        if not ids:
+            return CommunityTacticalResult(
+                ok=False,
+                report="# Error\n\nNo family UUIDs supplied.",
+                ranked_radii=[],
+            )
+
+        _progress("[tactical] Community 1/4: Loading merged context…")
+        ctx = await self._call("get_community_context", family_ids=ids)
+        if not ctx.get("ok"):
+            return CommunityTacticalResult(
+                ok=False,
+                report=(
+                    f"# Error — Community Context Failed\n\n"
+                    f"{ctx.get('error', 'Unknown error.')}"
+                ),
+                ranked_radii=[],
+            )
+
+        member_families: list[dict[str, Any]] = ctx["member_families"]
+        community_needs: Optional[dict[str, Any]] = ctx.get("community_needs")
+        cluster: Optional[dict[str, Any]] = ctx.get("cluster")
+
+        if not community_needs or not cluster or not cluster.get("run_id"):
+            return CommunityTacticalResult(
+                ok=False,
+                report=(
+                    "# Community Context Incomplete\n\n"
+                    f"{ctx.get('error', 'Missing cluster or merged profile.')}"
+                ),
+                ranked_radii=[],
+            )
+
+        _progress("[tactical] Community 2/4: Discovering hubs (merged tags)…")
+        needs_tags = _extract_needs_tags(community_needs)
+        supervision = _community_resolve_education_supervision(member_families)
+        if supervision:
+            _progress(f"[tactical]   Education filter (unanimous): {supervision}")
+
+        radii_result = await self._call(
+            "discover_optimal_radius",
+            run_id=cluster["run_id"],
+            cluster_number=cluster["cluster_number"],
+            education_supervision=supervision,
+            needs_tags=needs_tags,
+        )
+
+        if not radii_result.get("ok") or not radii_result.get("radii"):
+            return CommunityTacticalResult(
+                ok=False,
+                report=(
+                    "# No Radii Found (Community)\n\n"
+                    f"Could not identify service hubs in cluster "
+                    f"`{cluster.get('cluster_name')}` (#{cluster['cluster_number']}).\n\n"
+                    f"Reason: {radii_result.get('error', 'No amenities in boundary.')}"
+                ),
+                ranked_radii=[],
+            )
+
+        radii: list[dict[str, Any]] = radii_result["radii"]
+        per_family_texts = [
+            _build_needs_text(m["family_needs"]) for m in member_families
+        ]
+
+        _progress("[tactical] Community 3/4: Semantic scoring (centroid)…")
+        score_result = await self._call(
+            "community_semantic_scoring",
+            radii=radii,
+            family_needs_texts=per_family_texts,
+            education_supervision=supervision,
+        )
+        ranked_radii: list[dict[str, Any]] = (
+            score_result.get("ranked_radii") or radii
+        )
+
+        _progress("[tactical] Community 4/4: Group-centric report…")
+        ai_letter = await _generate_community_recommendation(
+            member_families, community_needs, cluster, ranked_radii
+        )
+        report = _format_community_report(
+            member_families, community_needs, cluster, ranked_radii, ai_letter
+        )
+        return CommunityTacticalResult(
+            ok=True,
+            report=report,
+            ranked_radii=ranked_radii,
+            confidence=cluster.get("confidence"),
+        )
 
 
 # ─── Report formatter ─────────────────────────────────────────────────────────
@@ -858,26 +1154,36 @@ def _relevant_categories(family_needs: dict[str, Any]) -> set[str]:
     """
     relevant: set[str] = set()
 
-    comp      = family_needs.get("composition") or {}
-    edu       = family_needs.get("education")   or {}
-    rel       = family_needs.get("religion")    or {}
-    comm      = family_needs.get("community")   or {}
-    mob       = family_needs.get("mobility")    or {}
-    lifestyle = family_needs.get("lifestyle")   or {}
-    medical   = family_needs.get("medical")     or {}
-    notes     = (family_needs.get("notes") or "").lower()
+    comp = family_needs.get("composition") or {}
+    edu = family_needs.get("education") or {}
+    rel = family_needs.get("religion") or {}
+    comm = family_needs.get("community") or {}
+    mob = family_needs.get("mobility") or {}
+    lifestyle = family_needs.get("lifestyle") or {}
+    medical = family_needs.get("medical") or {}
+    notes = (family_needs.get("notes") or "").lower()
 
     has_children = any(
         comp.get(k) for k in ("infants", "preschool", "elementary", "youth")
     )
-    if has_children or edu.get("essential_tags") or _to_int(edu.get("proximity_importance")) >= 3:
+    if (
+        has_children
+        or edu.get("essential_tags")
+        or _to_int(edu.get("proximity_importance")) >= 3
+    ):
         relevant.add("education")
 
-    if mob.get("has_mobility_disability") or "חינוך מיוחד" in notes or "special" in notes:
+    if (
+        mob.get("has_mobility_disability")
+        or "חינוך מיוחד" in notes
+        or "special" in notes
+    ):
         relevant.add("education_special")
 
     if rel.get("needs_synagogue") or rel.get("affiliation") in (
-        "religious", "haredi", "traditional",
+        "religious",
+        "haredi",
+        "traditional",
     ):
         relevant.add("synagogue")
 
@@ -897,7 +1203,10 @@ def _relevant_categories(family_needs: dict[str, Any]) -> set[str]:
     if culture_freq >= 3:
         relevant.add("city_facility")
 
-    if medical.get("needs_medical_proximity") or _to_int(medical.get("services_importance")) >= 4:
+    if (
+        medical.get("needs_medical_proximity")
+        or _to_int(medical.get("services_importance")) >= 4
+    ):
         relevant.add("city_facility")
 
     return relevant
@@ -906,15 +1215,15 @@ def _relevant_categories(family_needs: dict[str, Any]) -> set[str]:
 # Hebrew translations for the fixed zone hub labels produced by the pipeline.
 _HUB_LABEL_HE: dict[str, str] = {
     "zone_alpha": "אזור אלפא",
-    "zone_beta":  "אזור בטא",
+    "zone_beta": "אזור בטא",
     "zone_gamma": "אזור גמא",
 }
 
 # Hebrew labels for the education phase keys (parallel to _PHASE_LABELS in English).
 _PHASE_LABELS_HE: dict[str, str] = {
     "kindergarten": "גני ילדים",
-    "elementary":   "בתי ספר יסודיים",
-    "high_school":  "בתי ספר תיכוניים",
+    "elementary": "בתי ספר יסודיים",
+    "high_school": "בתי ספר תיכוניים",
 }
 
 
@@ -940,13 +1249,15 @@ def _format_report(
     ai_letter: Optional[str],
 ) -> str:
     """Build the final Markdown tactical report from pipeline outputs."""
-    name         = family_needs.get("family_name") or "משפחה לא ידועה"
-    comp         = family_needs.get("composition") or {}
-    cluster_name = cluster.get("cluster_name") or f"אשכול {cluster.get('cluster_number')}"
+    name = family_needs.get("family_name") or "משפחה לא ידועה"
+    comp = family_needs.get("composition") or {}
+    cluster_name = (
+        cluster.get("cluster_name") or f"אשכול {cluster.get('cluster_number')}"
+    )
 
     # RTL Unicode marker ensures renderers that honour the BOM/marker apply
     # right-to-left text flow even before any CSS is applied.
-    RTL = "\u200F"  # RIGHT-TO-LEFT MARK (invisible, no width)
+    RTL = "\u200f"  # RIGHT-TO-LEFT MARK (invisible, no width)
 
     lines: list[str] = [
         f"{RTL} דו״ח מיקום טקטי — CityStrata | {name}",
@@ -966,7 +1277,7 @@ def _format_report(
     if ai_letter:
         lines += ["## המלצת המערכת", "", ai_letter, "", "---", ""]
 
-    relevant      = _relevant_categories(family_needs)
+    relevant = _relevant_categories(family_needs)
     needed_phases = _needed_education_phases(family_needs)
 
     lines += ["## אזורי מגורים מומלצים", ""]
@@ -974,19 +1285,21 @@ def _format_report(
     _PRIORITY_LABELS = ["עדיפות ראשונה", "עדיפות שנייה", "עדיפות שלישית"]
 
     for i, zone in enumerate(ranked_radii[:3]):
-        counts  = zone.get("amenity_counts") or {}
+        counts = zone.get("amenity_counts") or {}
         hub_raw = zone.get("hub_label") or f"zone_{i}"
-        label   = _he_zone_label(hub_raw)
-        lat     = zone.get("center_lat", 0.0)
-        lng     = zone.get("center_lng", 0.0)
-        radius  = zone.get("radius_m", 0)
+        label = _he_zone_label(hub_raw)
+        lat = zone.get("center_lat", 0.0)
+        lng = zone.get("center_lng", 0.0)
+        radius = zone.get("radius_m", 0)
 
         education_special = zone.get("education_special")
-        edu_filter        = zone.get("education_supervision_filter")
-        raw_phase_counts  = zone.get("education_phase_counts") or {}
-        phase_counts      = _aggregate_phase_counts(raw_phase_counts)
+        edu_filter = zone.get("education_supervision_filter")
+        raw_phase_counts = zone.get("education_phase_counts") or {}
+        phase_counts = _aggregate_phase_counts(raw_phase_counts)
 
-        priority = _PRIORITY_LABELS[i] if i < len(_PRIORITY_LABELS) else f"עדיפות {i + 1}"
+        priority = (
+            _PRIORITY_LABELS[i] if i < len(_PRIORITY_LABELS) else f"עדיפות {i + 1}"
+        )
 
         lines += [
             f"### {priority}: {label}",
@@ -1005,9 +1318,7 @@ def _format_report(
                         phase_parts.append(f"{cnt} {_PHASE_LABELS_HE[phase_key]}")
 
             if phase_parts:
-                amenity_bullets.append(
-                    f"  - **חינוך:** {', '.join(phase_parts)}."
-                )
+                amenity_bullets.append(f"  - **חינוך:** {', '.join(phase_parts)}.")
             else:
                 all_edu = counts.get("education", 0)
                 if all_edu:
@@ -1041,9 +1352,7 @@ def _format_report(
         if "matnas" in relevant:
             matnas_count = counts.get("matnas", 0)
             if matnas_count:
-                amenity_bullets.append(
-                    f"  - **קהילה:** {matnas_count} מתנ״ס בסביבה."
-                )
+                amenity_bullets.append(f"  - **קהילה:** {matnas_count} מתנ״ס בסביבה.")
 
         if "city_facility" in relevant:
             cf_count = counts.get("city_facility", 0)
@@ -1066,7 +1375,148 @@ def _format_report(
     return "\n".join(lines)
 
 
+def _format_community_report(
+    member_families: list[dict[str, Any]],
+    community_needs: dict[str, Any],
+    cluster: dict[str, Any],
+    ranked_radii: list[dict[str, Any]],
+    ai_letter: Optional[str],
+) -> str:
+    """Markdown report for multi-family relocation (merged relevance + per-family blurbs)."""
+    RTL = "\u200F"
+    names = ", ".join(
+        (m.get("family_needs") or {}).get("family_name") or "—"
+        for m in member_families
+    )
+    comp = community_needs.get("composition") or {}
+    cluster_name = cluster.get("cluster_name") or f"אשכול {cluster.get('cluster_number')}"
+
+    lines: list[str] = [
+        f"{RTL} דו״ח מיקום טקטי — קהילה | CityStrata",
+        "",
+        f"**משפחות:** {names}  ",
+        f"**סה״כ נפשות:** {comp.get('total_people', '?')}  ",
+        f"**אשכול מוקצה:** {cluster_name}  ",
+        f"**רמת וודאות:** {cluster.get('confidence', '—')}  ",
+        "",
+        "**פירוט משפחות:**",
+        "",
+    ]
+    for m in member_families:
+        fn = m.get("family_needs") or {}
+        fname = fn.get("family_name") or "משפחה"
+        lines.append(f"- **{fname}:** {_build_needs_text(fn)}")
+    lines.append("")
+
+    notes = community_needs.get("notes")
+    if notes:
+        lines += [f"**הערות משולבות:** {notes}  ", ""]
+
+    lines += ["---", ""]
+
+    if ai_letter:
+        lines += ["## המלצת המערכת (קהילה)", "", ai_letter, "", "---", ""]
+
+    relevant = _relevant_categories(community_needs)
+    needed_phases = _needed_education_phases(community_needs)
+    lines += ["## אזורי מגורים מומלצים לקהילה", ""]
+
+    priority_labels = ["עדיפות ראשונה", "עדיפות שנייה", "עדיפות שלישית"]
+
+    for i, zone in enumerate(ranked_radii[:3]):
+        counts = zone.get("amenity_counts") or {}
+        hub_raw = zone.get("hub_label") or f"zone_{i}"
+        label = _he_zone_label(hub_raw)
+        lat = zone.get("center_lat", 0.0)
+        lng = zone.get("center_lng", 0.0)
+        radius = zone.get("radius_m", 0)
+        education_special = zone.get("education_special")
+        raw_phase_counts = zone.get("education_phase_counts") or {}
+        phase_counts = _aggregate_phase_counts(raw_phase_counts)
+        priority = (
+            priority_labels[i] if i < len(priority_labels) else f"עדיפות {i + 1}"
+        )
+
+        lines += [
+            f"### {priority}: {label}",
+            "",
+            f"* **מיקום וכיסוי:** `{lat:.5f}, {lng:.5f}` (רדיוס: {radius} מ׳)",
+        ]
+
+        amenity_bullets: list[str] = []
+
+        if "education" in relevant:
+            phase_parts: list[str] = []
+            for phase_key in ("kindergarten", "elementary", "high_school"):
+                if phase_key in needed_phases:
+                    cnt = phase_counts.get(phase_key, 0)
+                    if cnt:
+                        phase_parts.append(f"{cnt} {_PHASE_LABELS_HE[phase_key]}")
+
+            if phase_parts:
+                amenity_bullets.append(
+                    f"  - **חינוך (לפי צרכי הילדים בקהילה):** {', '.join(phase_parts)}."
+                )
+            else:
+                all_edu = counts.get("education", 0)
+                if all_edu:
+                    amenity_bullets.append(
+                        f"  - **חינוך:** {all_edu} מוסדות חינוך בסביבה."
+                    )
+
+        if "education_special" in relevant and education_special:
+            amenity_bullets.append(
+                f"  - **חינוך מיוחד:** {education_special} בתי ספר לחינוך מיוחד."
+            )
+
+        if "synagogue" in relevant:
+            syn_count = counts.get("synagogue", 0)
+            if syn_count:
+                amenity_bullets.append(f"  - **דת:** {syn_count} בתי כנסת בסביבה.")
+
+        if "cafe" in relevant or "restaurant" in relevant:
+            cafe_count = counts.get("cafe", 0) if "cafe" in relevant else 0
+            rest_count = counts.get("restaurant", 0) if "restaurant" in relevant else 0
+            prts: list[str] = []
+            if rest_count:
+                prts.append(f"{rest_count} מסעדות")
+            if cafe_count:
+                prts.append(f"{cafe_count} בתי קפה")
+            if prts:
+                amenity_bullets.append(
+                    f"  - **אורח חיים:** {' ו-'.join(prts)} לצרכים חברתיים."
+                )
+
+        if "matnas" in relevant:
+            matnas_count = counts.get("matnas", 0)
+            if matnas_count:
+                amenity_bullets.append(
+                    f"  - **קהילה:** {matnas_count} מתנ״ס בסביבה."
+                )
+
+        if "city_facility" in relevant:
+            cf_count = counts.get("city_facility", 0)
+            if cf_count:
+                amenity_bullets.append(
+                    f"  - **מתקנים עירוניים:** {cf_count} פארקים, שירותים ומוסדות."
+                )
+
+        if amenity_bullets:
+            lines.append("* **מתקנים עיקריים באזור (קהילה):**")
+            lines.extend(amenity_bullets)
+
+        lines.append("")
+
+    lines += [
+        "---",
+        "",
+        f"*{RTL} CityStrata — דו״ח קהילתי; דירוג סמנטי לפי ממוצע וקטורי (centroid).*",
+    ]
+    return "\n".join(lines)
+
+
 # ─── Pipeline entry point ─────────────────────────────────────────────────────
+
 
 async def run_pipeline(
     family_id: str,
@@ -1088,7 +1538,28 @@ async def run_pipeline(
         return await agent.run_for_family(family_id)
 
 
+async def run_community_pipeline(
+    family_ids: list[str],
+    *,
+    server_path: Optional[Path] = None,
+    tool_timeout_s: float = 300.0,
+    forward_server_stderr: bool = False,
+) -> CommunityTacticalResult:
+    """Async entry — community relocation (extra embeddings + group report)."""
+    mcp_dir = Path(__file__).resolve().parent
+    load_dotenv(_project_root() / ".env")
+    load_dotenv(mcp_dir / ".env")
+
+    async with TacticalRelocationAgent(
+        mcp_server_script=server_path,
+        tool_timeout_s=tool_timeout_s,
+        forward_server_stderr=forward_server_stderr,
+    ) as agent:
+        return await agent.run_for_community(family_ids)
+
+
 # ─── CLI ──────────────────────────────────────────────────────────────────────
+
 
 def main() -> None:
     logging.basicConfig(
@@ -1102,7 +1573,15 @@ def main() -> None:
     parser.add_argument(
         "--family-id",
         default=os.getenv("TACTICAL_SAMPLE_FAMILY_ID", "").strip(),
-        help="evacuee_family_profiles.uuid (or set TACTICAL_SAMPLE_FAMILY_ID)",
+        help="Single evacuee_family_profiles.uuid (or set TACTICAL_SAMPLE_FAMILY_ID)",
+    )
+    parser.add_argument(
+        "--community-ids",
+        nargs="+",
+        metavar="UUID",
+        default=None,
+        help="Community mode: two or more family UUIDs (same cluster). "
+        "Mutually exclusive with --family-id.",
     )
     parser.add_argument(
         "--server",
@@ -1123,9 +1602,46 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.community_ids and args.family_id:
+        print(
+            "Error: use either --family-id or --community-ids, not both.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    if args.community_ids:
+        if len(args.community_ids) < 2:
+            print(
+                "Error: --community-ids requires at least two UUIDs.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        try:
+            result = asyncio.run(
+                run_community_pipeline(
+                    args.community_ids,
+                    server_path=args.server,
+                    tool_timeout_s=max(args.tool_timeout, 300.0),
+                    forward_server_stderr=args.forward_server_stderr,
+                )
+            )
+            print(result.report, flush=True)
+            if not result.ok:
+                sys.exit(1)
+        except TimeoutError as exc:
+            print(f"\nTimed out: {exc}", file=sys.stderr)
+            sys.exit(124)
+        except (RuntimeError, OSError) as exc:
+            print(f"\nFailed: {exc}", file=sys.stderr)
+            sys.exit(1)
+        except KeyboardInterrupt:
+            sys.exit(130)
+        return
+
     if not args.family_id:
         print(
-            "Error: supply --family-id <uuid> or set TACTICAL_SAMPLE_FAMILY_ID.",
+            "Error: supply --family-id <uuid>, set TACTICAL_SAMPLE_FAMILY_ID, "
+            "or use --community-ids with two or more UUIDs.",
             file=sys.stderr,
         )
         sys.exit(2)

@@ -81,6 +81,7 @@ logger = logging.getLogger("citystrata_mcp")
 
 # ─── Environment ──────────────────────────────────────────────────────────────
 
+
 def _load_env() -> None:
     """
     Load environment variables from a .env file.
@@ -176,6 +177,7 @@ async def _get_pool() -> asyncpg.Pool:
 # buffer fills.  Using plain urllib.request in a thread executor avoids this
 # entirely.  Do not reintroduce httpx or the openai SDK in this file.
 
+
 def _embed_sync(text: str) -> list[float]:
     """
     Perform a synchronous OpenAI text-embedding-3-small call via stdlib urllib.
@@ -192,20 +194,24 @@ def _embed_sync(text: str) -> list[float]:
     Raises:
         RuntimeError: On HTTP errors from the OpenAI API.
     """
-    payload = json.dumps({"model": "text-embedding-3-small", "input": text}).encode() # dumps convert dict to json 
+    payload = json.dumps(
+        {"model": "text-embedding-3-small", "input": text}
+    ).encode()  # dumps convert dict to json
     # and encode the payload to bytes
-    req = urllib.request.Request( # create a request object
-        "https://api.openai.com/v1/embeddings", # the url to send the request to openai api endpoint
-        data=payload, # the payload to send
-        headers={ # the headers to send
-            "Authorization": f"Bearer {_require_env('OPENAI_API_KEY')}", # the authorization header
-            "Content-Type": "application/json", # the content type header
+    req = urllib.request.Request(  # create a request object
+        "https://api.openai.com/v1/embeddings",  # the url to send the request to openai api endpoint
+        data=payload,  # the payload to send
+        headers={  # the headers to send
+            "Authorization": f"Bearer {_require_env('OPENAI_API_KEY')}",  # the authorization header
+            "Content-Type": "application/json",  # the content type header
         },
-        method="POST", # the method to use
+        method="POST",  # the method to use
     )
     try:
         with urllib.request.urlopen(req, timeout=90) as resp:
-            return json.loads(resp.read())["data"][0]["embedding"] # loads the response and returns only the embedding like "embedding": [0.123, 0.456, ...]
+            return json.loads(resp.read())["data"][0][
+                "embedding"
+            ]  # loads the response and returns only the embedding like "embedding": [0.123, 0.456, ...]
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"OpenAI embeddings HTTP {exc.code}: {body[:400]}") from exc
@@ -233,51 +239,68 @@ async def _embed(text: str) -> list[float]:
 
 
 # ─── OSM facility whitelist ───────────────────────────────────────────────────
-    # osm_city_facilities is a large OSM catch-all table (~1 150 rows for Eilat).
-    # Raw, it is dominated by infrastructure noise: bus stops (259), parking (176),
-    # swimming pools (84), pitch (61), etc.
-    #
-    # This whitelist keeps only facility_type values that meaningfully affect a
-    # displaced family's daily quality of life.
-    #
-    # Exclusion rationale:
-    #   transport infrastructure : bus_stop (259), bus_station, parking (176),
-    #       fuel, charging_station, bicycle  → don't affect liveability decisions
-    #   leisure (high volume, low daily relevance): swimming_pool (84), pitch (61)
-    #       → distort K-means; not a housing selection factor
-    #   retail / personal services : clothes, shoes, hairdresser, electronics,
-    #       mobile_phone, hardware, electrical, jewelry, optician, florist,
-    #       computer, gift, baby_goods, bureau_de_change, kiosk, variety_store
-    #   tourism / entertainment : marina, bird_hide, scuba_diving, ice_rink,
-    #       water_park, beach_resort, tattoo, erotic, massage, outdoor, track,
-    #       deli, bakery (covered by restaurants table), bar, pub, alcohol
-    #   miscellaneous / bad data : yes, recycling
-    #
-    # After filtering, effective OSM rows drop from ~1 150 to ~100–110, which is
-    # proportionate to other tables (schools ~15–20, synagogues 27, matnasim 7,
-    # cafes ~50, restaurants ~180).
-    #
-    # To update: edit this set only — AMENITY_TABLES picks it up automatically.
+# osm_city_facilities is a large OSM catch-all table (~1 150 rows for Eilat).
+# Raw, it is dominated by infrastructure noise: bus stops (259), parking (176),
+# swimming pools (84), pitch (61), etc.
+#
+# This whitelist keeps only facility_type values that meaningfully affect a
+# displaced family's daily quality of life.
+#
+# Exclusion rationale:
+#   transport infrastructure : bus_stop (259), bus_station, parking (176),
+#       fuel, charging_station, bicycle  → don't affect liveability decisions
+#   leisure (high volume, low daily relevance): swimming_pool (84), pitch (61)
+#       → distort K-means; not a housing selection factor
+#   retail / personal services : clothes, shoes, hairdresser, electronics,
+#       mobile_phone, hardware, electrical, jewelry, optician, florist,
+#       computer, gift, baby_goods, bureau_de_change, kiosk, variety_store
+#   tourism / entertainment : marina, bird_hide, scuba_diving, ice_rink,
+#       water_park, beach_resort, tattoo, erotic, massage, outdoor, track,
+#       deli, bakery (covered by restaurants table), bar, pub, alcohol
+#   miscellaneous / bad data : yes, recycling
+#
+# After filtering, effective OSM rows drop from ~1 150 to ~100–110, which is
+# proportionate to other tables (schools ~15–20, synagogues 27, matnasim 7,
+# cafes ~50, restaurants ~180).
+#
+# To update: edit this set only — AMENITY_TABLES picks it up automatically.
 
-OSM_FACILITY_WHITELIST: frozenset[str] = frozenset({
-    # Green space — daily-life anchors for families with young children
-    "park", "playground", "garden", "dog_park", "recreation_ground",
-    # Sports and fitness — relevant for youth and adults
-    # pitch and swimming_pool excluded (high count, not a housing factor)
-    "fitness_station", "sports_centre",
-    # Essential daily commerce
-    "supermarket", "convenience",
-    # Medical access — critical during displacement
-    "pharmacy", "hospital", "clinic",
-    # Financial services
-    "atm", "bank",
-    # Civic and government services — displaced families deal with paperwork
-    "government", "post_office", "townhall", "police",
-    # Education and culture (supplementary to educational_institutions table)
-    "library", "arts_centre", "university", "college", 
-    # Practical household need for families without in-unit laundry
-    "laundry",
-})
+OSM_FACILITY_WHITELIST: frozenset[str] = frozenset(
+    {
+        # Green space — daily-life anchors for families with young children
+        "park",
+        "playground",
+        "garden",
+        "dog_park",
+        "recreation_ground",
+        # Sports and fitness — relevant for youth and adults
+        # pitch and swimming_pool excluded (high count, not a housing factor)
+        "fitness_station",
+        "sports_centre",
+        # Essential daily commerce
+        "supermarket",
+        "convenience",
+        # Medical access — critical during displacement
+        "pharmacy",
+        "hospital",
+        "clinic",
+        # Financial services
+        "atm",
+        "bank",
+        # Civic and government services — displaced families deal with paperwork
+        "government",
+        "post_office",
+        "townhall",
+        "police",
+        # Education and culture (supplementary to educational_institutions table)
+        "library",
+        "arts_centre",
+        "university",
+        "college",
+        # Practical household need for families without in-unit laundry
+        "laundry",
+    }
+)
 
 # Pre-built SQL array literal — constructed once at module load.
 # Used in the extra_filter for osm_city_facilities:
@@ -288,73 +311,73 @@ _OSM_WHITELIST_SQL_LITERAL: str = (
 
 
 # ─── Amenity registry ─────────────────────────────────────────────────────────
-    # AMENITY_TABLES is the single source of truth for every amenity data source.
-    #
-    # Schema per entry:
-    #   table         — PostgreSQL table name (never interpolated from user input)
-    #   category      — Label used in amenity_counts output and SQL FILTER expressions
-    #   location      — Name of the PostGIS geography/geometry column
-    #   has_embedding — True if the table has an 'embedding' vector column
-    #   extra_filter  — Optional SQL AND fragment appended to the WHERE clause
-    #                   (e.g. OSM whitelist, closed-venue exclusion).
-    #                   Must be valid SQL with no unbound parameters.
-    #
-    # Data quality notes derived from Pydantic model inspection:
-    #   educational_institutions : institution_code is the unique school identifier.
-    #       Multiple rows per code exist (different education_phase/type_of_education).
-    #       Step C education queries use COUNT(DISTINCT institution_code) directly.
-    #   coffee_shops / restaurants : permanently_closed and temporarily_closed
-    #       boolean columns exist.  extra_filter excludes them from all queries.
+# AMENITY_TABLES is the single source of truth for every amenity data source.
+#
+# Schema per entry:
+#   table         — PostgreSQL table name (never interpolated from user input)
+#   category      — Label used in amenity_counts output and SQL FILTER expressions
+#   location      — Name of the PostGIS geography/geometry column
+#   has_embedding — True if the table has an 'embedding' vector column
+#   extra_filter  — Optional SQL AND fragment appended to the WHERE clause
+#                   (e.g. OSM whitelist, closed-venue exclusion).
+#                   Must be valid SQL with no unbound parameters.
+#
+# Data quality notes derived from Pydantic model inspection:
+#   educational_institutions : institution_code is the unique school identifier.
+#       Multiple rows per code exist (different education_phase/type_of_education).
+#       Step C education queries use COUNT(DISTINCT institution_code) directly.
+#   coffee_shops / restaurants : permanently_closed and temporarily_closed
+#       boolean columns exist.  extra_filter excludes them from all queries.
 
 AMENITY_TABLES: list[dict[str, Any]] = [
     {
-        "table":        "educational_institutions",
-        "category":     "education",
-        "location":     "location",
+        "table": "educational_institutions",
+        "category": "education",
+        "location": "location",
         "has_embedding": True,
-        "dedup_col":    None,
+        "dedup_col": None,
         "extra_filter": None,
     },
     {
-        "table":        "synagogues",
-        "category":     "synagogue",
-        "location":     "location",
+        "table": "synagogues",
+        "category": "synagogue",
+        "location": "location",
         "has_embedding": True,
-        "dedup_col":    None,
+        "dedup_col": None,
         "extra_filter": None,
     },
     {
-        "table":        "matnasim",
-        "category":     "matnas",
-        "location":     "location",
+        "table": "matnasim",
+        "category": "matnas",
+        "location": "location",
         "has_embedding": True,
-        "dedup_col":    None,
+        "dedup_col": None,
         "extra_filter": None,
     },
     {
-        "table":        "coffee_shops",
-        "category":     "cafe",
-        "location":     "location",
+        "table": "coffee_shops",
+        "category": "cafe",
+        "location": "location",
         "has_embedding": True,
-        "dedup_col":    None,
+        "dedup_col": None,
         "extra_filter": "AND permanently_closed = FALSE AND temporarily_closed = FALSE",
     },
     {
-        "table":        "restaurants",
-        "category":     "restaurant",
-        "location":     "location",
+        "table": "restaurants",
+        "category": "restaurant",
+        "location": "location",
         "has_embedding": True,
-        "dedup_col":    None,
+        "dedup_col": None,
         "extra_filter": "AND permanently_closed = FALSE AND temporarily_closed = FALSE",
     },
     {
         # OSM filtered to the curated whitelist.
         # Raw: ~1150 rows.  After whitelist: ~100–110 rows.
-        "table":        "osm_city_facilities",
-        "category":     "city_facility",
-        "location":     "location",
+        "table": "osm_city_facilities",
+        "category": "city_facility",
+        "location": "location",
         "has_embedding": True,
-        "dedup_col":    None,
+        "dedup_col": None,
         "extra_filter": f"AND facility_type = ANY({_OSM_WHITELIST_SQL_LITERAL})",
     },
 ]
@@ -364,29 +387,29 @@ AMENITY_TABLES: list[dict[str, Any]] = [
 ALL_CATEGORIES: list[str] = [t["category"] for t in AMENITY_TABLES]
 
 # ─── Education supervision mapping ────────────────────────────────────────────
-    # Maps a family's religious_affiliation value to the corresponding
-    # type_of_supervision label in educational_institutions.
-    #
-    # DB values confirmed by query:
-    #   State (106 rows), State Religious (19), Ultra-Orthodox (3)
-    #
-    # Mapping rationale:
-    #   secular     → State            (standard state-secular schools)
-    #   religious   → State Religious  (Mamlachti Dati — national-religious)
-    #   traditional → State Religious  (closest fit; traditional families use dati schools)
-    #   haredi      → Ultra-Orthodox   (independent haredi network)
-    #   None / other → no filter       (count all supervision types)
-    #
-    # Used in discover_optimal_radius and semantic_radius_scoring to:
-    #   1. Filter the K-means point cloud to relevant school buildings only
-    #   2. Report education_matched (schools the family can use) alongside
-    #      education_total (all schools) and education_special (special ed)
+# Maps a family's religious_affiliation value to the corresponding
+# type_of_supervision label in educational_institutions.
+#
+# DB values confirmed by query:
+#   State (106 rows), State Religious (19), Ultra-Orthodox (3)
+#
+# Mapping rationale:
+#   secular     → State            (standard state-secular schools)
+#   religious   → State Religious  (Mamlachti Dati — national-religious)
+#   traditional → State Religious  (closest fit; traditional families use dati schools)
+#   haredi      → Ultra-Orthodox   (independent haredi network)
+#   None / other → no filter       (count all supervision types)
+#
+# Used in discover_optimal_radius and semantic_radius_scoring to:
+#   1. Filter the K-means point cloud to relevant school buildings only
+#   2. Report education_matched (schools the family can use) alongside
+#      education_total (all schools) and education_special (special ed)
 
 SUPERVISION_MAP: dict[str, str] = {
-    "secular":     "State",
-    "religious":   "State Religious",
+    "secular": "State",
+    "religious": "State Religious",
     "traditional": "State Religious",
-    "haredi":      "Ultra-Orthodox",
+    "haredi": "Ultra-Orthodox",
 }
 
 # Allowed supervision values (whitelist for SQL safety).
@@ -398,16 +421,16 @@ _VALID_SUPERVISION_VALUES: frozenset[str] = frozenset(SUPERVISION_MAP.values())
 # agent module.  Keys are substrings; first match wins.
 
 _SCORE_PHASE_CANONICAL: dict[str, str] = {
-    "pre-primary":  "kindergarten",
-    "preprimary":   "kindergarten",
+    "pre-primary": "kindergarten",
+    "preprimary": "kindergarten",
     "kindergarten": "kindergarten",
-    "preschool":    "kindergarten",
-    "elementary":   "elementary",
-    "primary":      "elementary",
+    "preschool": "kindergarten",
+    "elementary": "elementary",
+    "primary": "elementary",
     "post-primary": "high_school",
-    "postprimary":  "high_school",
-    "secondary":    "high_school",
-    "high school":  "high_school",
+    "postprimary": "high_school",
+    "secondary": "high_school",
+    "high school": "high_school",
 }
 
 
@@ -421,22 +444,24 @@ def _canonical_phase_score(raw: str) -> Optional[str]:
 
 
 # ─── SQL fragment builders ────────────────────────────────────────────────────
-    # These three functions generate the UNION ALL blocks used in Tools 2 and 3.
-    # They read AMENITY_TABLES at call time, so any registry change is automatically
-    # reflected in all queries.
-    #
-    # Parameter conventions (positional, asyncpg style):
-    #   _sql_all_amenities_in_cluster : no extra params — uses cluster_boundary CTE
-    #   _sql_all_amenities_near_hub   : $1=hub_lat  $2=hub_lng  $3=radius_m
-    #   _sql_all_embeddings_near_hub  : $1=vec_lit  $2=hub_lat  $3=hub_lng  $4=radius_m
+# These three functions generate the UNION ALL blocks used in Tools 2 and 3.
+# They read AMENITY_TABLES at call time, so any registry change is automatically
+# reflected in all queries.
+#
+# Parameter conventions (positional, asyncpg style):
+#   _sql_all_amenities_in_cluster : no extra params — uses cluster_boundary CTE
+#   _sql_all_amenities_near_hub   : $1=hub_lat  $2=hub_lng  $3=radius_m
+#   _sql_all_embeddings_near_hub  : $1=vec_lit  $2=hub_lat  $3=hub_lng  $4=radius_m
 
 
 def _build_table_block(
     t: dict[str, Any],
-    spatial_clause: str, # complete SQL spatial condition like ST_Within(location::geometry, (SELECT geom FROM cluster_boundary))
+    spatial_clause: str,  # complete SQL spatial condition like ST_Within(location::geometry, (SELECT geom FROM cluster_boundary))
     select_cols: str,
-    extra_filter_override: Optional[str] = None, # optional extra SQL AND fragment to merge with t["extra_filter"] for this call only.
-    ) -> str:
+    extra_filter_override: Optional[
+        str
+    ] = None,  # optional extra SQL AND fragment to merge with t["extra_filter"] for this call only.
+) -> str:
     """
     Build a single SELECT block for one amenity table entry.
 
@@ -463,11 +488,11 @@ def _build_table_block(
 
         Returns:
             A complete SQL SELECT block ready to join with UNION ALL.
-        """
+    """
     # Merge the registry filter with the per-request override
-    parts = [t["extra_filter"] or "", extra_filter_override or ""] 
+    parts = [t["extra_filter"] or "", extra_filter_override or ""]
     combined = " ".join(p for p in parts if p).strip()
-    extra    = f"\n          {combined}" if combined else ""
+    extra = f"\n          {combined}" if combined else ""
     distinct = f"DISTINCT ON ({t['dedup_col']}) " if t["dedup_col"] else ""
     order_by = f" ORDER BY {t['dedup_col']}" if t["dedup_col"] else ""
 
@@ -487,7 +512,7 @@ def _build_table_block(
 
 def _sql_all_amenities_in_cluster(
     table_filter_overrides: Optional[dict[str, str]] = None,
-    ) -> str:
+) -> str:
     """
     Build a UNION ALL selecting (category TEXT, geom GEOMETRY) for every amenity
     table, restricted to points that lie strictly inside the cluster polygon.
@@ -505,15 +530,23 @@ def _sql_all_amenities_in_cluster(
     blocks: list[str] = []
     overrides = table_filter_overrides or {}
     for t in AMENITY_TABLES:
-        select_cols    = f"'{t['category']}'::text AS category, {t['location']}::geometry AS geom"
-        spatial_clause = f"ST_Within({t['location']}::geometry, (SELECT geom FROM cluster_boundary))"
-        blocks.append(_build_table_block(t, spatial_clause, select_cols, overrides.get(t["table"])))
+        select_cols = (
+            f"'{t['category']}'::text AS category, {t['location']}::geometry AS geom"
+        )
+        spatial_clause = (
+            f"ST_Within({t['location']}::geometry, (SELECT geom FROM cluster_boundary))"
+        )
+        blocks.append(
+            _build_table_block(
+                t, spatial_clause, select_cols, overrides.get(t["table"])
+            )
+        )
     return "\n        UNION ALL\n        ".join(blocks)
 
 
 def _sql_all_amenities_near_hub(
     table_filter_overrides: Optional[dict[str, str]] = None,
-    ) -> str:
+) -> str:
     """
     Build a UNION ALL selecting (category TEXT, location GEOGRAPHY) for every
     amenity table, restricted to points within a given radius of a hub centre.
@@ -534,19 +567,25 @@ def _sql_all_amenities_near_hub(
     blocks: list[str] = []
     overrides = table_filter_overrides or {}
     for t in AMENITY_TABLES:
-        select_cols    = f"'{t['category']}'::text AS category, {t['location']} AS location"
+        select_cols = (
+            f"'{t['category']}'::text AS category, {t['location']} AS location"
+        )
         spatial_clause = (
             f"ST_DWithin("
             f"{t['location']}::geography, "
             f"geography(ST_SetSRID(ST_MakePoint($2, $1), 4326)), $3)"
         )
-        blocks.append(_build_table_block(t, spatial_clause, select_cols, overrides.get(t["table"])))
+        blocks.append(
+            _build_table_block(
+                t, spatial_clause, select_cols, overrides.get(t["table"])
+            )
+        )
     return "\n        UNION ALL\n        ".join(blocks)
 
 
 def _sql_all_embeddings_near_hub(
     table_filter_overrides: Optional[dict[str, str]] = None,
-    ) -> str:
+) -> str:
     """
     Build a UNION ALL selecting (embedding VECTOR) for every table with embeddings,
     restricted to points within a given radius of a hub centre.
@@ -572,7 +611,7 @@ def _sql_all_embeddings_near_hub(
     for t in AMENITY_TABLES:
         if not t["has_embedding"]:
             continue
-        select_cols    = "embedding"
+        select_cols = "embedding"
         spatial_clause = (
             f"ST_DWithin("
             f"{t['location']}::geography, "
@@ -583,13 +622,14 @@ def _sql_all_embeddings_near_hub(
         t_effective = {
             **t,
             "extra_filter": (
-                emb_filter
-                + (f" {t['extra_filter']}" if t["extra_filter"] else "")
+                emb_filter + (f" {t['extra_filter']}" if t["extra_filter"] else "")
             ),
         }
-        blocks.append(_build_table_block(
-            t_effective, spatial_clause, select_cols, overrides.get(t["table"])
-        ))
+        blocks.append(
+            _build_table_block(
+                t_effective, spatial_clause, select_cols, overrides.get(t["table"])
+            )
+        )
     return "\n        UNION ALL\n        ".join(blocks)
 
 
@@ -609,8 +649,7 @@ def _sql_count_filters() -> str:
         A SQL fragment suitable for use in a SELECT list.
     """
     return ",\n        ".join(
-        f"COUNT(*) FILTER (WHERE category = '{cat}') AS {cat}"
-        for cat in ALL_CATEGORIES
+        f"COUNT(*) FILTER (WHERE category = '{cat}') AS {cat}" for cat in ALL_CATEGORIES
     )
 
 
@@ -653,6 +692,7 @@ mcp = FastMCP(
 # ══════════════════════════════════════════════════════════════════════════════
 # Tool 1 — get_evacuation_context
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @mcp.tool()
 async def get_evacuation_context(family_id: str) -> dict[str, Any]:
@@ -741,46 +781,46 @@ async def get_evacuation_context(family_id: str) -> dict[str, Any]:
         "family_name": row["family_name"],
         "composition": {
             "total_people": row["total_people"],
-            "infants":      row["infants"],
-            "preschool":    row["preschool"],
-            "elementary":   row["elementary"],
-            "youth":        row["youth"],
-            "adults":       row["adults"],
-            "seniors":      row["seniors"],
+            "infants": row["infants"],
+            "preschool": row["preschool"],
+            "elementary": row["elementary"],
+            "youth": row["youth"],
+            "adults": row["adults"],
+            "seniors": row["seniors"],
         },
         "mobility": {
             # has_car affects walkability signal in _build_needs_text.
-            "has_car":                row["has_car"],
+            "has_car": row["has_car"],
             "has_mobility_disability": row["has_mobility_disability"],
         },
         "education": {
             # essential_tags are Hebrew/English phase labels matched against
             # educational_institutions.education_phase in scoring.
-            "essential_tags":       list(row["essential_education"] or []),
+            "essential_tags": list(row["essential_education"] or []),
             "proximity_importance": row["education_proximity_importance"],
         },
         "religion": {
-            "affiliation":     row["religious_affiliation"],
+            "affiliation": row["religious_affiliation"],
             "needs_synagogue": row["needs_synagogue"],
         },
         "community": {
-            "matnas_participation":      row["matnas_participation"],
+            "matnas_participation": row["matnas_participation"],
             "needs_community_proximity": row["needs_community_proximity"],
-            "social_importance":         row["social_venues_importance"],
-            "culture_frequency":         row["culture_frequency"],
+            "social_importance": row["social_venues_importance"],
+            "culture_frequency": row["culture_frequency"],
         },
         "lifestyle": {
             # social_venues_importance >= 3 → infer cafe/restaurant interest
             # culture_frequency >= 3        → infer parks/city facility interest
             "social_venues_importance": row["social_venues_importance"],
-            "culture_frequency":        row["culture_frequency"],
+            "culture_frequency": row["culture_frequency"],
         },
         "medical": {
             "needs_medical_proximity": row["needs_medical_proximity"],
-            "services_importance":     row["services_importance"],
+            "services_importance": row["services_importance"],
         },
         "housing": {
-            "preference":    row["accommodation_preference"],
+            "preference": row["accommodation_preference"],
             "stay_duration": row["estimated_stay_duration"],
         },
         "notes": row["notes"],
@@ -811,26 +851,350 @@ async def get_evacuation_context(family_id: str) -> dict[str, Any]:
             )
 
         cluster = {
-            "run_id":         row["run_id"],
+            "run_id": row["run_id"],
             "cluster_number": row["recommended_cluster_number"],
-            "cluster_name":   row["recommended_cluster"],
-            "center_lat":     float(crow["center_lat"]) if crow and crow["center_lat"] else None,
-            "center_lng":     float(crow["center_lng"]) if crow and crow["center_lng"] else None,
-            "area_count":     crow["area_count"] if crow else 0,
-            "confidence":     row["confidence"],
-            "reasoning":      row["reasoning"],
+            "cluster_name": row["recommended_cluster"],
+            "center_lat": (
+                float(crow["center_lat"]) if crow and crow["center_lat"] else None
+            ),
+            "center_lng": (
+                float(crow["center_lng"]) if crow and crow["center_lng"] else None
+            ),
+            "area_count": crow["area_count"] if crow else 0,
+            "confidence": row["confidence"],
+            "reasoning": row["reasoning"],
         }
 
     logger.info(
         "get_evacuation_context ok family=%s cluster_found=%s",
-        fid, cluster is not None,
+        fid,
+        cluster is not None,
     )
     return {"ok": True, "family_needs": family_needs, "cluster": cluster}
+
+
+def _vector_mean(vectors: list[list[float]]) -> list[float]:
+    """Component-wise mean of embedding vectors (same dimension)."""
+    if not vectors:
+        raise ValueError("vectors must be non-empty")
+    n = len(vectors)
+    dim = len(vectors[0])
+    return [sum(v[j] for v in vectors) / n for j in range(dim)]
+
+
+def _merge_culture_rank(value: Any) -> int:
+    """daily > weekly > rarely when merging culture_frequency."""
+    s = (str(value or "")).strip().lower()
+    if s == "daily":
+        return 3
+    if s == "weekly":
+        return 2
+    return 1
+
+
+def _culture_from_rank(rank: int) -> str:
+    if rank >= 3:
+        return "daily"
+    if rank == 2:
+        return "weekly"
+    return "rarely"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Tool 1b — get_community_context (parallel path; single-family Tool 1 unchanged)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+async def get_community_context(family_ids: list[str]) -> dict[str, Any]:
+    """
+    Fetch N family profiles with ``WHERE uuid = ANY($1::uuid[])``, merge into one
+    community profile, and require a single shared cluster assignment.
+    """
+    if not family_ids:
+        return {"ok": False, "error": "family_ids must contain at least one UUID."}
+
+    parsed: list[UUID] = []
+    for raw in family_ids:
+        try:
+            parsed.append(UUID(str(raw).strip()))
+        except ValueError:
+            return {"ok": False, "error": f"Invalid UUID in family_ids: {raw!r}"}
+
+    pool = await _get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT
+                efp.uuid::text              AS family_uuid,
+                efp.family_name,
+                efp.total_people,
+                efp.infants,   efp.preschool, efp.elementary,
+                efp.youth,     efp.adults,    efp.seniors,
+                efp.has_mobility_disability,
+                efp.has_car,
+                efp.essential_education,
+                efp.education_proximity_importance,
+                efp.religious_affiliation,
+                efp.needs_synagogue,
+                efp.matnas_participation,
+                efp.needs_community_proximity,
+                efp.social_venues_importance,
+                efp.culture_frequency,
+                efp.accommodation_preference,
+                efp.estimated_stay_duration,
+                efp.needs_medical_proximity,
+                efp.services_importance,
+                efp.notes,
+                mr.run_id::text            AS run_id,
+                mr.recommended_cluster,
+                mr.recommended_cluster_number,
+                mr.confidence,
+                mr.reasoning
+            FROM evacuee_family_profiles efp
+            LEFT JOIN matching_results mr
+                ON mr.id = efp.selected_matching_result_id
+            WHERE efp.uuid = ANY($1::uuid[])
+            """,
+            parsed,
+        )
+
+    by_uuid = {r["family_uuid"]: r for r in rows}
+    missing = [str(u) for u in parsed if str(u) not in by_uuid]
+    if missing:
+        return {"ok": False, "error": f"No profile found for family_id(s): {missing}"}
+
+    ordered_rows = [by_uuid[str(u)] for u in parsed]
+
+    def row_to_family_needs(row: Any) -> dict[str, Any]:
+        return {
+            "family_uuid": row["family_uuid"],
+            "family_name": row["family_name"],
+            "composition": {
+                "total_people": row["total_people"],
+                "infants": row["infants"],
+                "preschool": row["preschool"],
+                "elementary": row["elementary"],
+                "youth": row["youth"],
+                "adults": row["adults"],
+                "seniors": row["seniors"],
+            },
+            "mobility": {
+                "has_car": row["has_car"],
+                "has_mobility_disability": row["has_mobility_disability"],
+            },
+            "education": {
+                "essential_tags": list(row["essential_education"] or []),
+                "proximity_importance": row["education_proximity_importance"],
+            },
+            "religion": {
+                "affiliation": row["religious_affiliation"],
+                "needs_synagogue": row["needs_synagogue"],
+            },
+            "community": {
+                "matnas_participation": row["matnas_participation"],
+                "needs_community_proximity": row["needs_community_proximity"],
+                "social_importance": row["social_venues_importance"],
+                "culture_frequency": row["culture_frequency"],
+            },
+            "lifestyle": {
+                "social_venues_importance": row["social_venues_importance"],
+                "culture_frequency": row["culture_frequency"],
+            },
+            "medical": {
+                "needs_medical_proximity": row["needs_medical_proximity"],
+                "services_importance": row["services_importance"],
+            },
+            "housing": {
+                "preference": row["accommodation_preference"],
+                "stay_duration": row["estimated_stay_duration"],
+            },
+            "notes": row["notes"],
+        }
+
+    member_families: list[dict[str, Any]] = []
+    for row in ordered_rows:
+        member_families.append(
+            {
+                "family_uuid": row["family_uuid"],
+                "family_name": row["family_name"],
+                "family_needs": row_to_family_needs(row),
+            }
+        )
+
+    run_ids = {r["run_id"] for r in ordered_rows if r["run_id"]}
+    cluster_nums = {
+        int(r["recommended_cluster_number"])
+        for r in ordered_rows
+        if r["recommended_cluster_number"] is not None
+    }
+
+    if len(run_ids) > 1 or len(cluster_nums) > 1:
+        return {
+            "ok": False,
+            "error": (
+                "Community relocation requires every family to share the same cluster. "
+                f"run_ids={sorted(str(x) for x in run_ids)}, "
+                f"cluster_numbers={sorted(cluster_nums)}"
+            ),
+            "member_families": member_families,
+            "community_needs": None,
+            "cluster": None,
+        }
+
+    ref = ordered_rows[0]
+    if ref["run_id"] is None or ref["recommended_cluster_number"] is None:
+        return {
+            "ok": False,
+            "error": "One or more families have no cluster / matching result linked.",
+            "member_families": member_families,
+            "community_needs": None,
+            "cluster": None,
+        }
+
+    async with pool.acquire() as conn:
+        crow = await conn.fetchrow(
+            """
+            SELECT
+                AVG(ST_Y(COALESCE(sa.centroid, ST_Centroid(sa.geom)))) AS center_lat,
+                AVG(ST_X(COALESCE(sa.centroid, ST_Centroid(sa.geom)))) AS center_lng,
+                COUNT(*)::int AS area_count
+            FROM cluster_assignments ca
+            JOIN statistical_areas sa
+                ON sa.stat_2022 = ca.stat_2022
+               AND sa.semel_yish = 2600
+            WHERE ca.run_id = $1::uuid
+              AND ca.cluster = $2
+            """,
+            UUID(ref["run_id"]),
+            int(ref["recommended_cluster_number"]),
+        )
+
+    cluster: dict[str, Any] = {
+        "run_id": ref["run_id"],
+        "cluster_number": ref["recommended_cluster_number"],
+        "cluster_name": ref["recommended_cluster"],
+        "center_lat": (
+            float(crow["center_lat"]) if crow and crow["center_lat"] else None
+        ),
+        "center_lng": (
+            float(crow["center_lng"]) if crow and crow["center_lng"] else None
+        ),
+        "area_count": crow["area_count"] if crow else 0,
+        "confidence": ref["confidence"],
+        "reasoning": ref["reasoning"],
+    }
+
+    total_people = sum(int(r["total_people"] or 0) for r in ordered_rows)
+    infants = sum(int(r["infants"] or 0) for r in ordered_rows)
+    preschool = sum(int(r["preschool"] or 0) for r in ordered_rows)
+    elementary = sum(int(r["elementary"] or 0) for r in ordered_rows)
+    youth = sum(int(r["youth"] or 0) for r in ordered_rows)
+    adults = sum(int(r["adults"] or 0) for r in ordered_rows)
+    seniors = sum(int(r["seniors"] or 0) for r in ordered_rows)
+    has_mobility = any(bool(r["has_mobility_disability"]) for r in ordered_rows)
+    has_car_all = all(bool(r["has_car"]) for r in ordered_rows)
+    edu_imp = max(int(r["education_proximity_importance"] or 0) for r in ordered_rows)
+    social_imp = max(int(r["social_venues_importance"] or 0) for r in ordered_rows)
+    services_imp = max(int(r["services_importance"] or 0) for r in ordered_rows)
+
+    essential_union: list[str] = []
+    seen_e: set[str] = set()
+    for r in ordered_rows:
+        for tag in list(r["essential_education"] or []):
+            t = str(tag).strip()
+            if t and t not in seen_e:
+                seen_e.add(t)
+                essential_union.append(t)
+
+    affil_set = {
+        str(r["religious_affiliation"] or "").strip()
+        for r in ordered_rows
+        if str(r["religious_affiliation"] or "").strip()
+    }
+    merged_affiliation = (
+        next(iter(affil_set)) if len(affil_set) == 1 else "mixed"
+    )
+
+    culture_rank = max(
+        _merge_culture_rank(r["culture_frequency"]) for r in ordered_rows
+    )
+    notes_parts = [
+        f"[{r['family_name']}] {r['notes']}"
+        for r in ordered_rows
+        if (r["notes"] or "").strip()
+    ]
+    merged_notes = " | ".join(notes_parts) if notes_parts else None
+    names_join = ", ".join(r["family_name"] for r in ordered_rows)
+
+    community_needs: dict[str, Any] = {
+        "family_uuid": "community",
+        "family_name": f"Community relocation ({len(ordered_rows)} families: {names_join})",
+        "composition": {
+            "total_people": total_people,
+            "infants": infants,
+            "preschool": preschool,
+            "elementary": elementary,
+            "youth": youth,
+            "adults": adults,
+            "seniors": seniors,
+        },
+        "mobility": {
+            "has_car": has_car_all,
+            "has_mobility_disability": has_mobility,
+        },
+        "education": {
+            "essential_tags": essential_union,
+            "proximity_importance": edu_imp,
+        },
+        "religion": {
+            "affiliation": merged_affiliation,
+            "needs_synagogue": any(bool(r["needs_synagogue"]) for r in ordered_rows),
+        },
+        "community": {
+            "matnas_participation": any(
+                bool(r["matnas_participation"]) for r in ordered_rows
+            ),
+            "needs_community_proximity": any(
+                bool(r["needs_community_proximity"]) for r in ordered_rows
+            ),
+            "social_importance": social_imp,
+            "culture_frequency": _culture_from_rank(culture_rank),
+        },
+        "lifestyle": {
+            "social_venues_importance": social_imp,
+            "culture_frequency": _culture_from_rank(culture_rank),
+        },
+        "medical": {
+            "needs_medical_proximity": any(
+                bool(r["needs_medical_proximity"]) for r in ordered_rows
+            ),
+            "services_importance": services_imp,
+        },
+        "housing": {
+            "preference": ref["accommodation_preference"],
+            "stay_duration": None,
+        },
+        "notes": merged_notes,
+    }
+
+    logger.info(
+        "get_community_context ok members=%d cluster=%s",
+        len(ordered_rows),
+        cluster.get("cluster_number"),
+    )
+    return {
+        "ok": True,
+        "member_families": member_families,
+        "community_needs": community_needs,
+        "cluster": cluster,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Tool 2 — discover_optimal_radius
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @mcp.tool()
 async def discover_optimal_radius(
@@ -838,7 +1202,7 @@ async def discover_optimal_radius(
     cluster_number: int,
     needs_tags: list[str],
     education_supervision: Optional[str] = None,
-    ) -> dict[str, Any]:
+) -> dict[str, Any]:
     """
     Identify up to 3 spatially distinct relocation "service-hub" radii within
     the assigned cluster boundary.
@@ -965,7 +1329,8 @@ async def discover_optimal_radius(
 
         logger.info(
             "discover_optimal_radius: K-means produced %d hub(s) for cluster=%s",
-            len(hub_rows), cluster_number,
+            len(hub_rows),
+            cluster_number,
         )
 
         # ── Phase 2: per-hub radius + census ─────────────────────────────
@@ -976,10 +1341,12 @@ async def discover_optimal_radius(
         #
         # Steps A and B use the supervision-filtered SQL so all counts reflect
         # what is visible inside the circle drawn on the map.
-        amenities_near_sql         = _sql_all_amenities_near_hub(edu_table_overrides)
-        amenities_near_sql_unfiltered = _sql_all_amenities_near_hub()  # for P75 (stable)
-        count_filters_sql          = _sql_count_filters()
-        zone_labels                = ["zone_alpha", "zone_beta", "zone_gamma"]
+        amenities_near_sql = _sql_all_amenities_near_hub(edu_table_overrides)
+        amenities_near_sql_unfiltered = (
+            _sql_all_amenities_near_hub()
+        )  # for P75 (stable)
+        count_filters_sql = _sql_count_filters()
+        zone_labels = ["zone_alpha", "zone_beta", "zone_gamma"]
         radii: list[dict[str, Any]] = []
 
         # Pre-extract all hub coordinates so the no-overlap constraint can
@@ -1010,8 +1377,8 @@ async def discover_optimal_radius(
                     {amenities_near_sql_unfiltered}
                 ) AS all_amenities
                 """,
-                hlat,    # $1
-                hlng,    # $2
+                hlat,  # $1
+                hlng,  # $2
                 1500.0,  # $3 — wide discovery window
             )
             p75_dist = float(p75_row["p75_dist_m"] or 500.0)
@@ -1044,12 +1411,12 @@ async def discover_optimal_radius(
                     {amenities_near_sql}
                 ) AS all_amenities
                 """,
-                hlat,     # $1
-                hlng,     # $2
-                radius_m, # $3 — exact radius, matches the map circle
+                hlat,  # $1
+                hlng,  # $2
+                radius_m,  # $3 — exact radius, matches the map circle
             )
 
-            amenity_counts  = {cat: int(counts[cat] or 0) for cat in ALL_CATEGORIES}
+            amenity_counts = {cat: int(counts[cat] or 0) for cat in ALL_CATEGORIES}
             total_amenities = sum(amenity_counts.values())
 
             # Step C: education breakdown — query educational_institutions directly
@@ -1073,7 +1440,10 @@ async def discover_optimal_radius(
                             $3
                           )
                     """,
-                    hlat, hlng, radius_m, education_supervision,
+                    hlat,
+                    hlng,
+                    radius_m,
+                    education_supervision,
                 )
             else:
                 edu_row = await conn.fetchrow(
@@ -1091,7 +1461,9 @@ async def discover_optimal_radius(
                             $3
                           )
                     """,
-                    hlat, hlng, radius_m,
+                    hlat,
+                    hlng,
+                    radius_m,
                 )
 
             education_matched = int(edu_row["education_matched"] or 0)
@@ -1114,7 +1486,10 @@ async def discover_optimal_radius(
                     GROUP BY education_phase
                     ORDER BY education_phase
                     """,
-                    hlat, hlng, radius_m, education_supervision,
+                    hlat,
+                    hlng,
+                    radius_m,
+                    education_supervision,
                 )
             else:
                 phase_rows = await conn.fetch(
@@ -1130,7 +1505,9 @@ async def discover_optimal_radius(
                     GROUP BY education_phase
                     ORDER BY education_phase
                     """,
-                    hlat, hlng, radius_m,
+                    hlat,
+                    hlng,
+                    radius_m,
                 )
 
             education_phase_counts: dict[str, int] = {
@@ -1139,31 +1516,41 @@ async def discover_optimal_radius(
                 if row["education_phase"]
             }
 
-            radii.append({
-                "hub_label":          zone_labels[i] if i < len(zone_labels) else f"zone_{i}",
-                "center_lat":         hlat,
-                "center_lng":         hlng,
-                "radius_m":           round(radius_m),
-                "total_amenities":    total_amenities,
-                "amenity_counts":     amenity_counts,
-                # Education breakdown — these are physical building counts
-                "education_matched":  education_matched,
-                "education_special":  education_special,
-                "education_supervision_filter": education_supervision,
-                "education_phase_counts": education_phase_counts,
-            })
+            radii.append(
+                {
+                    "hub_label": (
+                        zone_labels[i] if i < len(zone_labels) else f"zone_{i}"
+                    ),
+                    "center_lat": hlat,
+                    "center_lng": hlng,
+                    "radius_m": round(radius_m),
+                    "total_amenities": total_amenities,
+                    "amenity_counts": amenity_counts,
+                    # Education breakdown — these are physical building counts
+                    "education_matched": education_matched,
+                    "education_special": education_special,
+                    "education_supervision_filter": education_supervision,
+                    "education_phase_counts": education_phase_counts,
+                }
+            )
 
             logger.info(
                 "Hub %s: lat=%.5f lng=%.5f radius_m=%d total=%d "
                 "edu_matched=%d edu_special=%d phases=%s",
-                radii[-1]["hub_label"], hlat, hlng, round(radius_m),
-                total_amenities, education_matched, education_special,
+                radii[-1]["hub_label"],
+                hlat,
+                hlng,
+                round(radius_m),
+                total_amenities,
+                education_matched,
+                education_special,
                 education_phase_counts,
             )
 
     logger.info(
         "discover_optimal_radius ok cluster=%s radii_found=%d",
-        cluster_number, len(radii),
+        cluster_number,
+        len(radii),
     )
     return {"ok": True, "radii": radii}
 
@@ -1171,6 +1558,7 @@ async def discover_optimal_radius(
 # ══════════════════════════════════════════════════════════════════════════════
 # Tool 3 — semantic_radius_scoring
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @mcp.tool()
 async def semantic_radius_scoring(
@@ -1221,15 +1609,15 @@ async def semantic_radius_scoring(
     logger.info("semantic_radius_scoring: embedding family needs text…")
     family_vec = await _embed(family_needs_text)
     # asyncpg passes as text; SQL casts ::vector
-    vec_lit    = json.dumps(family_vec)
+    vec_lit = json.dumps(family_vec)
 
     embeddings_sql = _sql_all_embeddings_near_hub(edu_table_overrides)
-    pool           = await _get_pool()
+    pool = await _get_pool()
     scored: list[dict[str, Any]] = []
 
     for hub in radii:
-        lat      = float(hub["center_lat"])
-        lng      = float(hub["center_lng"])
+        lat = float(hub["center_lat"])
+        lng = float(hub["center_lng"])
         radius_m = float(hub["radius_m"])
 
         async with pool.acquire() as conn:
@@ -1242,9 +1630,9 @@ async def semantic_radius_scoring(
                 ORDER BY embedding <=> $1::vector ASC
                 LIMIT 20
                 """,
-                vec_lit,   # $1 — family embedding
-                lat,       # $2 — hub latitude
-                lng,       # $3 — hub longitude
+                vec_lit,  # $1 — family embedding
+                lat,  # $2 — hub latitude
+                lng,  # $3 — hub longitude
                 radius_m,  # $4 — search radius in metres
             )
 
@@ -1254,15 +1642,19 @@ async def semantic_radius_scoring(
         else:
             semantic_score = 0.0
 
-        scored.append({
-            **hub,
-            "semantic_score":     semantic_score,
-            "embeddings_matched": len(similarities),
-        })
+        scored.append(
+            {
+                **hub,
+                "semantic_score": semantic_score,
+                "embeddings_matched": len(similarities),
+            }
+        )
 
         logger.info(
             "Scored hub %s: semantic_score=%.4f embeddings_matched=%d",
-            hub.get("hub_label"), semantic_score, len(similarities),
+            hub.get("hub_label"),
+            semantic_score,
+            len(similarities),
         )
 
     scored.sort(key=lambda x: x["semantic_score"], reverse=True)
@@ -1271,7 +1663,96 @@ async def semantic_radius_scoring(
     return {"ok": True, "ranked_radii": scored}
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Tool 3b — community_semantic_scoring (embedding centroid over families)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+async def community_semantic_scoring(
+    radii: list[dict[str, Any]],
+    family_needs_texts: list[str],
+    education_supervision: Optional[str] = None,
+) -> dict[str, Any]:
+    """
+    Rank hubs using the mean of per-family need embeddings (community centroid).
+
+    Embeds each non-empty string in ``family_needs_texts``, averages vectors
+    component-wise, then applies the same pgvector similarity step as Tool 3.
+    """
+    texts = [t.strip() for t in family_needs_texts if (t or "").strip()]
+    if not radii:
+        return {"ok": False, "error": "radii list is empty."}
+    if not texts:
+        return {
+            "ok": False,
+            "error": "family_needs_texts must contain at least one non-empty string.",
+        }
+
+    edu_table_overrides: Optional[dict[str, str]] = None
+    if education_supervision and education_supervision in _VALID_SUPERVISION_VALUES:
+        edu_table_overrides = {
+            "educational_institutions": f"AND type_of_supervision = '{education_supervision}'",
+        }
+
+    logger.info(
+        "community_semantic_scoring: embedding %d family need vector(s)…",
+        len(texts),
+    )
+    family_vecs = await asyncio.gather(*[_embed(t) for t in texts])
+    community_vec = _vector_mean(family_vecs)
+    vec_lit = json.dumps(community_vec)
+
+    embeddings_sql = _sql_all_embeddings_near_hub(edu_table_overrides)
+    pool = await _get_pool()
+    scored: list[dict[str, Any]] = []
+
+    for hub in radii:
+        lat = float(hub["center_lat"])
+        lng = float(hub["center_lng"])
+        radius_m = float(hub["radius_m"])
+
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                f"""
+                SELECT 1.0 - (embedding <=> $1::vector) AS similarity
+                FROM (
+                    {embeddings_sql}
+                ) AS all_amenities
+                ORDER BY embedding <=> $1::vector ASC
+                LIMIT 20
+                """,
+                vec_lit,
+                lat,
+                lng,
+                radius_m,
+            )
+
+        similarities = [float(r["similarity"]) for r in rows]
+        semantic_score = (
+            round(sum(similarities) / len(similarities), 4) if similarities else 0.0
+        )
+
+        scored.append({
+            **hub,
+            "semantic_score": semantic_score,
+            "embeddings_matched": len(similarities),
+        })
+
+        logger.info(
+            "community_semantic_scoring hub %s: semantic_score=%.4f embeddings_matched=%d",
+            hub.get("hub_label"),
+            semantic_score,
+            len(similarities),
+        )
+
+    scored.sort(key=lambda x: x["semantic_score"], reverse=True)
+    logger.info("community_semantic_scoring ok radii_scored=%d", len(scored))
+    return {"ok": True, "ranked_radii": scored}
+
+
 # ─── Entry point ──────────────────────────────────────────────────────────────
+
 
 def main() -> None:
     """Start the MCP server on stdio transport (Cursor / Claude Desktop)."""

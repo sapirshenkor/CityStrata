@@ -104,5 +104,37 @@ export const getRecommendationByProfile = (profileUuid) => {
   return api.get(`/api/recommendations/${profileUuid}`)
 }
 
+/** All families + has_matching / has_tactical (Recommendations overview list). */
+export const getRecommendationsOverview = () => {
+  return api.get('/api/recommendations/overview')
+}
+/** Selected macro matching row for a profile (DB link via selected_matching_result_id). */
+export const getMatchingResultForProfile = (profileUuid) => {
+  return api.get(`/api/matching/result/${profileUuid}`)
+}
+
+/** Macro matching agent for an existing profile (sets selected_matching_result_id). */
+export const runMatchingForProfile = (profileUuid) => {
+  return api.post(`/api/matching/cluster/${profileUuid}`, null, {
+    timeout: 120_000,
+  })
+}
+
+/** Tactical agent (can take several minutes — MCP + DB + optional GPT). */
+export const runTacticalForProfile = (profileUuid) => {
+  return api.post(`/api/recommendations/run/${profileUuid}`, null, {
+    timeout: 600_000,
+  })
+}
+
+/** Community tactical: merge families + centroid pipeline; creates a new merged profile. */
+export const runCommunityTactical = (familyUuids) => {
+  return api.post(
+    '/api/recommendations/community/run',
+    { family_uuids: familyUuids },
+    { timeout: 600_000 },
+  )
+}
+
 export default api
 

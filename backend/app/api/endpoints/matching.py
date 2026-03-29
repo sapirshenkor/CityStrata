@@ -13,6 +13,7 @@ from app.agents.matchingAgent import (
 )
 from app.core.database import get_pool
 from app.models.evacuee_family_profiles import EvacueeFamilyProfile, EvacueeFamilyProfileBase
+from app.models.matching_result import MatchingResultResponse
 
 router = APIRouter(prefix="/matching", tags=["matching"])
 
@@ -158,6 +159,67 @@ async def _persist_matching_result(
             json.dumps(result.model_dump()),
         )
         return inserted_id
+
+
+def _row_to_matching_result(row) -> MatchingResultResponse:
+    flags = row["flags"]
+    if isinstance(flags, str):
+        flags = json.loads(flags)
+    return MatchingResultResponse(
+        id=row["id"],
+        created_at=row["created_at"],
+        profile_uuid=row["profile_uuid"],
+        run_id=row["run_id"],
+        recommended_cluster_number=row["recommended_cluster_number"],
+        recommended_cluster=row["recommended_cluster"],
+        confidence=row["confidence"],
+        reasoning=row["reasoning"],
+        alternative_cluster_number=row["alternative_cluster_number"],
+        alternative_cluster=row["alternative_cluster"],
+        alternative_reasoning=row["alternative_reasoning"],
+        flags=list(flags) if flags is not None else [],
+    )
+
+
+@router.get("/result/{profile_uuid}", response_model=MatchingResultResponse)
+async def get_selected_matching_result(profile_uuid: UUID) -> MatchingResultResponse:
+    """
+    Return the macro matching agent result currently linked to this profile
+    (evacuee_family_profiles.selected_matching_result_id).
+    """
+    pool = get_pool()
+    try:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT
+                    mr.id,
+                    mr.created_at,
+                    mr.profile_uuid,
+                    mr.run_id,
+                    mr.recommended_cluster_number,
+                    mr.recommended_cluster,
+                    mr.confidence,
+                    mr.reasoning,
+                    mr.alternative_cluster_number,
+                    mr.alternative_cluster,
+                    mr.alternative_reasoning,
+                    mr.flags
+                FROM evacuee_family_profiles efp
+                INNER JOIN matching_results mr ON mr.id = efp.selected_matching_result_id
+                WHERE efp.uuid = $1
+                """,
+                profile_uuid,
+            )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Database error: {exc}") from exc
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="No matching result linked to this profile. Run matching first.",
+        )
+    return _row_to_matching_result(row)
 
 
 @router.post("/cluster", response_model=Agent1Response)
