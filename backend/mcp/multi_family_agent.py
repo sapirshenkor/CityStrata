@@ -27,31 +27,276 @@ import json
 import logging
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
+from uuid import UUID as _UUID
 
+import asyncpg
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
-from base_agent import (
-    BaseTacticalAgent,
-    _AI_MODEL,
-    _AI_TIMEOUT,
-    _PHASE_LABELS_HE,
-    _aggregate_phase_counts,
-    _build_needs_text,
-    _extract_needs_tags,
-    _he_zone_label,
-    _needed_education_phases,
-    _progress,
-    _project_root,
-    _relevant_categories,
-    _resolve_education_supervision,
-    ensure_multi_family_profile,
-    logger,
-    save_multi_family_response,
+from base_agent import BaseTacticalAgent, _progress, _project_root
+from tactical_utils import (
+    AI_MODEL,
+    AI_TIMEOUT,
+    PHASE_LABELS_HE,
+    aggregate_phase_counts,
+    build_needs_text,
+    culture_from_rank,
+    culture_rank,
+    extract_needs_tags,
+    he_zone_label,
+    needed_education_phases,
+    relevant_categories,
+    resolve_education_supervision,
 )
+
+logger = logging.getLogger(__name__)
+
+
+# ─── DB persistence ───────────────────────────────────────────────────────────
+
+
+async def save_multi_family_response(
+    multi_family_uuid: str,
+    agent_output: str,
+    confidence: Optional[str] = None,
+    radii_data: Optional[list] = None,
+) -> None:
+    """
+    Upsert a tactical response for a multi-family group into
+    ``multi_family_tactical_responses``.
+
+    Uses INSERT … ON CONFLICT (multi_family_uuid) DO UPDATE so that re-running
+    replaces the previous report in-place.
+
+    Non-fatal: any DB error is logged and swallowed.
+    """
+    db_url = os.getenv("DATABASE_URL", "").strip()
+    if not db_url:
+        _progress("[tactical] DATABASE_URL not set — skipping multi-family response save.")
+        return
+
+    radii_json = json.dumps(radii_data) if radii_data else None
+
+    try:
+        conn = await asyncpg.connect(dsn=db_url, statement_cache_size=0)
+        try:
+            await conn.execute(
+                """
+                INSERT INTO multi_family_tactical_responses
+                    (multi_family_uuid, agent_output, confidence, radii_data)
+                VALUES ($1::uuid, $2, $3, $4::jsonb)
+                ON CONFLICT (multi_family_uuid) DO UPDATE
+                    SET agent_output = EXCLUDED.agent_output,
+                        confidence   = EXCLUDED.confidence,
+                        radii_data   = EXCLUDED.radii_data,
+                        updated_at   = NOW()
+                """,
+                multi_family_uuid,
+                agent_output,
+                confidence,
+                radii_json,
+            )
+        finally:
+            await conn.close()
+        _progress(
+            "[tactical] Multi-family response upserted to multi_family_tactical_responses."
+        )
+    except Exception as exc:
+        logger.warning("Multi-family response save failed (non-fatal): %s", exc)
+        _progress(f"[tactical] Multi-family response save skipped ({exc}).")
+
+
+# ─── Multi-family profile helpers ─────────────────────────────────────────────
+
+
+async def ensure_multi_family_profile(member_uuids: list[str]) -> str:
+    """
+    Ensure a ``multi_family_profiles`` row exists for the given source families.
+
+    Idempotent: if a profile with the exact same ``member_family_uuids`` (sorted)
+    already exists, its UUID is returned without inserting a new row.
+
+    Aggregation rules (same as MCP get_community_context / tactical_pipeline):
+        - Sums: total_people, age brackets
+        - Any: has_mobility_disability, needs_synagogue, matnas_participation,
+               needs_community_proximity, needs_medical_proximity
+        - All: has_car
+        - Max: education_proximity_importance, social_venues_importance,
+               services_importance, culture_frequency (by rank)
+        - Union: essential_education
+        - Single / "other": religious_affiliation
+
+    Returns:
+        The multi-family profile UUID (str) — existing or newly created.
+
+    Raises:
+        RuntimeError: if DATABASE_URL is not set.
+        ValueError: if any source profile is missing.
+    """
+    db_url = os.getenv("DATABASE_URL", "").strip()
+    if not db_url:
+        raise RuntimeError(
+            "DATABASE_URL not set — cannot create multi-family profile."
+        )
+
+    sorted_uuids = sorted(u.strip() for u in member_uuids)
+    uuid_objs = [_UUID(u) for u in sorted_uuids]
+
+    conn = await asyncpg.connect(dsn=db_url, statement_cache_size=0)
+    try:
+        existing = await conn.fetchrow(
+            """
+            SELECT uuid::text AS uuid
+            FROM multi_family_profiles
+            WHERE member_family_uuids = $1::uuid[]
+            """,
+            uuid_objs,
+        )
+        if existing:
+            _progress(
+                f"[tactical] Multi-family profile already exists: {existing['uuid']}"
+            )
+            return existing["uuid"]
+
+        rows = await conn.fetch(
+            """
+            SELECT *
+            FROM evacuee_family_profiles
+            WHERE uuid = ANY($1::uuid[])
+            """,
+            uuid_objs,
+        )
+
+        if len(rows) != len(sorted_uuids):
+            found = {str(r["uuid"]) for r in rows}
+            missing = [u for u in sorted_uuids if u not in found]
+            raise ValueError(f"Source profiles not found: {missing}")
+
+        by_uuid = {str(r["uuid"]): r for r in rows}
+        ordered = [by_uuid[u] for u in sorted_uuids]
+        first = ordered[0]
+
+        names = [r["family_name"] for r in ordered]
+        family_name = "Multi-Family: " + " & ".join(names)
+
+        total_people = sum(int(r["total_people"] or 0) for r in ordered)
+        infants = sum(int(r["infants"] or 0) for r in ordered)
+        preschool = sum(int(r["preschool"] or 0) for r in ordered)
+        elementary = sum(int(r["elementary"] or 0) for r in ordered)
+        youth = sum(int(r["youth"] or 0) for r in ordered)
+        adults = sum(int(r["adults"] or 0) for r in ordered)
+        seniors = sum(int(r["seniors"] or 0) for r in ordered)
+
+        has_mobility = any(bool(r["has_mobility_disability"]) for r in ordered)
+        has_car_all = all(bool(r["has_car"]) for r in ordered)
+
+        edu_imp = max(int(r["education_proximity_importance"] or 0) for r in ordered)
+        social_imp = max(int(r["social_venues_importance"] or 0) for r in ordered)
+        services_imp = max(int(r["services_importance"] or 0) for r in ordered)
+
+        essential_union: list[str] = []
+        seen_e: set[str] = set()
+        for r in ordered:
+            for tag in list(r["essential_education"] or []):
+                t = str(tag).strip()
+                if t and t not in seen_e:
+                    seen_e.add(t)
+                    essential_union.append(t)
+
+        affil_set = {
+            str(r["religious_affiliation"] or "").strip()
+            for r in ordered
+            if str(r["religious_affiliation"] or "").strip()
+        }
+        merged_affiliation = (
+            next(iter(affil_set)) if len(affil_set) == 1 else "other"
+        )
+
+        cr = max(culture_rank(r["culture_frequency"]) for r in ordered)
+        merged_culture_frequency = culture_from_rank(cr)
+
+        notes_parts = [
+            f"[{r['family_name']}] {r['notes']}"
+            for r in ordered
+            if (r["notes"] or "").strip()
+        ]
+        merger_line = (
+            "[Multi-Family merged profile — sources: "
+            + ", ".join(sorted_uuids)
+            + "]"
+        )
+        merged_notes = merger_line
+        if notes_parts:
+            merged_notes = merger_line + "\n" + " | ".join(notes_parts)
+
+        matching_id = first.get("selected_matching_result_id")
+
+        new_row = await conn.fetchrow(
+            """
+            INSERT INTO multi_family_profiles (
+                member_family_uuids,
+                family_name, contact_name, contact_phone, contact_email,
+                home_stat_2022, city_name, home_address,
+                total_people, infants, preschool, elementary, youth, adults, seniors,
+                has_mobility_disability, has_car,
+                essential_education, education_proximity_importance,
+                religious_affiliation, needs_synagogue, culture_frequency,
+                matnas_participation, social_venues_importance, needs_community_proximity,
+                accommodation_preference, estimated_stay_duration,
+                needs_medical_proximity, services_importance, notes,
+                selected_matching_result_id
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
+                $27, $28, $29, $30, $31
+            )
+            RETURNING uuid::text AS uuid
+            """,
+            uuid_objs,                                              # $1
+            family_name,                                            # $2
+            first.get("contact_name"),                              # $3
+            first.get("contact_phone"),                             # $4
+            first.get("contact_email"),                             # $5
+            first.get("home_stat_2022"),                            # $6
+            first.get("city_name"),                                 # $7
+            first.get("home_address"),                              # $8
+            total_people,                                           # $9
+            infants,                                                # $10
+            preschool,                                              # $11
+            elementary,                                             # $12
+            youth,                                                  # $13
+            adults,                                                 # $14
+            seniors,                                                # $15
+            has_mobility,                                           # $16
+            has_car_all,                                            # $17
+            essential_union,                                        # $18
+            edu_imp,                                                # $19
+            merged_affiliation,                                     # $20
+            any(bool(r["needs_synagogue"]) for r in ordered),       # $21
+            merged_culture_frequency,                               # $22
+            any(bool(r["matnas_participation"]) for r in ordered),  # $23
+            social_imp,                                             # $24
+            any(                                                    # $25
+                bool(r["needs_community_proximity"]) for r in ordered
+            ),
+            first.get("accommodation_preference", "airbnb"),        # $26
+            first.get("estimated_stay_duration"),                    # $27
+            any(                                                    # $28
+                bool(r["needs_medical_proximity"]) for r in ordered
+            ),
+            services_imp,                                           # $29
+            merged_notes,                                           # $30
+            matching_id,                                            # $31
+        )
+
+        mf_uuid = new_row["uuid"]
+        _progress(f"[tactical] Multi-family profile created: {mf_uuid}")
+        return mf_uuid
+    finally:
+        await conn.close()
 
 
 @dataclass
@@ -75,7 +320,7 @@ def _multi_family_resolve_education_supervision(
     vals: list[str] = []
     for m in member_families:
         fn = m.get("family_needs") or {}
-        v = _resolve_education_supervision(fn)
+        v = resolve_education_supervision(fn)
         if v is not None:
             vals.append(v)
     if not vals:
@@ -132,7 +377,7 @@ def _build_multi_family_grounding_context(
                 "medical": fn.get("medical") or {},
                 "mobility": fn.get("mobility") or {},
                 "notes": fn.get("notes"),
-                "needed_education_phases": _needed_education_phases(fn),
+                "needed_education_phases": needed_education_phases(fn),
             }
         )
 
@@ -166,7 +411,7 @@ def _build_multi_family_grounding_context(
                 "amenity_counts": r.get("amenity_counts") or {},
                 "education_matched": r.get("education_matched"),
                 "education_special": r.get("education_special"),
-                "education_phase_counts": _aggregate_phase_counts(
+                "education_phase_counts": aggregate_phase_counts(
                     r.get("education_phase_counts") or {}
                 ),
             }
@@ -199,10 +444,10 @@ async def _generate_multi_family_recommendation(
 
     _progress("[tactical] Calling GPT-4o for multi-family recommendation…")
     try:
-        client = AsyncOpenAI(api_key=api_key, timeout=_AI_TIMEOUT)
+        client = AsyncOpenAI(api_key=api_key, timeout=AI_TIMEOUT)
         response = await asyncio.wait_for(
             client.chat.completions.create(
-                model=_AI_MODEL,
+                model=AI_MODEL,
                 temperature=0.3,
                 max_tokens=2_000,
                 messages=[
@@ -210,7 +455,7 @@ async def _generate_multi_family_recommendation(
                     {"role": "user", "content": user_prompt},
                 ],
             ),
-            timeout=_AI_TIMEOUT + 5,
+            timeout=AI_TIMEOUT + 5,
         )
         letter = (response.choices[0].message.content or "").strip()
         _progress("[tactical] GPT-4o multi-family response received.")
@@ -254,7 +499,7 @@ def _format_multi_family_report(
     for m in member_families:
         fn = m.get("family_needs") or {}
         fname = fn.get("family_name") or "משפחה"
-        lines.append(f"- **{fname}:** {_build_needs_text(fn)}")
+        lines.append(f"- **{fname}:** {build_needs_text(fn)}")
     lines.append("")
 
     notes = multi_family_needs.get("notes")
@@ -266,8 +511,8 @@ def _format_multi_family_report(
     if ai_letter:
         lines += ["## המלצת המערכת (קהילה)", "", ai_letter, "", "---", ""]
 
-    relevant = _relevant_categories(multi_family_needs)
-    needed_phases = _needed_education_phases(multi_family_needs)
+    rel = relevant_categories(multi_family_needs)
+    phases_needed = needed_education_phases(multi_family_needs)
     lines += ["## אזורי מגורים מומלצים לקהילה", ""]
 
     priority_labels = ["עדיפות ראשונה", "עדיפות שנייה", "עדיפות שלישית"]
@@ -275,13 +520,13 @@ def _format_multi_family_report(
     for i, zone in enumerate(ranked_radii[:3]):
         counts = zone.get("amenity_counts") or {}
         hub_raw = zone.get("hub_label") or f"zone_{i}"
-        label = _he_zone_label(hub_raw)
+        label = he_zone_label(hub_raw)
         lat = zone.get("center_lat", 0.0)
         lng = zone.get("center_lng", 0.0)
         radius = zone.get("radius_m", 0)
         education_special = zone.get("education_special")
         raw_phase_counts = zone.get("education_phase_counts") or {}
-        phase_counts = _aggregate_phase_counts(raw_phase_counts)
+        phase_counts = aggregate_phase_counts(raw_phase_counts)
         priority = (
             priority_labels[i] if i < len(priority_labels) else f"עדיפות {i + 1}"
         )
@@ -294,13 +539,13 @@ def _format_multi_family_report(
 
         amenity_bullets: list[str] = []
 
-        if "education" in relevant:
+        if "education" in rel:
             phase_parts: list[str] = []
             for phase_key in ("kindergarten", "elementary", "high_school"):
-                if phase_key in needed_phases:
+                if phase_key in phases_needed:
                     cnt = phase_counts.get(phase_key, 0)
                     if cnt:
-                        phase_parts.append(f"{cnt} {_PHASE_LABELS_HE[phase_key]}")
+                        phase_parts.append(f"{cnt} {PHASE_LABELS_HE[phase_key]}")
 
             if phase_parts:
                 amenity_bullets.append(
@@ -313,19 +558,19 @@ def _format_multi_family_report(
                         f"  - **חינוך:** {all_edu} מוסדות חינוך בסביבה."
                     )
 
-        if "education_special" in relevant and education_special:
+        if "education_special" in rel and education_special:
             amenity_bullets.append(
                 f"  - **חינוך מיוחד:** {education_special} בתי ספר לחינוך מיוחד."
             )
 
-        if "synagogue" in relevant:
+        if "synagogue" in rel:
             syn_count = counts.get("synagogue", 0)
             if syn_count:
                 amenity_bullets.append(f"  - **דת:** {syn_count} בתי כנסת בסביבה.")
 
-        if "cafe" in relevant or "restaurant" in relevant:
-            cafe_count = counts.get("cafe", 0) if "cafe" in relevant else 0
-            rest_count = counts.get("restaurant", 0) if "restaurant" in relevant else 0
+        if "cafe" in rel or "restaurant" in rel:
+            cafe_count = counts.get("cafe", 0) if "cafe" in rel else 0
+            rest_count = counts.get("restaurant", 0) if "restaurant" in rel else 0
             prts: list[str] = []
             if rest_count:
                 prts.append(f"{rest_count} מסעדות")
@@ -336,14 +581,14 @@ def _format_multi_family_report(
                     f"  - **אורח חיים:** {' ו-'.join(prts)} לצרכים חברתיים."
                 )
 
-        if "matnas" in relevant:
+        if "matnas" in rel:
             matnas_count = counts.get("matnas", 0)
             if matnas_count:
                 amenity_bullets.append(
                     f"  - **קהילה:** {matnas_count} מתנ״ס בסביבה."
                 )
 
-        if "city_facility" in relevant:
+        if "city_facility" in rel:
             cf_count = counts.get("city_facility", 0)
             if cf_count:
                 amenity_bullets.append(
@@ -437,7 +682,7 @@ class MultiFamilyTacticalAgent(BaseTacticalAgent):
 
         # ── Step 2: Hub discovery ─────────────────────────────────────────
         _progress("[tactical] Multi-Family 2/4: Discovering hubs (merged tags)…")
-        needs_tags = _extract_needs_tags(multi_family_needs)
+        needs_tags = extract_needs_tags(multi_family_needs)
         supervision = _multi_family_resolve_education_supervision(member_families)
         if supervision:
             _progress(f"[tactical]   Education filter (unanimous): {supervision}")
@@ -465,7 +710,7 @@ class MultiFamilyTacticalAgent(BaseTacticalAgent):
 
         radii: list[dict[str, Any]] = radii_result["radii"]
         per_family_texts = [
-            _build_needs_text(m["family_needs"]) for m in member_families
+            build_needs_text(m["family_needs"]) for m in member_families
         ]
 
         # ── Step 3: Semantic scoring (centroid) ───────────────────────────

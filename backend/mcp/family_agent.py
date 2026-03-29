@@ -30,26 +30,79 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
+import asyncpg
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
-from base_agent import (
-    BaseTacticalAgent,
-    _AI_MODEL,
-    _AI_TIMEOUT,
-    _PHASE_LABELS_HE,
-    _aggregate_phase_counts,
-    _build_needs_text,
-    _extract_needs_tags,
-    _he_zone_label,
-    _needed_education_phases,
-    _progress,
-    _project_root,
-    _relevant_categories,
-    _resolve_education_supervision,
-    logger,
-    save_family_response,
+from base_agent import BaseTacticalAgent, _progress, _project_root
+from tactical_utils import (
+    AI_MODEL,
+    AI_TIMEOUT,
+    PHASE_LABELS_HE,
+    aggregate_phase_counts,
+    build_needs_text,
+    extract_needs_tags,
+    he_zone_label,
+    needed_education_phases,
+    relevant_categories,
+    resolve_education_supervision,
 )
+
+logger = logging.getLogger(__name__)
+
+
+# ─── DB persistence ───────────────────────────────────────────────────────────
+
+
+async def save_family_response(
+    family_uuid: str,
+    agent_output: str,
+    confidence: Optional[str] = None,
+    radii_data: Optional[list] = None,
+) -> None:
+    """
+    Upsert a tactical response for a single family into
+    ``family_tactical_responses``.
+
+    Uses INSERT … ON CONFLICT (profile_uuid) DO UPDATE so that re-running the
+    pipeline for the same family replaces the previous report in-place.
+
+    Non-fatal: any DB error is logged and swallowed so the caller always
+    receives the report regardless of persistence failures.
+    """
+    db_url = os.getenv("DATABASE_URL", "").strip()
+    if not db_url:
+        _progress("[tactical] DATABASE_URL not set — skipping family response save.")
+        return
+
+    radii_json = json.dumps(radii_data) if radii_data else None
+
+    try:
+        conn = await asyncpg.connect(dsn=db_url, statement_cache_size=0)
+        try:
+            await conn.execute(
+                """
+                INSERT INTO family_tactical_responses
+                    (profile_uuid, agent_output, confidence, radii_data)
+                VALUES ($1::uuid, $2, $3, $4::jsonb)
+                ON CONFLICT (profile_uuid) DO UPDATE
+                    SET agent_output = EXCLUDED.agent_output,
+                        confidence   = EXCLUDED.confidence,
+                        radii_data   = EXCLUDED.radii_data,
+                        updated_at   = NOW()
+                """,
+                family_uuid,
+                agent_output,
+                confidence,
+                radii_json,
+            )
+        finally:
+            await conn.close()
+        _progress("[tactical] Family response upserted to family_tactical_responses.")
+    except Exception as exc:
+        logger.warning("Family response save failed (non-fatal): %s", exc)
+        _progress(f"[tactical] Family response save skipped ({exc}).")
+
 
 # ─── GPT-4o grounded recommendation ──────────────────────────────────────────
 
@@ -222,7 +275,7 @@ def _build_grounding_context(
             "has_mobility_disability": mob.get("has_mobility_disability"),
         },
         "notes": family_needs.get("notes"),
-        "needed_education_phases": _needed_education_phases(family_needs),
+        "needed_education_phases": needed_education_phases(family_needs),
         "cluster_name": cluster.get("cluster_name"),
         "cluster_reasoning": cluster.get("reasoning"),
         "education_supervision_filter": (
@@ -243,7 +296,7 @@ def _build_grounding_context(
                 "amenity_counts": r.get("amenity_counts") or {},
                 "education_matched": r.get("education_matched"),
                 "education_special": r.get("education_special"),
-                "education_phase_counts": _aggregate_phase_counts(
+                "education_phase_counts": aggregate_phase_counts(
                     r.get("education_phase_counts") or {}
                 ),
             }
@@ -275,24 +328,24 @@ async def _generate_recommendation(
 
     _progress("[tactical] Calling GPT-4o for recommendation…")
     try:
-        client = AsyncOpenAI(api_key=api_key, timeout=_AI_TIMEOUT)
+        client = AsyncOpenAI(api_key=api_key, timeout=AI_TIMEOUT)
         response = await asyncio.wait_for(
             client.chat.completions.create(
-                model=_AI_MODEL,
-                temperature=0.3,  # low → reliable, grounded output
+                model=AI_MODEL,
+                temperature=0.3,
                 max_tokens=1_600,
                 messages=[
                     {"role": "system", "content": _SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},
                 ],
             ),
-            timeout=_AI_TIMEOUT + 5,
+            timeout=AI_TIMEOUT + 5,
         )
         letter = (response.choices[0].message.content or "").strip()
         _progress("[tactical] GPT-4o response received.")
         return letter or None
 
-    except Exception as exc:  # non-fatal — fall back to static report
+    except Exception as exc:
         logger.warning("AI generation failed (non-fatal): %s", exc)
         _progress(
             f"[tactical] AI generation skipped ({exc}). Continuing with static report."
@@ -316,9 +369,7 @@ def _format_report(
         cluster.get("cluster_name") or f"אשכול {cluster.get('cluster_number')}"
     )
 
-    # RTL Unicode marker ensures renderers that honour the BOM/marker apply
-    # right-to-left text flow even before any CSS is applied.
-    RTL = "\u200f"  # RIGHT-TO-LEFT MARK (invisible, no width)
+    RTL = "\u200f"
 
     lines: list[str] = [
         f"{RTL} דו״ח מיקום טקטי — CityStrata | {name}",
@@ -338,8 +389,8 @@ def _format_report(
     if ai_letter:
         lines += ["## המלצת המערכת", "", ai_letter, "", "---", ""]
 
-    relevant = _relevant_categories(family_needs)
-    needed_phases = _needed_education_phases(family_needs)
+    rel = relevant_categories(family_needs)
+    phases_needed = needed_education_phases(family_needs)
 
     lines += ["## אזורי מגורים מומלצים", ""]
 
@@ -348,15 +399,14 @@ def _format_report(
     for i, zone in enumerate(ranked_radii[:3]):
         counts = zone.get("amenity_counts") or {}
         hub_raw = zone.get("hub_label") or f"zone_{i}"
-        label = _he_zone_label(hub_raw)
+        label = he_zone_label(hub_raw)
         lat = zone.get("center_lat", 0.0)
         lng = zone.get("center_lng", 0.0)
         radius = zone.get("radius_m", 0)
 
         education_special = zone.get("education_special")
-        edu_filter = zone.get("education_supervision_filter")
         raw_phase_counts = zone.get("education_phase_counts") or {}
-        phase_counts = _aggregate_phase_counts(raw_phase_counts)
+        phase_counts = aggregate_phase_counts(raw_phase_counts)
 
         priority = (
             _PRIORITY_LABELS[i] if i < len(_PRIORITY_LABELS) else f"עדיפות {i + 1}"
@@ -370,13 +420,13 @@ def _format_report(
 
         amenity_bullets: list[str] = []
 
-        if "education" in relevant:
+        if "education" in rel:
             phase_parts: list[str] = []
             for phase_key in ("kindergarten", "elementary", "high_school"):
-                if phase_key in needed_phases:
+                if phase_key in phases_needed:
                     cnt = phase_counts.get(phase_key, 0)
                     if cnt:
-                        phase_parts.append(f"{cnt} {_PHASE_LABELS_HE[phase_key]}")
+                        phase_parts.append(f"{cnt} {PHASE_LABELS_HE[phase_key]}")
 
             if phase_parts:
                 amenity_bullets.append(f"  - **חינוך:** {', '.join(phase_parts)}.")
@@ -387,19 +437,19 @@ def _format_report(
                         f"  - **חינוך:** {all_edu} מוסדות חינוך בסביבה."
                     )
 
-        if "education_special" in relevant and education_special:
+        if "education_special" in rel and education_special:
             amenity_bullets.append(
                 f"  - **חינוך מיוחד:** {education_special} בתי ספר לחינוך מיוחד."
             )
 
-        if "synagogue" in relevant:
+        if "synagogue" in rel:
             syn_count = counts.get("synagogue", 0)
             if syn_count:
                 amenity_bullets.append(f"  - **דת:** {syn_count} בתי כנסת בסביבה.")
 
-        if "cafe" in relevant or "restaurant" in relevant:
-            cafe_count = counts.get("cafe", 0) if "cafe" in relevant else 0
-            rest_count = counts.get("restaurant", 0) if "restaurant" in relevant else 0
+        if "cafe" in rel or "restaurant" in rel:
+            cafe_count = counts.get("cafe", 0) if "cafe" in rel else 0
+            rest_count = counts.get("restaurant", 0) if "restaurant" in rel else 0
             parts: list[str] = []
             if rest_count:
                 parts.append(f"{rest_count} מסעדות")
@@ -410,12 +460,12 @@ def _format_report(
                     f"  - **אורח חיים:** {' ו-'.join(parts)} לצרכים חברתיים."
                 )
 
-        if "matnas" in relevant:
+        if "matnas" in rel:
             matnas_count = counts.get("matnas", 0)
             if matnas_count:
                 amenity_bullets.append(f"  - **קהילה:** {matnas_count} מתנ״ס בסביבה.")
 
-        if "city_facility" in relevant:
+        if "city_facility" in rel:
             cf_count = counts.get("city_facility", 0)
             if cf_count:
                 amenity_bullets.append(
@@ -484,8 +534,8 @@ class FamilyTacticalAgent(BaseTacticalAgent):
 
         # ── Step 2: Holistic K-means hub discovery ────────────────────────
         _progress("[tactical] Step 2/4: Discovering K-means hubs across all amenities…")
-        needs_tags = _extract_needs_tags(family_needs)
-        supervision = _resolve_education_supervision(family_needs)
+        needs_tags = extract_needs_tags(family_needs)
+        supervision = resolve_education_supervision(family_needs)
         if supervision:
             _progress(f"[tactical]   Education filter: {supervision} schools only")
         radii_result = await self._call(
@@ -511,7 +561,7 @@ class FamilyTacticalAgent(BaseTacticalAgent):
         _progress(
             "[tactical] Step 3/4: Holistic semantic scoring (pgvector across all amenities)…"
         )
-        needs_text = _build_needs_text(family_needs)
+        needs_text = build_needs_text(family_needs)
 
         score_result = await self._call(
             "semantic_radius_scoring",
@@ -520,7 +570,7 @@ class FamilyTacticalAgent(BaseTacticalAgent):
             education_supervision=supervision,
         )
         ranked_radii: list[dict[str, Any]] = (
-            score_result.get("ranked_radii") or radii  # fallback to unranked on failure
+            score_result.get("ranked_radii") or radii
         )
 
         # ── Step 4: GPT-4o grounded recommendation ────────────────────────
