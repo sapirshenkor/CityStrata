@@ -6,20 +6,22 @@ from pydantic import BaseModel, Field
 
 
 class FamilyRecommendationOverview(BaseModel):
-    """evacuee family + Agent pipeline status overview.
+    """Evacuee family or multi-family group with agent pipeline status.
 
-    - has_matching: True if matching agent has run for this family.
-    - has_tactical: True if tactical agent has run for this family.
-    - tactical_created_at: datetime of the tactical agent run, if it has run.
+    Returned by the overview endpoint for the Recommendations panel.
+    Individual families come from evacuee_family_profiles; multi-family
+    groups come from multi_family_profiles (is_merged_profile = True).
     """
 
-    profile_uuid: UUID = Field(description="UUID of the evacuee family profile.")
+    profile_uuid: UUID = Field(
+        description="UUID of the profile (evacuee_family_profiles or multi_family_profiles)."
+    )
     family_name: str
     has_matching: bool = Field(
         description="True if selected_matching_result_id is not NULL."
     )
     has_tactical: bool = Field(
-        description="True if tactical_agent_response_id is not NULL."
+        description="True if a tactical response exists for this profile."
     )
     tactical_created_at: datetime | None = Field(
         default=None,
@@ -31,5 +33,5 @@ class FamilyRecommendationOverview(BaseModel):
     )
     is_merged_profile: bool = Field(
         default=False,
-        description="True if this row is a merged community profile (Community: … name).",
+        description="True if this row is a multi-family group from multi_family_profiles.",
     )

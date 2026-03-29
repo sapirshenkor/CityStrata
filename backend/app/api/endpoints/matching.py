@@ -1,6 +1,7 @@
 """Matching API: match family profile to best cluster."""
 
 import json
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
@@ -14,6 +15,8 @@ from app.agents.matchingAgent import (
 from app.core.database import get_pool
 from app.models.evacuee_family_profiles import EvacueeFamilyProfile, EvacueeFamilyProfileBase
 from app.models.matching_result import MatchingResultResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/matching", tags=["matching"])
 
@@ -181,40 +184,78 @@ def _row_to_matching_result(row) -> MatchingResultResponse:
     )
 
 
+_MATCHING_RESULT_COLS = """
+    mr.id,
+    mr.created_at,
+    mr.profile_uuid,
+    mr.run_id,
+    mr.recommended_cluster_number,
+    mr.recommended_cluster,
+    mr.confidence,
+    mr.reasoning,
+    mr.alternative_cluster_number,
+    mr.alternative_cluster,
+    mr.alternative_reasoning,
+    mr.flags
+"""
+
+
 @router.get("/result/{profile_uuid}", response_model=MatchingResultResponse)
 async def get_selected_matching_result(profile_uuid: UUID) -> MatchingResultResponse:
     """
-    Return the macro matching agent result currently linked to this profile
-    (evacuee_family_profiles.selected_matching_result_id).
+    Return the macro matching result linked to this profile.
+
+    Resolution order:
+      1. Individual family — ``evacuee_family_profiles.selected_matching_result_id``
+      2. Multi-family group — ``multi_family_profiles.selected_matching_result_id``
+      3. Member of a group — if the UUID is listed in a group's
+         ``member_family_uuids``, return that group's matching result.
     """
     pool = get_pool()
     try:
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
-                """
-                SELECT
-                    mr.id,
-                    mr.created_at,
-                    mr.profile_uuid,
-                    mr.run_id,
-                    mr.recommended_cluster_number,
-                    mr.recommended_cluster,
-                    mr.confidence,
-                    mr.reasoning,
-                    mr.alternative_cluster_number,
-                    mr.alternative_cluster,
-                    mr.alternative_reasoning,
-                    mr.flags
+                f"""
+                SELECT {_MATCHING_RESULT_COLS}
                 FROM evacuee_family_profiles efp
-                INNER JOIN matching_results mr ON mr.id = efp.selected_matching_result_id
+                INNER JOIN matching_results mr
+                    ON mr.id = efp.selected_matching_result_id
                 WHERE efp.uuid = $1
                 """,
                 profile_uuid,
             )
+            if not row:
+                row = await conn.fetchrow(
+                    f"""
+                    SELECT {_MATCHING_RESULT_COLS}
+                    FROM multi_family_profiles mfp
+                    INNER JOIN matching_results mr
+                        ON mr.id = mfp.selected_matching_result_id
+                    WHERE mfp.uuid = $1
+                    """,
+                    profile_uuid,
+                )
+            if not row:
+                row = await conn.fetchrow(
+                    f"""
+                    SELECT {_MATCHING_RESULT_COLS}
+                    FROM multi_family_profiles mfp
+                    INNER JOIN matching_results mr
+                        ON mr.id = mfp.selected_matching_result_id
+                    WHERE $1 = ANY(mfp.member_family_uuids)
+                    """,
+                    profile_uuid,
+                )
     except Exception as exc:
+        logger.exception("Matching result lookup failed for %s", profile_uuid)
         raise HTTPException(status_code=500, detail=f"Database error: {exc}") from exc
 
     if not row:
+        logger.warning(
+            "No matching result found for UUID %s in evacuee_family_profiles, "
+            "multi_family_profiles, or as a group member.",
+            profile_uuid,
+        )
         raise HTTPException(
             status_code=404,
             detail="No matching result linked to this profile. Run matching first.",
