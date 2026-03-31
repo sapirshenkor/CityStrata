@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import AreaDetails from './AreaDetails'
-import FilterPanel from './FilterPanel'
-import EvacuationPlanner from './EvacuationPlanner'
 import EvacueeProfileForm from '../EvacueeProfileForm'
 import RecommendationsPanel from '../Recommendations/RecommendationsPanel'
 import { useOSMFacilityTypes } from '../../hooks/useMapData'
@@ -11,8 +9,6 @@ import './Sidebar.css'
 function Sidebar({
   selectedArea,
   onSelectArea,
-  areaFilter,
-  onAreaFilterChange,
   layerVisibility,
   onToggleLayer,
   filters,
@@ -103,18 +99,6 @@ function Sidebar({
           Layers
         </button>
         <button
-          className={activeTab === 'filters' ? 'active' : ''}
-          onClick={() => setActiveTab('filters')}
-        >
-          Filters
-        </button>
-        <button
-          className={activeTab === 'evacuation' ? 'active' : ''}
-          onClick={() => setActiveTab('evacuation')}
-        >
-          Evacuation
-        </button>
-        <button
           className={activeTab === 'evacuee-profile' ? 'active' : ''}
           onClick={() => setActiveTab('evacuee-profile')}
         >
@@ -131,44 +115,6 @@ function Sidebar({
       <div className="sidebar-content">
         {activeTab === 'layers' && (
           <>
-            <div className="area-filter-section">
-              <h2>Area Filter</h2>
-              <div className="area-filter-controls">
-                <input
-                  type="number"
-                  min="1"
-                  max="25"
-                  placeholder="Enter area (1-25)"
-                  value={areaFilter || ''}
-                  onChange={(e) => {
-                    const value = e.target.value ? parseInt(e.target.value) : null
-                    onAreaFilterChange(value)
-                    // Auto-select the area when filtering
-                    if (value) {
-                      onSelectArea(value)
-                    }
-                  }}
-                  className="area-filter-input"
-                />
-                {areaFilter && (
-                  <button
-                    onClick={() => {
-                      onAreaFilterChange(null)
-                      onSelectArea(null)
-                    }}
-                    className="clear-filter-button"
-                  >
-                    Clear Filter
-                  </button>
-                )}
-              </div>
-              {areaFilter && (
-                <p className="filter-info">
-                  Showing only Area {areaFilter}. All layers are filtered to this area.
-                </p>
-              )}
-            </div>
-
             <div className="layer-controls">
               <h2>Layer Visibility</h2>
               <label className="layer-toggle">
@@ -392,11 +338,6 @@ function Sidebar({
           </>
         )}
 
-        {activeTab === 'filters' && (
-          <FilterPanel filters={filters} onUpdateFilters={onUpdateFilters} />
-        )}
-
-        {activeTab === 'evacuation' && <EvacuationPlanner />}
         {activeTab === 'evacuee-profile' && <EvacueeProfileForm />}
         {activeTab === 'recommendations' && (
           <RecommendationsPanel
