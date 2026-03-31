@@ -17,3 +17,7 @@ supabase>=2.0
 gotrue>=2.0
 
 
+mcp>=1.2.0
+asyncpg>=0.29.0
+openai>=1.40.0
+python-dotenv>=1.0.0

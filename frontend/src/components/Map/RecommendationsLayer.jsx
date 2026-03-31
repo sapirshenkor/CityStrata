@@ -1,0 +1,61 @@
+import { Circle, Tooltip } from 'react-leaflet'
+
+// Three visually distinct colours for zone_alpha / zone_beta / zone_gamma.
+// Ordered by rank: blue (best) → orange → green.
+const ZONE_COLORS = ['#667eea', '#e67e22', '#27ae60']
+
+function formatZoneLabel(hub_label) {
+  return (hub_label || 'Zone')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+/**
+ * Renders the recommended relocation radii for the selected family as
+ * react-leaflet Circle components, each with a hover Tooltip.
+ *
+ * Props
+ * -----
+ * recommendation : TacticalAgentResponse object from the API, or null.
+ *                  Reads recommendation.radii_data (array of zone objects).
+ *
+ * Each zone must have: center_lat, center_lng, radius_m.
+ * Optional: hub_label, semantic_score, total_amenities.
+ */
+function RecommendationsLayer({ recommendation }) {
+  if (!recommendation?.radii_data?.length) return null
+
+  return recommendation.radii_data.map((zone, i) => (
+    <Circle
+      key={zone.hub_label ?? i}
+      center={[zone.center_lat, zone.center_lng]}
+      radius={zone.radius_m}
+      pathOptions={{
+        color: ZONE_COLORS[i % ZONE_COLORS.length],
+        fillColor: ZONE_COLORS[i % ZONE_COLORS.length],
+        fillOpacity: 0.1,
+        weight: 2.5,
+      }}
+    >
+      <Tooltip sticky>
+        <div style={{ minWidth: 140 }}>
+          <strong style={{ display: 'block', marginBottom: 4 }}>
+            {formatZoneLabel(zone.hub_label)}
+          </strong>
+          <div>Radius: <b>{zone.radius_m} m</b></div>
+          {zone.semantic_score != null && (
+            <div>
+              Score:{' '}
+              <b>{(zone.semantic_score * 100).toFixed(1)}%</b>
+            </div>
+          )}
+          {zone.total_amenities != null && (
+            <div>Amenities: <b>{zone.total_amenities}</b></div>
+          )}
+        </div>
+      </Tooltip>
+    </Circle>
+  ))
+}
+
+export default RecommendationsLayer

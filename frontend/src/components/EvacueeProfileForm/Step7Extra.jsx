@@ -16,26 +16,26 @@ export default function Step7Extra({ data, onChange, errors }) {
             checked={data.needs_medical_proximity}
             onChange={(e) => onChange({ needs_medical_proximity: e.target.checked })}
           />
-          <span>Needs medical proximity</span>
+          <span>זקוקים לקרבה לשירותים רפואיים</span>
         </div>
         <FieldError errors={errors} name="needs_medical_proximity" />
       </div>
 
       <ImportanceSlider
-        label="Services importance"
+        label="חשיבות גישה לשירותים ומוסדות עירוניים"
         value={data.services_importance}
         onChange={(v) => onChange({ services_importance: v })}
         error={errors?.services_importance}
       />
 
       <div className="evpf-field">
-        <label>Notes (optional)</label>
+        <label>הערות (אופציונלי)</label>
         <textarea
           className="evpf-textarea"
           rows="5"
           value={data.notes}
           onChange={(e) => onChange({ notes: e.target.value })}
-          placeholder="Any extra details relevant for matching..."
+          placeholder="כל פרט נוסף שחשוב לדעת לצורך שיבוץ מתאים..."
         />
         <FieldError errors={errors} name="notes" />
       </div>

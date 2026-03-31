@@ -243,3 +243,43 @@
     font-size: 16px;
     line-height: 1;
   }
+
+  /* ── RTL overrides (active when dir="rtl" is set on .evpf-card) ──────────── */
+  [dir="rtl"] .evpf-field label {
+    text-align: right;
+  }
+
+  /* Checkbox: put the native checkbox to the right of the text in RTL */
+  [dir="rtl"] .evpf-checkbox {
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+  }
+
+  /* Radio card: inner input sits to the right of the label text */
+  [dir="rtl"] .evpf-radioCard input {
+    margin-right: 0;
+    margin-left: 10px;
+  }
+
+  /* Steps progress bar: align to the left in RTL (visually right edge) */
+  [dir="rtl"] .evpf-stepsbar {
+    justify-content: flex-start;
+  }
+
+  /* Action buttons: keep Back on the right, Next/Submit on the left in RTL */
+  [dir="rtl"] .evpf-actions {
+    flex-direction: row-reverse;
+  }
+
+  /* Inputs & textareas: right-align text and set RTL caret direction */
+  [dir="rtl"] .evpf-input,
+  [dir="rtl"] .evpf-select,
+  [dir="rtl"] .evpf-textarea {
+    text-align: right;
+    direction: rtl;
+  }
+
+  /* Chips: text reads right-to-left, remove button stays on the far left */
+  [dir="rtl"] .evpf-chip {
+    flex-direction: row-reverse;
+  }

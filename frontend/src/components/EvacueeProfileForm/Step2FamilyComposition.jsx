@@ -14,7 +14,7 @@ export default function Step2FamilyComposition({ data, onChange, errors }) {
   return (
     <div className="evpf-grid sm2">
       <div className="evpf-field evpf-span2">
-        <label>Total people</label>
+        <label>סך הכל נפשות</label>
         <input
           className="evpf-input"
           type="number"
@@ -26,12 +26,12 @@ export default function Step2FamilyComposition({ data, onChange, errors }) {
       </div>
 
       {[
-        ['infants', 'Infants'],
-        ['preschool', 'Preschool'],
-        ['elementary', 'Elementary'],
-        ['youth', 'Youth'],
-        ['adults', 'Adults'],
-        ['seniors', 'Seniors'],
+        ['infants',    'תינוקות (0-1)'],
+        ['preschool',  'גיל גן (2-5)'],
+        ['elementary', 'גיל יסודי (6-12)'],
+        ['youth',      'נוער (13-18)'],
+        ['adults',     'מבוגרים'],
+        ['seniors',    'קשישים'],
       ].map(([key, label]) => (
         <div key={key} className="evpf-field">
           <label>{label}</label>
@@ -53,7 +53,7 @@ export default function Step2FamilyComposition({ data, onChange, errors }) {
             checked={data.has_mobility_disability}
             onChange={(e) => onChange({ has_mobility_disability: e.target.checked })}
           />
-          <span>Has mobility disability</span>
+          <span>יש לבן/בת המשפחה מוגבלות ניידות</span>
         </div>
         <FieldError errors={errors} name="has_mobility_disability" />
 
@@ -63,7 +63,7 @@ export default function Step2FamilyComposition({ data, onChange, errors }) {
             checked={data.has_car}
             onChange={(e) => onChange({ has_car: e.target.checked })}
           />
-          <span>Has car</span>
+          <span>יש רכב פרטי</span>
         </div>
         <FieldError errors={errors} name="has_car" />
       </div>

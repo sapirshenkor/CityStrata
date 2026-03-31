@@ -52,6 +52,7 @@ from .evacuation import (
     EvacuationAnalysis,
     NearbySearchRequest,
 )
+from .recommendations_overview import FamilyRecommendationOverview
 
 __all__ = [
     # Common
@@ -111,4 +112,6 @@ __all__ = [
     "EvacuationNeed",
     "EvacuationAnalysis",
     "NearbySearchRequest",
+    # Recommendations Overview
+    "FamilyRecommendationOverview",
 ]

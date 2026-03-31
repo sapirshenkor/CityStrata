@@ -11,12 +11,12 @@ Python [Model Context Protocol](https://modelcontextprotocol.io/) server exposin
 ## Install
 
 ```bash
-pip install -r mcp/requirements.txt
+pip install -r backend/mcp/requirements.txt
 ```
 
 ## Configure `.env`
 
-The server searches for `.env` in this order: `mcp/.env` → project root `.env` → current working directory.
+The server searches for `.env` in this order: `backend/mcp/.env` → `backend/.env` → project root `.env` → current working directory.
 
 | Variable | Description |
 |----------|-------------|
@@ -27,14 +27,14 @@ The server searches for `.env` in this order: `mcp/.env` → project root `.env`
 
 **Server only (stdio):**
 ```bash
-python mcp/mcp_server.py
+python backend/mcp/mcp_server.py
 ```
 
 **Full end-to-end pipeline:**
 ```bash
-python mcp/tactical_agent.py --family-id YOUR_PROFILE_UUID --radius-km 2.5
+python backend/mcp/tactical_agent.py --family-id YOUR_PROFILE_UUID --radius-km 2.5
 # or
-set TACTICAL_SAMPLE_FAMILY_ID=<uuid> && python mcp/tactical_agent.py
+set TACTICAL_SAMPLE_FAMILY_ID=<uuid> && python backend/mcp/tactical_agent.py
 ```
 
 The agent runs four steps: context → discovery → parallel scoring → Markdown report printed to stdout.
@@ -90,5 +90,5 @@ The last line before a hang identifies the stall point:
 - **Windows OpenAI stall in MCP child** — embeddings use stdlib `urllib` on a thread executor, not `httpx`. This avoids the ProactorEventLoop/piped-stdout hang. Do not reintroduce the `openai` SDK in `mcp_server.py`.
 - **`statement_timeout` not firing** — the pool sets it via `server_settings` at startup, which survives PgBouncer transaction mode. `SET LOCAL` inside a transaction is unreliable with PgBouncer and is not used.
 - **Missing GiST / HNSW indexes** — run `backend/sql/0018_*` and `backend/sql/0019_*` in Supabase, then `ANALYZE` the listing tables.
-- **`ModuleNotFoundError: mcp`** — run `pip install -r mcp/requirements.txt` in the same environment as the `command` Python.
+- **`ModuleNotFoundError: mcp`** — run `pip install -r backend/mcp/requirements.txt` in the same environment as the `command` Python.
 - **`--forward-server-stderr` hangs on Windows** — this flag pipes the child's stderr; if nothing drains it the process can deadlock. Use the debug log file instead. Only enable `--forward-server-stderr` when actively debugging.

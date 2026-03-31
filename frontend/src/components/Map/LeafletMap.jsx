@@ -9,6 +9,7 @@ import HotelsLayer from './HotelsLayer'
 import MatnasimLayer from './MatnasimLayer'
 import OSMFacilitiesLayer from './OSMFacilitiesLayer'
 import SynagoguesLayer from './SynagoguesLayer'
+import RecommendationsLayer from './RecommendationsLayer'
 import LayerControls from './LayerControls'
 import 'leaflet/dist/leaflet.css'
 
@@ -29,7 +30,7 @@ L.Marker.prototype.options.icon = DefaultIcon
 const EILAT_CENTER = [29.55, 34.95]
 const DEFAULT_ZOOM = 13
 
-function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, filters, showClusters, clusterAssignments }) {
+function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, filters, showClusters, clusterAssignments, selectedRecommendation }) {
   // Merge areaFilter into filters for all layers
   const institutionsFilters = { ...filters.institutions, ...(areaFilter && { area: areaFilter }) }
   const airbnbFilters = { ...filters.airbnb, ...(areaFilter && { area: areaFilter }) }
@@ -93,6 +94,8 @@ function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, f
       {layerVisibility.synagogues && (
         <SynagoguesLayer filters={synagoguesFilters} />
       )}
+
+      <RecommendationsLayer recommendation={selectedRecommendation} />
 
       <LayerControls />
     </MapContainer>

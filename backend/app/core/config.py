@@ -19,7 +19,13 @@ ENV_FILE = str(env_file_path) if env_file_path.exists() else None
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8")
+    # Shared repo-root .env may contain keys for other apps (e.g. Supabase for frontend);
+    # only declared fields are loaded into Settings.
+    model_config = SettingsConfigDict(
+        env_file=ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # supabase API credentials
     ENV: str = "dev"

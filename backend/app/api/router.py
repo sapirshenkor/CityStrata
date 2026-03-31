@@ -18,6 +18,7 @@ from app.api.endpoints import (
     matching,
     evacuee_family_profiles,
     auth,
+    recommendations,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -38,3 +39,4 @@ api_router.include_router(clustering.router)
 api_router.include_router(matching.router)
 api_router.include_router(evacuee_family_profiles.router)
 api_router.include_router(auth.router)
+api_router.include_router(recommendations.router)

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import AreaDetails from './AreaDetails'
 import EvacueeProfileForm from '../EvacueeProfileForm'
+import RecommendationsPanel from '../Recommendations/RecommendationsPanel'
 import { useOSMFacilityTypes } from '../../hooks/useMapData'
 import { runClustering } from '../../services/api'
 import './Sidebar.css'
@@ -14,6 +15,8 @@ function Sidebar({
   onUpdateFilters,
   clusterAssignments,
   onRunClustering,
+  selectedRecommendation,
+  onSelectRecommendation,
 }) {
   const [activeTab, setActiveTab] = useState('layers')
   const [facilityTypeSearch, setFacilityTypeSearch] = useState('')
@@ -100,6 +103,12 @@ function Sidebar({
           onClick={() => setActiveTab('evacuee-profile')}
         >
           Form
+        </button>
+        <button
+          className={activeTab === 'recommendations' ? 'active' : ''}
+          onClick={() => setActiveTab('recommendations')}
+        >
+          Recs
         </button>
       </div>
 
@@ -330,6 +339,12 @@ function Sidebar({
         )}
 
         {activeTab === 'evacuee-profile' && <EvacueeProfileForm />}
+        {activeTab === 'recommendations' && (
+          <RecommendationsPanel
+            selectedRecommendation={selectedRecommendation}
+            onSelectRecommendation={onSelectRecommendation}
+          />
+        )}
       </div>
     </div>
   )

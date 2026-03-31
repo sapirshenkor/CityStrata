@@ -9,31 +9,33 @@ export default function Step4ReligiousCultural({ data, onChange, errors }) {
   return (
     <div className="evpf-grid sm2">
       <div className="evpf-field">
-        <label>Religious affiliation</label>
+        <label>זהות דתית</label>
+        {/* option value stays as the English key the backend expects */}
         <select
           className="evpf-select"
           value={data.religious_affiliation}
           onChange={(e) => onChange({ religious_affiliation: e.target.value })}
         >
-          <option value="secular">secular</option>
-          <option value="traditional">traditional</option>
-          <option value="religious">religious</option>
-          <option value="haredi">haredi</option>
-          <option value="other">other</option>
+          <option value="secular">חילוני</option>
+          <option value="traditional">מסורתי</option>
+          <option value="religious">דתי</option>
+          <option value="haredi">חרדי</option>
+          <option value="other">אחר</option>
         </select>
         <FieldError errors={errors} name="religious_affiliation" />
       </div>
 
       <div className="evpf-field">
-        <label>Culture frequency</label>
+        <label>תדירות פעילות תרבותית</label>
+        {/* option value stays as the English key the backend expects */}
         <select
           className="evpf-select"
           value={data.culture_frequency}
           onChange={(e) => onChange({ culture_frequency: e.target.value })}
         >
-          <option value="daily">daily</option>
-          <option value="weekly">weekly</option>
-          <option value="rarely">rarely</option>
+          <option value="daily">יומי</option>
+          <option value="weekly">שבועי</option>
+          <option value="rarely">לעתים נדירות</option>
         </select>
         <FieldError errors={errors} name="culture_frequency" />
       </div>
@@ -45,7 +47,7 @@ export default function Step4ReligiousCultural({ data, onChange, errors }) {
             checked={data.needs_synagogue}
             onChange={(e) => onChange({ needs_synagogue: e.target.checked })}
           />
-          <span>Needs synagogue</span>
+          <span>זקוקים לבית כנסת בסמיכות</span>
         </div>
         <FieldError errors={errors} name="needs_synagogue" />
       </div>

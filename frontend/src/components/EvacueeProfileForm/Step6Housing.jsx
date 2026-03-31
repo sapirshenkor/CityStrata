@@ -9,9 +9,10 @@ export default function Step6Housing({ data, onChange, errors }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="evpf-field">
-        <label>Accommodation preference</label>
+        <label>סוג לינה מועדף</label>
 
         <div className="evpf-radioRow">
+          {/* value stays as the English key the backend expects */}
           <label className="evpf-radioCard">
             <input
               type="radio"
@@ -20,7 +21,7 @@ export default function Step6Housing({ data, onChange, errors }) {
               checked={data.accommodation_preference === 'airbnb'}
               onChange={() => onChange({ accommodation_preference: 'airbnb' })}
             />
-            airbnb
+            Airbnb / דירה פרטית
           </label>
 
           <label className="evpf-radioCard">
@@ -31,7 +32,7 @@ export default function Step6Housing({ data, onChange, errors }) {
               checked={data.accommodation_preference === 'hotel'}
               onChange={() => onChange({ accommodation_preference: 'hotel' })}
             />
-            hotel
+            מלון / בית מלון
           </label>
         </div>
 
@@ -39,12 +40,12 @@ export default function Step6Housing({ data, onChange, errors }) {
       </div>
 
       <div className="evpf-field">
-        <label>Estimated stay duration</label>
+        <label>משך שהייה משוער</label>
         <input
           className="evpf-input"
           value={data.estimated_stay_duration}
           onChange={(e) => onChange({ estimated_stay_duration: e.target.value })}
-          placeholder="e.g. 2 weeks / 30 days"
+          placeholder="לדוגמה: שבועיים / 30 יום"
         />
         <FieldError errors={errors} name="estimated_stay_duration" />
       </div>
