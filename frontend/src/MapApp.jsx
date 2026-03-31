@@ -8,6 +8,7 @@ import './App.css'
 /** Main map + sidebar (public). */
 export default function MapApp() {
   const [selectedArea, setSelectedArea] = useState(null)
+  const [selectedRecommendation, setSelectedRecommendation] = useState(null)
   const { data: clusterAssignments, refetch: refetchClusterAssignments } = useClusterAssignments()
   const [layerVisibility, setLayerVisibility] = useState({
     statisticalAreas: true,
@@ -44,6 +45,8 @@ export default function MapApp() {
         onUpdateFilters={setFilters}
         clusterAssignments={clusterAssignments}
         onRunClustering={refetchClusterAssignments}
+        selectedRecommendation={selectedRecommendation}
+        onSelectRecommendation={setSelectedRecommendation}
       />
       <div className="map-container">
         <LeafletMap
@@ -54,6 +57,7 @@ export default function MapApp() {
           filters={filters}
           showClusters={layerVisibility.clusters}
           clusterAssignments={clusterAssignments}
+          selectedRecommendation={selectedRecommendation}
         />
       </div>
     </div>
