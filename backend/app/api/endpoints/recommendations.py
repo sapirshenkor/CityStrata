@@ -1,17 +1,21 @@
 """Tactical recommendation endpoints.
 
 Exposes:
-    GET /recommendations/overview — all families + matching/tactical flags (for Recommendations UI)
-    GET /recommendations          — list all families that have a tactical response
-    POST /recommendations/community/run — merged community profile + community tactical pipeline
-    GET /recommendations/{uuid}   — latest recommendation for a specific family
+    GET  /recommendations/overview        — all families + matching/tactical flags
+    GET  /recommendations                 — list all families with a tactical response
+    POST /recommendations/run/{uuid}      — run single-family tactical pipeline
+    POST /recommendations/community/run   — run multi-family tactical pipeline
+    GET  /recommendations/{uuid}          — latest recommendation for a profile
 """
 
 import json
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import get_pool
 from app.models.tactical_agent_response import TacticalAgentResponse
@@ -33,34 +37,96 @@ class CommunityRunRequest(BaseModel):
 
 # ── SQL ───────────────────────────────────────────────────────────────────────
 
-_SELECT_SQL = """
+_FAMILY_SELECT_SQL = """
     SELECT
-        tar.id,
-        tar.created_at,
-        tar.profile_uuid,
-        tar.confidence,
-        tar.agent_output,
-        tar.radii_data,
+        ftr.id,
+        ftr.created_at,
+        ftr.profile_uuid,
+        ftr.confidence,
+        ftr.agent_output,
+        ftr.radii_data,
         efp.family_name
-    FROM tactical_agent_response tar
+    FROM family_tactical_responses ftr
     JOIN evacuee_family_profiles efp
-        ON efp.uuid = tar.profile_uuid
+        ON efp.uuid = ftr.profile_uuid
+"""
+
+_MULTI_FAMILY_SELECT_SQL = """
+    SELECT
+        mftr.id,
+        mftr.created_at,
+        mftr.multi_family_uuid AS profile_uuid,
+        mftr.confidence,
+        mftr.agent_output,
+        mftr.radii_data,
+        mfp.family_name
+    FROM multi_family_tactical_responses mftr
+    JOIN multi_family_profiles mfp
+        ON mfp.uuid = mftr.multi_family_uuid
 """
 
 _OVERVIEW_SQL = """
-     SELECT
+    SELECT
         efp.uuid AS profile_uuid,
         efp.family_name,
         (efp.selected_matching_result_id IS NOT NULL) AS has_matching,
-        (tar.id IS NOT NULL) AS has_tactical,
-        tar.created_at AS tactical_created_at,
+        (ftr.id IS NOT NULL) AS has_tactical,
+        ftr.created_at AS tactical_created_at,
         mr.recommended_cluster_number AS cluster_number,
-        (efp.family_name LIKE 'Community:%') AS is_merged_profile
+        FALSE AS is_merged_profile
     FROM evacuee_family_profiles efp
-    LEFT JOIN tactical_agent_response tar
-        ON tar.profile_uuid = efp.uuid
+    LEFT JOIN family_tactical_responses ftr
+        ON ftr.profile_uuid = efp.uuid
     LEFT JOIN matching_results mr
         ON mr.id = efp.selected_matching_result_id
+
+    UNION ALL
+
+    SELECT
+        mfp.uuid AS profile_uuid,
+        mfp.family_name,
+        (mfp.selected_matching_result_id IS NOT NULL) AS has_matching,
+        (mftr.id IS NOT NULL) AS has_tactical,
+        mftr.created_at AS tactical_created_at,
+        mr.recommended_cluster_number AS cluster_number,
+        TRUE AS is_merged_profile
+    FROM multi_family_profiles mfp
+    LEFT JOIN multi_family_tactical_responses mftr
+        ON mftr.multi_family_uuid = mfp.uuid
+    LEFT JOIN matching_results mr
+        ON mr.id = mfp.selected_matching_result_id
+"""
+
+_ALL_RESPONSES_SQL = """
+    SELECT id, created_at, profile_uuid, confidence,
+           agent_output, radii_data, family_name
+    FROM (
+        SELECT
+            ftr.id,
+            ftr.created_at,
+            ftr.profile_uuid,
+            ftr.confidence,
+            ftr.agent_output,
+            ftr.radii_data,
+            efp.family_name
+        FROM family_tactical_responses ftr
+        JOIN evacuee_family_profiles efp
+            ON efp.uuid = ftr.profile_uuid
+
+        UNION ALL
+
+        SELECT
+            mftr.id,
+            mftr.created_at,
+            mftr.multi_family_uuid AS profile_uuid,
+            mftr.confidence,
+            mftr.agent_output,
+            mftr.radii_data,
+            mfp.family_name
+        FROM multi_family_tactical_responses mftr
+        JOIN multi_family_profiles mfp
+            ON mfp.uuid = mftr.multi_family_uuid
+    ) combined
 """
 
 
@@ -88,7 +154,7 @@ def _row_to_recommendation(row) -> TacticalAgentResponse:
     if isinstance(raw, str):
         radii = json.loads(raw)
     else:
-        radii = raw  # None or already a list
+        radii = raw
 
     return TacticalAgentResponse(
         id=row["id"],
@@ -106,16 +172,14 @@ def _row_to_recommendation(row) -> TacticalAgentResponse:
 
 @router.get("/overview", response_model=list[FamilyRecommendationOverview])
 async def list_families_recommendation_overview():
-    """
-    All evacuee families with agent status for the recommendations panel.
-
-    Use has_tactical/ has_matching for styling.
-    tactical_created_at for "last tactical run
-    """
+    """All evacuee families + multi-family groups with agent status."""
     pool = get_pool()
     try:
         async with pool.acquire() as conn:
-            rows = await conn.fetch(_OVERVIEW_SQL + " ORDER BY efp.created_at DESC")
+            rows = await conn.fetch(
+                "SELECT * FROM (" + _OVERVIEW_SQL + ") overview "
+                "ORDER BY is_merged_profile, family_name"
+            )
             return [_row_to_overview(row) for row in rows]
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Database error: {exc}")
@@ -124,15 +188,15 @@ async def list_families_recommendation_overview():
 @router.get("", response_model=list[TacticalAgentResponse])
 async def list_recommendations():
     """
-    Return all families that have at least one tactical agent response,
+    Return all tactical responses (individual + multi-family),
     ordered by most recent first.
-
-    Used by the frontend Recommendations tab to populate the family list.
     """
     pool = get_pool()
     try:
         async with pool.acquire() as conn:
-            rows = await conn.fetch(_SELECT_SQL + " ORDER BY tar.created_at DESC")
+            rows = await conn.fetch(
+                _ALL_RESPONSES_SQL + " ORDER BY created_at DESC"
+            )
             return [_row_to_recommendation(row) for row in rows]
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Database error: {exc}")
@@ -143,7 +207,7 @@ async def run_tactical_recommendation(profile_uuid: UUID):
     """
     Run the tactical agent for an existing profile.
     Requires macro matching first (selected_matching_result_id set).
-    Persists to tactical_agent_response and returns the latest row (same shape as GET).
+    Persists to family_tactical_responses and returns the row.
     """
     pool = get_pool()
     try:
@@ -173,18 +237,21 @@ async def run_tactical_recommendation(profile_uuid: UUID):
             detail="Tactical pipeline timed out. Check DATABASE_URL, OpenAI, and MCP tools.",
         ) from exc
     except (RuntimeError, OSError) as exc:
+        logger.exception("Tactical pipeline error for %s", profile_uuid)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Unexpected tactical pipeline error for %s", profile_uuid)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     try:
         async with pool.acquire() as conn:
             rec_row = await conn.fetchrow(
-                _SELECT_SQL
-                + " WHERE tar.profile_uuid = $1 ORDER BY tar.created_at DESC LIMIT 1",
+                _FAMILY_SELECT_SQL + " WHERE ftr.profile_uuid = $1",
                 profile_uuid,
             )
         if not rec_row:
             raise HTTPException(
                 status_code=500,
-                detail="Tactical run finished but no tactical_agent_response row was found.",
+                detail="Tactical run finished but no family_tactical_responses row was found.",
             )
         return _row_to_recommendation(rec_row)
     except HTTPException:
@@ -196,33 +263,34 @@ async def run_tactical_recommendation(profile_uuid: UUID):
 @router.post("/community/run", response_model=TacticalAgentResponse)
 async def run_community_tactical_recommendation(body: CommunityRunRequest):
     """
-    Merge selected families into one community evacuee profile, run the community
-    tactical MCP pipeline, persist the report on the new profile, and return it.
+    Run the multi-family tactical pipeline for a group of families sharing
+    a cluster. Creates a multi_family_profiles row and persists the response
+    to multi_family_tactical_responses.
     """
     try:
-        new_uuid = await execute_community_tactical_pipeline(body.family_uuids)
+        mf_uuid = await execute_community_tactical_pipeline(body.family_uuids)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except TimeoutError as exc:
         raise HTTPException(
             status_code=504,
-            detail="Community tactical pipeline timed out. Check DATABASE_URL, OpenAI, and MCP.",
+            detail="Multi-family tactical pipeline timed out. Check DATABASE_URL, OpenAI, and MCP.",
         ) from exc
     except (RuntimeError, OSError) as exc:
+        logger.exception("Multi-family pipeline error")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     pool = get_pool()
     try:
         async with pool.acquire() as conn:
             rec_row = await conn.fetchrow(
-                _SELECT_SQL
-                + " WHERE tar.profile_uuid = $1 ORDER BY tar.created_at DESC LIMIT 1",
-                new_uuid,
+                _MULTI_FAMILY_SELECT_SQL + " WHERE mftr.multi_family_uuid = $1",
+                mf_uuid,
             )
         if not rec_row:
             raise HTTPException(
                 status_code=500,
-                detail="Community tactical run finished but no tactical_agent_response row.",
+                detail="Multi-family tactical run finished but no response row was found.",
             )
         return _row_to_recommendation(rec_row)
     except HTTPException:
@@ -234,18 +302,35 @@ async def run_community_tactical_recommendation(body: CommunityRunRequest):
 @router.get("/{profile_uuid}", response_model=TacticalAgentResponse)
 async def get_recommendation(profile_uuid: UUID):
     """
-    Return the most recent tactical recommendation for a specific family.
+    Return the tactical recommendation for a profile UUID.
 
-    Returns 404 if no recommendation exists yet for this profile.
+    Resolution order:
+      1. Direct hit in family_tactical_responses (individual family).
+      2. Direct hit in multi_family_tactical_responses (multi-family group UUID).
+      3. The UUID is a *member* of a multi-family group — return that group's
+         response so the frontend can display the shared recommendation.
+
+    Returns 404 if no recommendation exists anywhere.
     """
     pool = get_pool()
     try:
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
-                _SELECT_SQL
-                + " WHERE tar.profile_uuid = $1 ORDER BY tar.created_at DESC LIMIT 1",
+                _FAMILY_SELECT_SQL + " WHERE ftr.profile_uuid = $1",
                 profile_uuid,
             )
+            if not row:
+                row = await conn.fetchrow(
+                    _MULTI_FAMILY_SELECT_SQL
+                    + " WHERE mftr.multi_family_uuid = $1",
+                    profile_uuid,
+                )
+            if not row:
+                row = await conn.fetchrow(
+                    _MULTI_FAMILY_SELECT_SQL
+                    + " WHERE $1 = ANY(mfp.member_family_uuids)",
+                    profile_uuid,
+                )
             if not row:
                 raise HTTPException(
                     status_code=404,
