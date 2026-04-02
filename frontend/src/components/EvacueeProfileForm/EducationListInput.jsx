@@ -33,7 +33,11 @@ export default function EducationListInput({ items, onChange, error }) {
             }
           }}
         />
-        <button className="evpf-btn primary" type="button" onClick={add}>
+        <button
+          type="button"
+          onClick={add}
+          className="rounded-md bg-[#667eea] px-3 py-2 text-sm font-semibold text-white hover:bg-[#5568d3] disabled:opacity-50"
+        >
           הוסף
         </button>
       </div>

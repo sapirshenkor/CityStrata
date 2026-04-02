@@ -13,9 +13,12 @@ export default function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="auth-loading">
-        <div className="auth-loading__spinner" aria-hidden />
-        <p>Loading…</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#f8f9fa] text-[#333]">
+        <div
+          className="h-9 w-9 animate-spin rounded-full border-2 border-[#667eea] border-t-transparent"
+          aria-hidden
+        />
+        <p className="text-sm">Loading…</p>
       </div>
     )
   }

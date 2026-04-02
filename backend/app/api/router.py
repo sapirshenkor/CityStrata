@@ -11,6 +11,8 @@ from app.api.endpoints import (
     evacuation,
     nearby,
     hotels,
+    hotels_management,
+    poi,
     matnasim,
     osm_facilities,
     synagogues,
@@ -32,6 +34,8 @@ api_router.include_router(coffee_shops.router)
 api_router.include_router(evacuation.router)
 api_router.include_router(nearby.router)
 api_router.include_router(hotels.router)
+api_router.include_router(hotels_management.router)
+api_router.include_router(poi.router)
 api_router.include_router(matnasim.router)
 api_router.include_router(osm_facilities.router)
 api_router.include_router(synagogues.router)
