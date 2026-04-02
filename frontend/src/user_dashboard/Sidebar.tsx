@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import {
   Building2,
   Home,
+  MapPin,
   MapPinned,
   RefreshCw,
   XCircle,
@@ -53,6 +54,10 @@ export function Sidebar({
           <MapPinned className="h-4 w-4 shrink-0" />
           Municipality view
         </div>
+        <Link to="/municipality/poi" className="dashboard-app__nav-link">
+          <MapPin className="h-4 w-4 shrink-0" />
+          POI management
+        </Link>
       </nav>
 
       <div className="mx-3 mt-2 rounded-lg border border-[#e0e0e0] bg-white p-4 shadow-sm">

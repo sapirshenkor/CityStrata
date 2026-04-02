@@ -6,6 +6,8 @@ import MapApp from './MapApp'
 import ProtectedRoute from './components/ProtectedRoute'
 
 const MunicipalityDashboard = lazy(() => import('./user_dashboard/DashboardContainer'))
+const HotelManagementPage = lazy(() => import('./hotels_management/HotelManagementPage'))
+const PointOfInterestManagement = lazy(() => import('./poi_management/PointOfInterestManagement'))
 
 /** Map is public; use <ProtectedRoute> on future routes that require sign-in. */
 export default function App() {
@@ -26,6 +28,38 @@ export default function App() {
               }
             >
               <MunicipalityDashboard />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/municipality/hotels"
+        element={
+          <ProtectedRoute>
+            <Suspense
+              fallback={
+                <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+                  Loading…
+                </div>
+              }
+            >
+              <HotelManagementPage />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/municipality/poi"
+        element={
+          <ProtectedRoute>
+            <Suspense
+              fallback={
+                <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+                  Loading…
+                </div>
+              }
+            >
+              <PointOfInterestManagement />
             </Suspense>
           </ProtectedRoute>
         }

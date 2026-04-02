@@ -2,12 +2,16 @@
 
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
-import asyncpg
 
 from app.core.database import get_pool
 from app.services.geojson import build_geojson_feature_collection, parse_postgis_geojson
+from app.services.poi_table_registry import qualified_hotel_table
 
 router = APIRouter(prefix="/hotels", tags=["hotels"])
+
+
+def _hotels_from_clause() -> str:
+    return qualified_hotel_table()
 
 
 @router.get("")
@@ -45,6 +49,7 @@ async def get_hotels_listings(
 
     where_clause = " AND ".join(conditions)
 
+    ht = _hotels_from_clause()
     query = f"""
         SELECT 
             hl.uuid::text,
@@ -57,7 +62,7 @@ async def get_hotels_listings(
             hl.location_fulladdress,
             hl.stat_2022,
             ST_AsGeoJSON(hl.location)::jsonb as geometry
-        FROM hotels_listings hl
+        FROM {ht} hl
         WHERE {where_clause}
         ORDER BY hl.rating_value DESC NULLS LAST, hl.name
     """

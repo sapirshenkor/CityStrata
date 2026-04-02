@@ -5,6 +5,7 @@ import asyncpg
 
 from app.core.database import get_pool
 from app.services.geojson import build_geojson_feature_collection, parse_postgis_geojson
+from app.services.poi_table_registry import qualified_restaurants_table
 from app.models.evacuation import NearbySearchRequest
 
 router = APIRouter(prefix="/nearby", tags=["nearby"])
@@ -103,7 +104,8 @@ async def get_nearby_resources(
         ]
 
     elif type == "restaurant":
-        query = """
+        rt = qualified_restaurants_table()
+        query = f"""
             SELECT 
                 r.uuid::text as id,
                 r.cid,
@@ -114,7 +116,7 @@ async def get_nearby_resources(
                 r.stat_2022,
                 ST_AsGeoJSON(r.location)::jsonb as geometry,
                 ST_Distance(r.location::geography, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) as distance_meters
-            FROM restaurants r
+            FROM {rt} r
             WHERE r.semel_yish = 2600
               AND r.permanently_closed = false
               AND ST_DWithin(
