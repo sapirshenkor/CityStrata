@@ -26,8 +26,11 @@ from app.models.hotel_management import (
     row_to_hotel_read,
 )
 from app.services.nominatim_geocoding import GeocodeNotFoundError, nominatim_geocoder
+from app.services.poi_create import create_row_for_category
+from app.services.poi_geospatial import resolve_stat_2022_for_point
 from app.services.poi_table_registry import (
     PoiTableSpec,
+    get_search_columns,
     get_spec,
     qualified_hotel_table,
 )
@@ -68,30 +71,6 @@ def _json_row(r: asyncpg.Record, spec: PoiTableSpec) -> dict[str, Any]:
     return out
 
 
-async def _resolve_stat_2022(
-    conn: asyncpg.Connection, semel_yish: int, lon: float, lat: float
-) -> int:
-    row = await conn.fetchrow(
-        """
-        SELECT sa.stat_2022
-        FROM public.statistical_areas sa
-        WHERE sa.semel_yish = $1
-          AND ST_Contains(sa.geom, ST_SetSRID(ST_MakePoint($2, $3), 4326))
-        ORDER BY sa.stat_2022
-        LIMIT 1
-        """,
-        semel_yish,
-        lon,
-        lat,
-    )
-    if row is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Geocoded location is outside known statistical areas for this municipality.",
-        )
-    return int(row["stat_2022"])
-
-
 def _list_where_sql(spec: PoiTableSpec) -> tuple[str, str]:
     """Returns (WHERE clause fragment, ORDER BY column)."""
     if spec.semel_yish_column:
@@ -104,27 +83,55 @@ def _list_where_sql(spec: PoiTableSpec) -> tuple[str, str]:
     )
 
 
+def _ilike_pattern(q: str) -> str:
+    """Escape LIKE wildcards; wrap for ILIKE."""
+    q = q.strip()
+    if not q:
+        return ""
+    escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _search_and_clause(cat: PoiCategory) -> str:
+    cols = get_search_columns(cat)
+    parts = [f'COALESCE("{c}"::text, \'\') ILIKE $2' for c in cols]
+    return f" AND ({' OR '.join(parts)})"
+
+
 @router.get("/{category}")
 async def list_poi(
     category: str,
     current: Annotated[MunicipalityUserRecord, Depends(require_editor)],
     page: int = Query(1, ge=1, description="Page number (1-based)"),
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
+    search: str | None = Query(
+        None,
+        max_length=200,
+        description="Case-insensitive filter across main text columns (partial match)",
+    ),
 ):
     cat = _parse_category(category)
     spec = get_spec(cat)
     where_sql, order_col = _list_where_sql(spec)
     pool = get_pool()
-    count_q = f"SELECT COUNT(*)::bigint AS c FROM {spec.sql_table} WHERE {where_sql}"
+    pattern = _ilike_pattern(search or "")
+    use_search = bool(pattern)
+    where_full = f"{where_sql}{_search_and_clause(cat) if use_search else ''}"
+    count_q = f"SELECT COUNT(*)::bigint AS c FROM {spec.sql_table} WHERE {where_full}"
     data_q = f"""
         SELECT * FROM {spec.sql_table}
-        WHERE {where_sql}
+        WHERE {where_full}
         ORDER BY "{order_col}" NULLS LAST
-        LIMIT $2 OFFSET $3
+        LIMIT {'$3' if use_search else '$2'} OFFSET {'$4' if use_search else '$3'}
     """
     try:
         async with pool.acquire() as conn:
-            total_row = await conn.fetchrow(count_q, current.semel_yish)
+            if use_search:
+                total_row = await conn.fetchrow(
+                    count_q, current.semel_yish, pattern
+                )
+            else:
+                total_row = await conn.fetchrow(count_q, current.semel_yish)
             total = int(total_row["c"]) if total_row else 0
             total_pages = math.ceil(total / page_size) if total > 0 else 0
             if total > 0:
@@ -132,9 +139,14 @@ async def list_poi(
             else:
                 page = 1
             offset = (page - 1) * page_size
-            rows = await conn.fetch(
-                data_q, current.semel_yish, page_size, offset
-            )
+            if use_search:
+                rows = await conn.fetch(
+                    data_q, current.semel_yish, pattern, page_size, offset
+                )
+            else:
+                rows = await conn.fetch(
+                    data_q, current.semel_yish, page_size, offset
+                )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}") from e
     return {
@@ -213,7 +225,7 @@ async def create_hotel_listing_poi(
     pool = get_pool()
     try:
         async with pool.acquire() as conn:
-            stat_2022 = await _resolve_stat_2022(
+            stat_2022 = await resolve_stat_2022_for_point(
                 conn, current.semel_yish, geo.longitude, geo.latitude
             )
             next_id_row = await conn.fetchrow(
@@ -274,23 +286,42 @@ async def update_hotel_listing_poi(
     return await update_hotel(hotel_uuid, body, current)
 
 
-@router.post("/{category}")
+@router.post("/{category}", status_code=status.HTTP_201_CREATED)
 async def create_poi_generic(
     category: str,
     body: dict[str, Any],
     current: Annotated[MunicipalityUserRecord, Depends(require_editor)],
 ):
-    """Create POI row. hotel_listings uses dedicated POST /poi/hotel_listings with HotelCreate."""
+    """Create POI row. hotel_listings uses dedicated POST /api/poi/hotel_listings with HotelCreate."""
     cat = _parse_category(category)
     if cat == PoiCategory.HOTEL_LISTINGS:
         raise HTTPException(
             status_code=400,
             detail="Use POST /api/poi/hotel_listings with HotelCreate JSON body.",
         )
-    raise HTTPException(
-        status_code=501,
-        detail="Create for this category is not implemented yet; use imports or extend poi.py.",
-    )
+    spec = get_spec(cat)
+    pool = get_pool()
+    try:
+        async with pool.acquire() as conn:
+            row = await create_row_for_category(conn, cat, current.semel_yish, body)
+    except HTTPException:
+        raise
+    except asyncpg.UniqueViolationError as e:
+        raise HTTPException(
+            status_code=409,
+            detail="Insert failed: duplicate key.",
+        ) from e
+    except asyncpg.ForeignKeyViolationError as e:
+        raise HTTPException(
+            status_code=400,
+            detail="Insert failed: statistical area or reference constraint.",
+        ) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}") from e
+
+    if row is None:
+        raise HTTPException(status_code=500, detail="Insert returned no row.")
+    return _json_row(row, spec)
 
 
 @router.patch("/{category}/{entity_id}")

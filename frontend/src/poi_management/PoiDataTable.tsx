@@ -45,6 +45,10 @@ function showRatingColumn(category: PoiCategory): boolean {
   )
 }
 
+function showTypeColumn(category: PoiCategory): boolean {
+  return category !== 'airbnb_listings'
+}
+
 function buildColumns(
   category: PoiCategory,
   onEdit: (row: PoiEntityRow) => void,
@@ -61,15 +65,18 @@ function buildColumns(
         </div>
       ),
     },
-    {
+  ]
+
+  if (showTypeColumn(category)) {
+    cols.push({
       id: 'type',
       header: 'Type',
       cell: ({ row }) => {
         const t = getDisplayType(row.original, category)
         return <span className="text-muted-foreground">{t ?? '—'}</span>
       },
-    },
-  ]
+    })
+  }
 
   if (showRatingColumn(category)) {
     cols.push({

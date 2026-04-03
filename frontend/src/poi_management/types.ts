@@ -23,6 +23,46 @@ export interface PoiCommonFormValues {
   address: string
   type?: string
   institutionCode?: string
+  /** hotel_listings — HotelCreate.description; airbnb_listings / coffee_shops / restaurants — description */
+  description?: string
+  /** hotel_listings — HotelCreate.url; airbnb_listings / coffee_shops / restaurants — url */
+  url?: string
+  /** hotel_listings → rating_value; airbnb_listings → rating_value; coffee_shops / restaurants → total_score */
+  ratingValue?: number | null
+  /** airbnb_listings — num_nights */
+  numNights?: number | null
+  /** airbnb_listings — price_per_night */
+  pricePerNight?: number | null
+  /** airbnb_listings — person_capacity */
+  personCapacity?: number | null
+  /** coffee_shops / restaurants — website (distinct from url) */
+  website?: string
+  /** coffee_shops — activity_times JSONB, edited as JSON text */
+  activityTimesJson?: string
+  /** educational_institutions — type_of_supervision */
+  typeOfSupervision?: string
+  /** educational_institutions — type_of_education */
+  typeOfEducation?: string
+  /** educational_institutions — education_phase */
+  educationPhase?: string
+  /** matnasim — person_in_charge */
+  personInCharge?: string
+  /** matnasim — phone_number */
+  phoneNumber?: string
+  /** matnasim — activity_days */
+  activityDays?: string
+  /** matnasim — facility_area */
+  facilityArea?: number | null
+  /** matnasim — occupancy */
+  occupancy?: number | null
+  /** matnasim — number_of_activity_rooms */
+  numberOfActivityRooms?: string
+  /** matnasim — shelter_and_where */
+  shelterAndWhere?: string
+  /** synagogues — name_he (at least one of name / name_he required) */
+  nameHe?: string
+  /** synagogues — type_he (at least one of type / type_he required) */
+  typeHe?: string
 }
 
 /** GET /api/poi/{category} — rows mirror DB JSON; narrowed in adapters. */

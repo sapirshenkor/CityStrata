@@ -10,9 +10,15 @@ export async function fetchPoiList(
   category: PoiCategory,
   page: number,
   pageSize: number = DEFAULT_PAGE_SIZE,
+  search?: string,
 ): Promise<PoiListPage> {
+  const q = search?.trim()
   const res: AxiosResponse<PoiListPage> = await api.get(base(category), {
-    params: { page, page_size: pageSize },
+    params: {
+      page,
+      page_size: pageSize,
+      ...(q ? { search: q } : {}),
+    },
   })
   return res.data
 }

@@ -136,6 +136,68 @@ def get_spec(category: PoiCategory) -> PoiTableSpec:
     return POI_TABLES[category]
 
 
+# Columns combined with OR for list ?search= (ILIKE %q% on each, COALESCE for NULL).
+POI_SEARCH_COLUMNS: Final[dict[PoiCategory, tuple[str, ...]]] = {
+    PoiCategory.AIRBNB_LISTINGS: (
+        "title",
+        "location_subtitle",
+        "description",
+        "url",
+    ),
+    PoiCategory.COFFEE_SHOPS: (
+        "title",
+        "street",
+        "category_name",
+        "description",
+        "url",
+        "website",
+    ),
+    PoiCategory.HOTEL_LISTINGS: (
+        "name",
+        "location_fulladdress",
+        "type",
+        "description",
+        "url",
+    ),
+    PoiCategory.MATNASIM: (
+        "matnas_name",
+        "full_address",
+        "person_in_charge",
+        "phone_number",
+        "activity_days",
+        "number_of_activity_rooms",
+        "shelter_and_where",
+    ),
+    PoiCategory.RESTAURANTS: (
+        "title",
+        "street",
+        "category_name",
+        "description",
+        "url",
+        "website",
+    ),
+    PoiCategory.EDUCATIONAL_INSTITUTIONS: (
+        "institution_code",
+        "institution_name",
+        "full_address",
+        "type_of_supervision",
+        "type_of_education",
+        "education_phase",
+    ),
+    PoiCategory.SYNAGOGUES: (
+        "name",
+        "name_he",
+        "type",
+        "type_he",
+        "address",
+    ),
+}
+
+
+def get_search_columns(category: PoiCategory) -> tuple[str, ...]:
+    return POI_SEARCH_COLUMNS[category]
+
+
 def qualified_hotel_table() -> str:
     """Same physical table as POI category hotel_listings (public.hotels_listings)."""
     return POI_TABLES[PoiCategory.HOTEL_LISTINGS].sql_table

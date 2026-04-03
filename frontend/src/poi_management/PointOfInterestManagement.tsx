@@ -6,8 +6,9 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { ArrowLeft, ChevronLeft, ChevronRight, MapPin } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Card,
   CardContent,
@@ -25,6 +26,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import { EntityForm } from './EntityForm'
+import { getPoiFormFieldConfig } from './poiFormConfig'
 import { POI_CATEGORY_ICONS, POI_CATEGORY_META, DEFAULT_POI_CATEGORY } from './poiCategories'
 import { getEntityId } from './poiAdapters'
 import { createPoi, deletePoi, fetchPoiList, updatePoi } from './poiApi'
@@ -48,19 +50,41 @@ export default function PointOfInterestManagement() {
   const queryClient = useQueryClient()
   const [category, setCategory] = useState<PoiCategory>(DEFAULT_POI_CATEGORY)
   const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<PoiEntityRow | null>(null)
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create')
   const [bannerError, setBannerError] = useState<string | null>(null)
 
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim())
+    }, 300)
+    return () => window.clearTimeout(t)
+  }, [searchInput])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
+
   const listQuery = useQuery({
-    queryKey: poiQueryKeys.list(category, page),
-    queryFn: () => fetchPoiList(category, page),
-    placeholderData: keepPreviousData,
+    queryKey: poiQueryKeys.list(category, page, debouncedSearch),
+    queryFn: () => fetchPoiList(category, page, undefined, debouncedSearch),
+    // Keep previous rows only while refetching the same category + search (pagination).
+    placeholderData: (previousData, previousQuery) => {
+      if (!previousQuery) return undefined
+      const prevCategory = previousQuery.queryKey[1]
+      const prevSearch = previousQuery.queryKey[3]
+      if (prevCategory !== category || prevSearch !== debouncedSearch) return undefined
+      return keepPreviousData(previousData)
+    },
   })
 
   useEffect(() => {
     setPage(1)
+    setSearchInput('')
+    setDebouncedSearch('')
   }, [category])
 
   useEffect(() => {
@@ -165,6 +189,8 @@ export default function PointOfInterestManagement() {
     return `${category}-create`
   }, [category, formMode, editing])
 
+  const formFieldConfig = useMemo(() => getPoiFormFieldConfig(category), [category])
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/80 bg-card shadow-soft">
@@ -239,6 +265,21 @@ export default function PointOfInterestManagement() {
             <CardDescription>{POI_CATEGORY_META[category].description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="relative max-w-md">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search this category…"
+                className="rounded-lg pl-9"
+                autoComplete="off"
+                aria-label="Search listings"
+              />
+            </div>
             {listQuery.isError ? (
               <p className="text-sm text-destructive">{apiErrorMessage(listQuery.error)}</p>
             ) : (
@@ -300,10 +341,12 @@ export default function PointOfInterestManagement() {
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{formMode === 'create' ? 'Add record' : 'Edit record'}</DialogTitle>
-            <DialogDescription>
-              {POI_CATEGORY_META[category].label}. Address changes should trigger geocoding on the server.
-            </DialogDescription>
+            <DialogTitle>
+              {formMode === 'create'
+                ? `Add ${formFieldConfig.addRecordTitle}`
+                : `Edit ${formFieldConfig.addRecordTitle}`}
+            </DialogTitle>
+            <DialogDescription>{formFieldConfig.dialogDescription}</DialogDescription>
           </DialogHeader>
           <EntityForm
             key={formDialogKey}
