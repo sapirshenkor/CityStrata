@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     # OpenAI (for matching agent); optional so app starts without it
     openai_api_key: str | None = None
 
+    # Nominatim (OSM) — required descriptive User-Agent per usage policy
+    nominatim_user_agent: str = (
+        "CityStrata/1.0 (municipality dashboard; contact: hliran2@gmail.com)"
+    )
+
     print("Loading .env from:", ENV_FILE)
 
 

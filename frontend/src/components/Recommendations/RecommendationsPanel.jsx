@@ -1,13 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
 import {
-  getRecommendationsOverview,
   getRecommendationByProfile,
   getMatchingResultForProfile,
   runMatchingForProfile,
   runTacticalForProfile,
   runCommunityTactical,
 } from '../../services/api'
+import { recommendationsKeys, useRecommendationsOverviewQuery } from '../../hooks/useRecommendationsData'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import './RecommendationsPanel.css'
 
 function MatchingResultBlock({ data }) {
@@ -61,9 +64,9 @@ function MatchingResultBlock({ data }) {
 }
 
 const CONFIDENCE_LABELS = {
-  high: { label: 'High', cls: 'conf-high' },
-  medium: { label: 'Medium', cls: 'conf-medium' },
-  low: { label: 'Low', cls: 'conf-low' },
+  high: { label: 'High' },
+  medium: { label: 'Medium' },
+  low: { label: 'Low' },
 }
 
 function pid(u) {
@@ -71,9 +74,15 @@ function pid(u) {
 }
 
 function ConfidenceBadge({ value }) {
-  const meta =
-    CONFIDENCE_LABELS[value?.toLowerCase()] ?? { label: value ?? '—', cls: 'conf-unknown' }
-  return <span className={`rec-confidence ${meta.cls}`}>{meta.label}</span>
+  const v = value?.toLowerCase()
+  const variant =
+    v === 'high' ? 'success' : v === 'medium' ? 'warning' : v === 'low' ? 'secondary' : 'outline'
+  const label = CONFIDENCE_LABELS[v]?.label ?? value ?? '—'
+  return (
+    <Badge variant={variant} className="shrink-0">
+      {label}
+    </Badge>
+  )
 }
 
 /**
@@ -85,9 +94,14 @@ function ConfidenceBadge({ value }) {
  * onSelectRecommendation  : (rec | null) => void
  */
 function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }) {
-  const [overview, setOverview] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const queryClient = useQueryClient()
+  const {
+    data: overview = [],
+    isLoading: loading,
+    error: overviewQueryError,
+    refetch: refetchOverview,
+  } = useRecommendationsOverviewQuery()
+  const loadError = overviewQueryError ? String(overviewQueryError.message) : null
   const [selectedOverview, setSelectedOverview] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [actionError, setActionError] = useState(null)
@@ -147,17 +161,14 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
     setFilterNeedsTactical(false)
   }
 
-  const refreshOverview = () =>
-    getRecommendationsOverview()
-      .then((res) => setOverview(res.data))
-      .catch((err) => setActionError(err.response?.data?.detail ?? err.message))
-
-  useEffect(() => {
-    getRecommendationsOverview()
-      .then((res) => setOverview(res.data))
-      .catch((err) => setError(err.response?.data?.detail ?? err.message))
-      .finally(() => setLoading(false))
-  }, [])
+  const refreshOverview = async () => {
+    try {
+      await queryClient.invalidateQueries({ queryKey: recommendationsKeys.overview() })
+      await refetchOverview()
+    } catch (err) {
+      setActionError(err.response?.data?.detail ?? err.message)
+    }
+  }
 
   useEffect(() => {
     if (clusterFilter === 'follow' && selectedOverview?.cluster_number == null) {
@@ -276,11 +287,12 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
     setCommunityBusy(true)
     try {
       const res = await runCommunityTactical(ids)
-      const fresh = await getRecommendationsOverview()
-      setOverview(fresh.data)
+      await queryClient.invalidateQueries({ queryKey: recommendationsKeys.overview() })
+      const { data: freshData } = await refetchOverview()
+      const fresh = freshData ?? []
       setCommunitySelection(new Set())
       const newId = pid(res.data.profile_uuid)
-      const row = fresh.data.find((r) => pid(r.profile_uuid) === newId)
+      const row = fresh.find((r) => pid(r.profile_uuid) === newId)
       if (row) {
         setSelectedOverview(row)
         setMatchingDetail(null)
@@ -309,22 +321,22 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
 
   if (loading) {
     return (
-      <div className="rec-panel">
-        <div className="rec-state">
-          <div className="rec-spinner" aria-hidden />
-          <p style={{ margin: 0 }}>Loading families and recommendation status…</p>
-        </div>
+      <div className="rec-panel space-y-3 p-1">
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <p className="text-center text-xs text-muted-foreground">Loading families…</p>
       </div>
     )
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <div className="rec-panel">
         <div className="rec-state rec-state--error" role="alert">
           <strong>Could not load data</strong>
           <br />
-          {error}
+          {loadError}
         </div>
       </div>
     )

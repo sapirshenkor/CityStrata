@@ -1,0 +1,176 @@
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  type ColumnDef,
+} from '@tanstack/react-table'
+import { MapPin, Pencil, Star, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { cn } from '@/lib/utils'
+import type { HotelRow } from './types'
+
+export interface HotelsTableProps {
+  data: HotelRow[]
+  isLoading?: boolean
+  onEdit: (row: HotelRow) => void
+  onDelete: (row: HotelRow) => void
+  deletingUuid?: string | null
+  className?: string
+}
+
+function buildColumns(
+  onEdit: (row: HotelRow) => void,
+  onDelete: (row: HotelRow) => void,
+  deletingUuid: string | null | undefined,
+): ColumnDef<HotelRow>[] {
+  return [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => (
+        <div className="font-medium text-foreground">{row.original.name}</div>
+      ),
+    },
+    {
+      accessorKey: 'type',
+      header: 'Type',
+      cell: ({ getValue }) => (
+        <span className="text-muted-foreground">{getValue<string | null>() ?? '—'}</span>
+      ),
+    },
+    {
+      accessorKey: 'rating_value',
+      header: 'Rating',
+      cell: ({ getValue }) => {
+        const v = getValue<number | null>()
+        if (v == null) return <span className="text-muted-foreground">—</span>
+        return (
+          <span className="inline-flex items-center gap-1 tabular-nums">
+            <Star className="h-3.5 w-3.5 text-amber-500" aria-hidden />
+            {v.toFixed(1)}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'location_fulladdress',
+      header: 'Address',
+      cell: ({ getValue }) => {
+        const addr = getValue<string | null>()
+        if (!addr) return <span className="text-muted-foreground">—</span>
+        return (
+          <span className="inline-flex items-start gap-1.5 text-sm text-muted-foreground">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" aria-hidden />
+            <span className="line-clamp-2">{addr}</span>
+          </span>
+        )
+      },
+    },
+    {
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => {
+        const r = row.original
+        const busy = deletingUuid === r.uuid
+        return (
+          <div className="flex justify-end gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => onEdit(r)}
+              aria-label={`Edit ${r.name}`}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              onClick={() => onDelete(r)}
+              disabled={busy}
+              aria-label={`Delete ${r.name}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        )
+      },
+    },
+  ]
+}
+
+export function HotelsTable({
+  data,
+  isLoading,
+  onEdit,
+  onDelete,
+  deletingUuid,
+  className,
+}: HotelsTableProps) {
+  const columns = buildColumns(onEdit, onDelete, deletingUuid)
+
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  })
+
+  if (isLoading) {
+    return (
+      <div className={cn('space-y-3', className)}>
+        <Skeleton className="h-10 w-full rounded-lg" />
+        <Skeleton className="h-10 w-full rounded-lg" />
+        <Skeleton className="h-10 w-full rounded-lg" />
+      </div>
+    )
+  }
+
+  return (
+    <div className={cn('w-full', className)}>
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((hg) => (
+            <TableRow key={hg.id} className="hover:bg-transparent">
+              {hg.headers.map((header) => (
+                <TableHead key={header.id} className={header.id === 'actions' ? 'w-[88px]' : ''}>
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center text-sm text-muted-foreground">
+                No hotels yet. Add one to get started.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}

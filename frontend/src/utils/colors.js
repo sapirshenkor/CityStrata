@@ -2,14 +2,14 @@
  * Color schemes for map layers
  */
 
-// Statistical Areas - 25 different colors
+// Statistical Areas — 25 fills: saturated enough to read on OSM tiles; cycled by stat_2022
 export const getAreaColor = (stat2022) => {
   const colors = [
-    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-    '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52BE80',
-    '#EC7063', '#5DADE2', '#58D68D', '#F4D03F', '#AF7AC5',
-    '#F1948A', '#85C1E9', '#73C6B6', '#F7DC6F', '#BB8FCE',
-    '#EC7063', '#5DADE2', '#58D68D', '#F4D03F', '#AF7AC5'
+    '#E85555', '#2EB8AE', '#2A9FD1', '#E8885C', '#6BC4A8',
+    '#E5C82E', '#9B6FCE', '#5AA8D9', '#E5A21E', '#3DA66A',
+    '#D95A4E', '#3A9FD4', '#3DB87A', '#D9B82E', '#9468B8',
+    '#E07068', '#4A9BDC', '#4AA896', '#E5C82E', '#9B6FCE',
+    '#D95A4E', '#3A9FD4', '#3DB87A', '#D9B82E', '#9468B8',
   ]
   return colors[(stat2022 - 1) % colors.length]
 }
@@ -18,8 +18,9 @@ export const getAreaColor = (stat2022) => {
 export const layerColors = {
   statisticalAreas: {
     fill: '#4A90E2',
-    stroke: '#2E5C8A',
-    selected: '#FF6B6B',
+    /** Dark outline so boundaries stay readable over light map tiles */
+    stroke: '#0f172a',
+    selected: '#e11d48',
   },
   institutions: {
     fill: '#52BE80',
@@ -44,9 +45,9 @@ export const getAreaStyle = (stat2022, isSelected) => {
   return {
     fillColor: isSelected ? layerColors.statisticalAreas.selected : getAreaColor(stat2022),
     color: layerColors.statisticalAreas.stroke,
-    weight: isSelected ? 3 : 2,
-    opacity: 0.8,
-    fillOpacity: isSelected ? 0.4 : 0.2,
+    weight: isSelected ? 4 : 2.5,
+    opacity: 1,
+    fillOpacity: isSelected ? 0.58 : 0.46,
   }
 }
 
@@ -57,10 +58,10 @@ export const getClusterStyle = (cluster, isSelected) => {
   const fillColor = CLUSTER_COLORS[cluster % CLUSTER_COLORS.length] ?? '#888'
   return {
     fillColor: isSelected ? layerColors.statisticalAreas.selected : fillColor,
-    color: '#333',
-    weight: isSelected ? 3 : 1.5,
-    opacity: 0.9,
-    fillOpacity: isSelected ? 0.5 : 0.5,
+    color: '#0f172a',
+    weight: isSelected ? 4 : 2.5,
+    opacity: 1,
+    fillOpacity: isSelected ? 0.62 : 0.52,
   }
 }
 

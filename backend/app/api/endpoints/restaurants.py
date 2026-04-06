@@ -6,6 +6,7 @@ import asyncpg
 
 from app.core.database import get_pool
 from app.services.geojson import build_geojson_feature_collection, parse_postgis_geojson
+from app.services.poi_table_registry import qualified_restaurants_table
 
 router = APIRouter(prefix="/restaurants", tags=["restaurants"])
 
@@ -45,6 +46,7 @@ async def get_restaurants(
 
     where_clause = " AND ".join(conditions)
 
+    rt = qualified_restaurants_table()
     query = f"""
         SELECT 
             r.uuid::text,
@@ -60,7 +62,7 @@ async def get_restaurants(
             r.street,
             r.stat_2022,
             ST_AsGeoJSON(r.location)::jsonb as geometry
-        FROM restaurants r
+        FROM {rt} r
         WHERE {where_clause}
         ORDER BY r.total_score DESC NULLS LAST, r.title
     """

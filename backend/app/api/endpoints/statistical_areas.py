@@ -7,6 +7,7 @@ import asyncpg
 
 from app.core.database import get_pool
 from app.services.geojson import build_geojson_feature_collection, parse_postgis_geojson
+from app.services.poi_table_registry import qualified_restaurants_table
 from app.models.statistical_area import StatisticalAreaSummary
 
 router = APIRouter(prefix="/statistical-areas", tags=["statistical-areas"])
@@ -133,7 +134,8 @@ async def get_statistical_area_summary(stat_2022: int):
     """
     pool = get_pool()
 
-    query = """
+    rt = qualified_restaurants_table()
+    query = f"""
         SELECT 
             sa.stat_2022,
             sa.area_m2,
@@ -147,7 +149,7 @@ async def get_statistical_area_summary(stat_2022: int):
             ei.semel_yish = sa.semel_yish AND ei.stat_2022 = sa.stat_2022
         LEFT JOIN airbnb_listings al ON 
             al.semel_yish = sa.semel_yish AND al.stat_2022 = sa.stat_2022
-        LEFT JOIN restaurants r ON 
+        LEFT JOIN {rt} r ON 
             r.semel_yish = sa.semel_yish AND r.stat_2022 = sa.stat_2022
         LEFT JOIN coffee_shops cs ON 
             cs.semel_yish = sa.semel_yish AND cs.stat_2022 = sa.stat_2022
