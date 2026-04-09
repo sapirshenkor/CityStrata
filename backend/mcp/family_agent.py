@@ -41,7 +41,9 @@ from tactical_utils import (
     PHASE_LABELS_HE,
     aggregate_phase_counts,
     build_needs_text,
+    build_semantic_filter_text,
     extract_needs_tags,
+    extract_priority_tags,
     he_zone_label,
     needed_education_phases,
     relevant_categories,
@@ -353,6 +355,32 @@ async def _generate_recommendation(
         return None
 
 
+async def _build_semantic_filter_vector(needs_text: str) -> Optional[list[float]]:
+    """
+    Build the family's embedding vector for radius pre-filtering.
+
+    Non-fatal: returns None when embedding generation fails so the pipeline can
+    continue with tag-based personalization only.
+    """
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        return None
+    try:
+        client = AsyncOpenAI(api_key=api_key, timeout=AI_TIMEOUT)
+        response = await asyncio.wait_for(
+            client.embeddings.create(
+                model="text-embedding-3-small",
+                input=needs_text,
+            ),
+            timeout=AI_TIMEOUT + 5,
+        )
+        vec = response.data[0].embedding if response.data else None
+        return list(vec) if vec else None
+    except Exception as exc:
+        logger.warning("Semantic filter vector generation failed (non-fatal): %s", exc)
+        return None
+
+
 # ─── Report formatter ─────────────────────────────────────────────────────────
 
 
@@ -535,6 +563,10 @@ class FamilyTacticalAgent(BaseTacticalAgent):
         # ── Step 2: Holistic K-means hub discovery ────────────────────────
         _progress("[tactical] Step 2/4: Discovering K-means hubs across all amenities…")
         needs_tags = extract_needs_tags(family_needs)
+        priority_tags = extract_priority_tags(family_needs)
+        needs_text = build_needs_text(family_needs)
+        semantic_filter_text = build_semantic_filter_text(family_needs)
+        semantic_filter_vector = await _build_semantic_filter_vector(semantic_filter_text)
         supervision = resolve_education_supervision(family_needs)
         if supervision:
             _progress(f"[tactical]   Education filter: {supervision} schools only")
@@ -544,6 +576,8 @@ class FamilyTacticalAgent(BaseTacticalAgent):
             cluster_number=cluster["cluster_number"],
             education_supervision=supervision,
             needs_tags=needs_tags,
+            priority_tags=priority_tags,
+            semantic_filter_vector=semantic_filter_vector,
         )
 
         if not radii_result.get("ok") or not radii_result.get("radii"):
@@ -561,8 +595,6 @@ class FamilyTacticalAgent(BaseTacticalAgent):
         _progress(
             "[tactical] Step 3/4: Holistic semantic scoring (pgvector across all amenities)…"
         )
-        needs_text = build_needs_text(family_needs)
-
         score_result = await self._call(
             "semantic_radius_scoring",
             radii=radii,

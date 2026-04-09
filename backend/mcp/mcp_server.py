@@ -385,6 +385,21 @@ AMENITY_TABLES: list[dict[str, Any]] = [
 # Ordered list of all category names — used to build COUNT FILTER expressions
 # and to iterate over amenity_counts dicts consistently.
 ALL_CATEGORIES: list[str] = [t["category"] for t in AMENITY_TABLES]
+_ALL_CATEGORIES_SET: set[str] = set(ALL_CATEGORIES)
+
+
+def _normalize_categories(
+    needs_tags: Optional[list[str]],
+    priority_tags: Optional[list[str]],
+) -> set[str]:
+    """
+    Build a validated category set for personalized spatial filtering.
+    """
+    raw = priority_tags if priority_tags else needs_tags
+    if not raw:
+        return set(ALL_CATEGORIES)
+    valid = {str(tag).strip() for tag in raw if str(tag).strip() in _ALL_CATEGORIES_SET}
+    return valid if valid else set(ALL_CATEGORIES)
 
 # ─── Education supervision mapping ────────────────────────────────────────────
 # Maps a family's religious_affiliation value to the corresponding
@@ -512,6 +527,7 @@ def _build_table_block(
 
 def _sql_all_amenities_in_cluster(
     table_filter_overrides: Optional[dict[str, str]] = None,
+    include_categories: Optional[set[str]] = None,
 ) -> str:
     """
     Build a UNION ALL selecting (category TEXT, geom GEOMETRY) for every amenity
@@ -530,6 +546,8 @@ def _sql_all_amenities_in_cluster(
     blocks: list[str] = []
     overrides = table_filter_overrides or {}
     for t in AMENITY_TABLES:
+        if include_categories and t["category"] not in include_categories:
+            continue
         select_cols = (
             f"'{t['category']}'::text AS category, {t['location']}::geometry AS geom"
         )
@@ -541,11 +559,12 @@ def _sql_all_amenities_in_cluster(
                 t, spatial_clause, select_cols, overrides.get(t["table"])
             )
         )
-    return "\n        UNION ALL\n        ".join(blocks)
+    return "\n        UNION ALL\n        ".join(blocks) if blocks else "SELECT NULL::text AS category, NULL::geometry AS geom WHERE FALSE"
 
 
 def _sql_all_amenities_near_hub(
     table_filter_overrides: Optional[dict[str, str]] = None,
+    include_categories: Optional[set[str]] = None,
 ) -> str:
     """
     Build a UNION ALL selecting (category TEXT, location GEOGRAPHY) for every
@@ -567,6 +586,8 @@ def _sql_all_amenities_near_hub(
     blocks: list[str] = []
     overrides = table_filter_overrides or {}
     for t in AMENITY_TABLES:
+        if include_categories and t["category"] not in include_categories:
+            continue
         select_cols = (
             f"'{t['category']}'::text AS category, {t['location']} AS location"
         )
@@ -580,11 +601,12 @@ def _sql_all_amenities_near_hub(
                 t, spatial_clause, select_cols, overrides.get(t["table"])
             )
         )
-    return "\n        UNION ALL\n        ".join(blocks)
+    return "\n        UNION ALL\n        ".join(blocks) if blocks else "SELECT NULL::text AS category, NULL::geography AS location WHERE FALSE"
 
 
 def _sql_all_embeddings_near_hub(
     table_filter_overrides: Optional[dict[str, str]] = None,
+    include_categories: Optional[set[str]] = None,
 ) -> str:
     """
     Build a UNION ALL selecting (embedding VECTOR) for every table with embeddings,
@@ -609,6 +631,8 @@ def _sql_all_embeddings_near_hub(
     blocks: list[str] = []
     overrides = table_filter_overrides or {}
     for t in AMENITY_TABLES:
+        if include_categories and t["category"] not in include_categories:
+            continue
         if not t["has_embedding"]:
             continue
         select_cols = "embedding"
@@ -630,7 +654,41 @@ def _sql_all_embeddings_near_hub(
                 t_effective, spatial_clause, select_cols, overrides.get(t["table"])
             )
         )
-    return "\n        UNION ALL\n        ".join(blocks)
+    return "\n        UNION ALL\n        ".join(blocks) if blocks else "SELECT NULL::vector AS embedding WHERE FALSE"
+
+
+def _sql_all_embeddings_in_cluster(
+    table_filter_overrides: Optional[dict[str, str]] = None,
+    include_categories: Optional[set[str]] = None,
+) -> str:
+    """
+    Build a UNION ALL selecting (geom GEOMETRY, embedding VECTOR) for tables
+    with embeddings, restricted to the cluster boundary.
+    """
+    blocks: list[str] = []
+    overrides = table_filter_overrides or {}
+    for t in AMENITY_TABLES:
+        if include_categories and t["category"] not in include_categories:
+            continue
+        if not t["has_embedding"]:
+            continue
+        select_cols = f"{t['location']}::geometry AS geom, embedding"
+        spatial_clause = (
+            f"ST_Within({t['location']}::geometry, (SELECT geom FROM cluster_boundary))"
+        )
+        emb_filter = "AND embedding IS NOT NULL"
+        t_effective = {
+            **t,
+            "extra_filter": (
+                emb_filter + (f" {t['extra_filter']}" if t["extra_filter"] else "")
+            ),
+        }
+        blocks.append(
+            _build_table_block(
+                t_effective, spatial_clause, select_cols, overrides.get(t["table"])
+            )
+        )
+    return "\n        UNION ALL\n        ".join(blocks) if blocks else "SELECT NULL::geometry AS geom, NULL::vector AS embedding WHERE FALSE"
 
 
 def _sql_count_filters() -> str:
@@ -1202,6 +1260,8 @@ async def discover_optimal_radius(
     cluster_number: int,
     needs_tags: list[str],
     education_supervision: Optional[str] = None,
+    semantic_filter_vector: Optional[list[float]] = None,
+    priority_tags: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     """
     Identify up to 3 spatially distinct relocation "service-hub" radii within
@@ -1229,10 +1289,15 @@ async def discover_optimal_radius(
         Args:
             run_id:               matching_results.run_id UUID string.
             cluster_number:       Integer cluster ID from the macro ML agent.
-            needs_tags:           Holistic need tags (informational).
+            needs_tags:           Holistic need tags (fallback category filter).
             education_supervision: Optional supervision type from SUPERVISION_MAP values:
                                 "State", "State Religious", or "Ultra-Orthodox".
                                 None → no education filter (counts all supervision types).
+            semantic_filter_vector:
+                                Optional family embedding vector used to pre-filter
+                                points before K-means (personalized hubs).
+            priority_tags:        Optional category tags overriding needs_tags for
+                                category-level personalization.
 
         Returns:
             dict with keys:
@@ -1267,12 +1332,33 @@ async def discover_optimal_radius(
             "educational_institutions": f"AND type_of_supervision = '{education_supervision}'",
         }
 
+    effective_categories = _normalize_categories(needs_tags, priority_tags)
+    semantic_vec_lit: Optional[str] = None
+    if semantic_filter_vector:
+        try:
+            semantic_vec_lit = json.dumps([float(v) for v in semantic_filter_vector])
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "semantic_filter_vector must be a float array."}
+
     pool = await _get_pool()
     async with pool.acquire() as conn:
 
         # ── Phase 1: K-means hub discovery ────────────────────────────────
         # LEAST(3, n) guards against clusters with fewer than 3 amenity points
         # since ST_ClusterKMeans requires k ≤ number of input points.
+        amenities_in_cluster_sql = _sql_all_amenities_in_cluster(
+            edu_table_overrides,
+            include_categories=effective_categories,
+        )
+        embeddings_in_cluster_sql = _sql_all_embeddings_in_cluster(
+            edu_table_overrides,
+            include_categories=effective_categories,
+        )
+        logger.info(
+            "discover_optimal_radius: personalized filters categories=%s semantic_vector=%s",
+            sorted(effective_categories),
+            bool(semantic_vec_lit),
+        )
         hub_rows = await conn.fetch(
             f"""
             WITH cluster_boundary AS (
@@ -1290,18 +1376,59 @@ async def discover_optimal_radius(
                 -- Collect all clean, deduplicated amenity points within the
                 -- cluster polygon.  The supervision filter (if set) restricts
                 -- educational_institutions to schools relevant to this family.
-                {_sql_all_amenities_in_cluster(edu_table_overrides)}
+                {amenities_in_cluster_sql}
+            ),
+            all_embeddings AS (
+                {embeddings_in_cluster_sql}
+            ),
+            semantic_amenities AS (
+                SELECT geom
+                FROM all_embeddings
+                WHERE $3::text IS NOT NULL
+                ORDER BY embedding <=> $3::vector ASC
+                LIMIT 200
             ),
             total AS (
-                SELECT COUNT(*) AS n FROM all_amenities
+                SELECT
+                    (SELECT COUNT(*) FROM semantic_amenities) AS semantic_n,
+                    COUNT(*) AS filtered_n
+                FROM all_amenities
+            ),
+            kmeans_input AS (
+                SELECT geom
+                FROM semantic_amenities
+                WHERE (
+                    $3::text IS NOT NULL
+                    AND (SELECT semantic_n FROM total) >= 12
+                )
+                UNION ALL
+                SELECT geom
+                FROM all_amenities
+                WHERE (
+                    $3::text IS NULL
+                    OR (SELECT semantic_n FROM total) < 12
+                )
             ),
             clustered AS (
                 -- Assign a K-means cluster ID to every amenity point.
                 SELECT
-                    ST_ClusterKMeans(geom, LEAST(3, (SELECT n FROM total)::int))
+                    ST_ClusterKMeans(
+                        geom,
+                        LEAST(
+                            3,
+                            GREATEST(
+                                1,
+                                (
+                                    SELECT
+                                        COUNT(*)::int
+                                    FROM kmeans_input
+                                )
+                            )
+                        )
+                    )
                         OVER () AS cid,
                     geom
-                FROM all_amenities
+                FROM kmeans_input
             )
             -- Hub centre = centroid of each K-means group.
             SELECT
@@ -1315,6 +1442,7 @@ async def discover_optimal_radius(
             """,
             rid,
             cluster_number,
+            semantic_vec_lit,
         )
 
         if not hub_rows:
@@ -1341,7 +1469,10 @@ async def discover_optimal_radius(
         #
         # Steps A and B use the supervision-filtered SQL so all counts reflect
         # what is visible inside the circle drawn on the map.
-        amenities_near_sql = _sql_all_amenities_near_hub(edu_table_overrides)
+        amenities_near_sql = _sql_all_amenities_near_hub(
+            edu_table_overrides,
+            include_categories=effective_categories,
+        )
         amenities_near_sql_unfiltered = (
             _sql_all_amenities_near_hub()
         )  # for P75 (stable)
