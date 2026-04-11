@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel
 
 from app.core.config import settings
+from app.models.community_profile import CommunityProfileBase
 from app.models.evacuee_family_profiles import EvacueeFamilyProfileBase
 
 # OpenAI client; initialized lazily so app can start without key when matching is unused
@@ -144,6 +145,68 @@ def _format_family_profile_text(family: EvacueeFamilyProfileBase) -> str:
     return "".join(parts).strip()
 
 
+def _format_community_profile_text(community: CommunityProfileBase) -> str:
+    """
+    Convert a collective community profile into natural language for the LLM prompt.
+    """
+    parts = [
+        f"This is a displaced community group named «{community.community_name}», "
+        f"with approximately {community.total_families} families and {community.total_people} people total. "
+    ]
+
+    has_children = (
+        community.infants
+        or community.preschool
+        or community.elementary
+        or community.youth
+    )
+    if has_children:
+        segs = []
+        if community.infants:
+            segs.append(f"{community.infants} infant(s)")
+        if community.preschool:
+            segs.append(f"{community.preschool} preschool-age child/children")
+        if community.elementary:
+            segs.append(f"{community.elementary} elementary-age child/children")
+        if community.youth:
+            segs.append(f"{community.youth} youth")
+        parts.append("Age composition includes " + ", ".join(segs) + ". ")
+
+    if community.seniors > 0:
+        parts.append(f"{community.seniors} senior(s). ")
+
+    ctype = community.community_type
+    type_desc = {
+        "neighborhood": "a neighborhood / residential block moving together",
+        "religious": "a religious community — prioritize religious infrastructure and cohesion",
+        "kibbutz_moshav": "a kibbutz or moshav-style collective",
+        "interest_group": "an interest-based or voluntary association",
+    }.get(ctype, ctype)
+    parts.append(f"Community type: {type_desc}. ")
+
+    parts.append(
+        f"Keeping the group physically cohesive after relocation is rated {community.cohesion_importance}/5 in importance. "
+    )
+
+    if community.needs_synagogue:
+        parts.append("They require access to synagogue(s). ")
+    if community.needs_community_center:
+        parts.append("They need a matnas or community meeting space. ")
+    if community.needs_education_institution:
+        parts.append("They need dedicated education facilities nearby. ")
+
+    hp = community.housing_preference
+    if hp == "hotel":
+        parts.append("They prefer concentrated hotel-style accommodation. ")
+    else:
+        parts.append("They prefer scattered apartments across the city. ")
+
+    if community.infrastructure_notes:
+        parts.append(f"Additional notes: {community.infrastructure_notes.strip()}")
+
+    return "".join(parts).strip()
+
+
 def _format_cluster_profiles_text(clusters: list[ClusterProfile]) -> str:
     """Format cluster profiles as readable text for the prompt."""
     lines = []
@@ -181,6 +244,21 @@ Apply these matching rules:
 Return exactly one JSON object with these keys (no markdown, no backticks, no preamble): recommended_cluster (string, one of the cluster names), confidence (string: "high" | "medium" | "low"), reasoning (string), alternative_cluster (string), alternative_reasoning (string), flags (array of strings; critical constraints for the placement officer)."""
 
 
+COMMUNITY_MATCHING_SYSTEM_PROMPT = """You are a placement officer assistant for neighborhood matching in Eilat, Israel. Your task is to recommend the best neighborhood cluster for a displaced **community group** (multiple families relocating together — e.g. a neighborhood block, kibbutz, or religious community) based on their collective profile and the available cluster profiles.
+
+Apply these matching rules (in addition to the family rules where relevant):
+- **Religious community type** or synagogue need → Prioritize high "religious" dimension.
+- **High cohesion importance (4–5)** → Prioritize high "community" dimension and avoid splitting the group across distant areas.
+- **Matnas / community center need** → Prioritize high "community" dimension.
+- **Education institution need** with many school-age children → Prioritize high "education" dimension.
+- **Hotel / concentrated housing** → Prioritize "Commercial Core" or high "tourism" as appropriate.
+- **Scattered apartments** → Prioritize high "tourism" and connectivity (food, osm_infra).
+- **Kibbutz/moshav type** → Consider clusters that support communal living patterns.
+- "Peripheral - Sparse" → Recommend only as absolute last resort; flag explicitly.
+
+Return exactly one JSON object with these keys (no markdown, no backticks, no preamble): recommended_cluster (string, one of the cluster names), confidence (string: "high" | "medium" | "low"), reasoning (string), alternative_cluster (string), alternative_reasoning (string), flags (array of strings; critical constraints for the placement officer)."""
+
+
 async def match_family_to_cluster(
     family_profile: EvacueeFamilyProfileBase,
     cluster_profiles: list[ClusterProfile],
@@ -205,6 +283,54 @@ async def match_family_to_cluster(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": MATCHING_SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            max_tokens=1000,
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+    except Exception as e:
+        raise RuntimeError(f"OpenAI API call failed: {e}") from e
+
+    raw = response.choices[0].message.content
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Agent returned invalid JSON: {e}. Raw response: {raw!r}") from e
+
+    return Agent1Response(
+        recommended_cluster=data["recommended_cluster"],
+        confidence=data["confidence"],
+        reasoning=data["reasoning"],
+        alternative_cluster=data["alternative_cluster"],
+        alternative_reasoning=data["alternative_reasoning"],
+        flags=data.get("flags", []) if isinstance(data.get("flags"), list) else [],
+    )
+
+
+async def match_community_to_cluster(
+    community_profile: CommunityProfileBase,
+    cluster_profiles: list[ClusterProfile],
+) -> Agent1Response:
+    """
+    Call OpenAI to match a collective community profile to the best cluster.
+    """
+    community_text = _format_community_profile_text(community_profile)
+    clusters_text = _format_cluster_profiles_text(cluster_profiles)
+
+    user_content = (
+        "Community group profile:\n"
+        f"{community_text}\n\n"
+        "Available clusters:\n"
+        f"{clusters_text}\n\n"
+        "Return ONLY a valid JSON object with keys: recommended_cluster, confidence, reasoning, alternative_cluster, alternative_reasoning, flags. No markdown, no backticks, no extra text."
+    )
+
+    try:
+        response = await _get_openai_client().chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": COMMUNITY_MATCHING_SYSTEM_PROMPT},
                 {"role": "user", "content": user_content},
             ],
             max_tokens=1000,

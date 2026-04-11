@@ -2,7 +2,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MapLayersPanel, type LayerVisibility } from '../Map/MapLayersPanel'
 import EvacueeProfileForm from '../EvacueeProfileForm'
+import CommunityForm from '../CommunityForm/CommunityForm'
 import RecommendationsPanel from '../Recommendations/RecommendationsPanel'
+import CommunityProfilesPanel from '../CommunityProfiles/CommunityProfilesPanel'
 import { cn } from '@/lib/utils'
 
 export type { LayerVisibility }
@@ -42,29 +44,56 @@ export function MapSidebar({
       )}
     >
       <Tabs defaultValue="form" className="flex h-full min-h-0 flex-col">
-        <TabsList className="mx-3 mt-3 grid w-auto grid-cols-3 rounded-lg bg-[#f8f9fa] p-1">
-          <TabsTrigger
-            value="form"
-            className="px-2 text-xs data-[state=active]:bg-white data-[state=active]:text-[#667eea] data-[state=active]:shadow-sm sm:text-sm"
-          >
-            Form
-          </TabsTrigger>
+        <TabsList className="mx-3 mt-3 grid h-auto w-full grid-cols-6 gap-1 rounded-lg bg-[#f8f9fa] p-1">
+          {/* Row 1: Layers · Family · Community */}
           <TabsTrigger
             value="layers"
-            className="px-2 text-xs data-[state=active]:bg-white data-[state=active]:text-[#667eea] data-[state=active]:shadow-sm sm:text-sm"
+            title="Map layers"
+            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight data-[state=active]:bg-white data-[state=active]:text-[#667eea] data-[state=active]:shadow-sm sm:text-xs"
           >
             Layers
           </TabsTrigger>
           <TabsTrigger
-            value="recommendations"
-            className="px-1.5 text-[11px] leading-tight data-[state=active]:bg-white data-[state=active]:text-[#667eea] data-[state=active]:shadow-sm sm:px-2 sm:text-xs"
+            value="form"
+            title="Family profile form"
+            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight data-[state=active]:bg-white data-[state=active]:text-[#667eea] data-[state=active]:shadow-sm sm:text-xs"
           >
-            Recommendations
+            Family
+          </TabsTrigger>
+          <TabsTrigger
+            value="community"
+            title="Community / group profile"
+            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight data-[state=active]:bg-white data-[state=active]:text-[#667eea] data-[state=active]:shadow-sm sm:text-xs"
+          >
+            Community
+          </TabsTrigger>
+          {/* Row 2: recommend Family · recommend Community */}
+          <TabsTrigger
+            value="recommendations"
+            title="Family recommendations & tactical reports"
+            className="col-span-3 min-h-[2.25rem] whitespace-normal px-1.5 text-center text-[10px] leading-snug data-[state=active]:bg-white data-[state=active]:text-[#667eea] data-[state=active]:shadow-sm sm:text-[11px]"
+          >
+            recommend Family
+          </TabsTrigger>
+          <TabsTrigger
+            value="communities"
+            title="Community profiles & saved groups"
+            className="col-span-3 min-h-[2.25rem] whitespace-normal px-1.5 text-center text-[10px] leading-snug data-[state=active]:bg-white data-[state=active]:text-[#667eea] data-[state=active]:shadow-sm sm:text-[11px]"
+          >
+            recommend Community
           </TabsTrigger>
         </TabsList>
         <TabsContent value="form" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
           <ScrollArea className="h-full flex-1 px-3 pb-4 pt-3">
             <EvacueeProfileForm />
+          </ScrollArea>
+        </TabsContent>
+        <TabsContent
+          value="community"
+          className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+        >
+          <ScrollArea className="h-full flex-1 px-3 pb-4 pt-3">
+            <CommunityForm />
           </ScrollArea>
         </TabsContent>
         <TabsContent
@@ -93,6 +122,14 @@ export function MapSidebar({
               selectedRecommendation={selectedRecommendation}
               onSelectRecommendation={onSelectRecommendation}
             />
+          </ScrollArea>
+        </TabsContent>
+        <TabsContent
+          value="communities"
+          className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+        >
+          <ScrollArea className="h-full flex-1 px-1 pb-4 pt-2">
+            <CommunityProfilesPanel />
           </ScrollArea>
         </TabsContent>
       </Tabs>

@@ -159,5 +159,25 @@ export const runCommunityTactical = (familyUuids) => {
   )
 }
 
+/** Collective community profiles (neighborhood / kibbutz / etc.) — CRUD list. */
+export const getCommunityProfiles = () => {
+  return api.get('/api/communities')
+}
+
+export const getCommunityProfile = (communityId) => {
+  return api.get(`/api/communities/${communityId}`)
+}
+
+/** Macro cluster matching for a saved community_profiles row (OpenAI + DB). */
+export const runMatchingForCommunityProfile = (communityId) => {
+  return api.post(`/api/matching/cluster/community/${communityId}`, null, {
+    timeout: 120_000,
+  })
+}
+
+export const getMatchingResultForCommunity = (communityId) => {
+  return api.get(`/api/matching/result/community/${communityId}`)
+}
+
 export default api
 
