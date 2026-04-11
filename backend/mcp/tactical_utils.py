@@ -182,6 +182,22 @@ def extract_needs_tags(family_needs: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(tags))
 
 
+def extract_priority_tags(family_needs: dict[str, Any]) -> list[str]:
+    """
+    Derive deterministic category filters for personalized spatial discovery.
+
+    Uses report relevance as the primary signal, then falls back to
+    ``extract_needs_tags`` so callers always get at least one valid category.
+    Returned tags are ordered by AMENITY_TABLES category convention.
+    """
+    ordered = ["education", "synagogue", "matnas", "cafe", "restaurant", "city_facility"]
+    rel = relevant_categories(family_needs)
+    tags = [cat for cat in ordered if cat in rel]
+    if not tags:
+        tags = extract_needs_tags(family_needs)
+    return list(dict.fromkeys(tags))
+
+
 def resolve_education_supervision(family_needs: dict[str, Any]) -> Optional[str]:
     """
     Map the family's religious affiliation to the corresponding school
@@ -287,6 +303,16 @@ def build_needs_text(family_needs: dict[str, Any]) -> str:
         ". ".join(parts)
         or "Displaced Israeli family seeking holistic relocation in Eilat"
     )
+
+
+def build_semantic_filter_text(family_needs: dict[str, Any]) -> str:
+    """
+    Build normalized text for semantic pre-filtering in spatial discovery.
+
+    Currently mirrors ``build_needs_text`` so embedding behavior stays aligned
+    between radius personalization and final semantic validation.
+    """
+    return build_needs_text(family_needs).strip()
 
 
 # ─── Report formatting helpers ────────────────────────────────────────────────
