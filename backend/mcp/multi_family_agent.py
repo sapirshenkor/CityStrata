@@ -46,6 +46,7 @@ from tactical_utils import (
     culture_from_rank,
     culture_rank,
     extract_needs_tags,
+    extract_priority_tags,
     he_zone_label,
     needed_education_phases,
     relevant_categories,
@@ -683,6 +684,7 @@ class MultiFamilyTacticalAgent(BaseTacticalAgent):
         # ── Step 2: Hub discovery ─────────────────────────────────────────
         _progress("[tactical] Multi-Family 2/4: Discovering hubs (merged tags)…")
         needs_tags = extract_needs_tags(multi_family_needs)
+        priority_tags = extract_priority_tags(multi_family_needs)
         supervision = _multi_family_resolve_education_supervision(member_families)
         if supervision:
             _progress(f"[tactical]   Education filter (unanimous): {supervision}")
@@ -693,6 +695,7 @@ class MultiFamilyTacticalAgent(BaseTacticalAgent):
             cluster_number=cluster["cluster_number"],
             education_supervision=supervision,
             needs_tags=needs_tags,
+            priority_tags=priority_tags,
         )
 
         if not radii_result.get("ok") or not radii_result.get("radii"):
