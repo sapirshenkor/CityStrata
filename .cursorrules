@@ -1,0 +1,28 @@
+{
+  "project_context": "CityStrata is a geospatial emergency evacuation management system for Eilat.",
+  "tech_stack": [
+    "React 18 (Vite)",
+    "TypeScript",
+    "Tailwind CSS",
+    "Radix UI / Shadcn UI",
+    "React Leaflet",
+    "TanStack Query (React Query)",
+    "Lucide React Icons"
+  ],
+  "design_system": {
+    "theme": "Dark Mode prioritized, professional, high-trust emergency UI.",
+    "colors": {
+      "primary": "Slate-900 (background), Blue-600 (actions)",
+      "status": "Red-500 (Critical), Amber-500 (Warning), Green-500 (Safe)",
+      "text": "Slate-50 (Heading), Slate-300 (Body)"
+    },
+    "border_radius": "rounded-lg (8px)",
+    "layout": "RTL (Hebrew) support is mandatory. Use 'flex-row-reverse' or logical properties where needed."
+  },
+  "coding_standards": {
+    "components": "Functional components with explicit TypeScript interfaces.",
+    "state": "Use TanStack Query for server state and React Context/Zustand for global UI state.",
+    "icons": "Only use Lucide-React icons.",
+    "forms": "Use React-Hook-Form with Zod validation."
+  }
+}

@@ -19,6 +19,7 @@ from app.api.endpoints import (
     clustering,
     matching,
     evacuee_family_profiles,
+    community_profiles,
     auth,
     recommendations,
 )
@@ -42,5 +43,6 @@ api_router.include_router(synagogues.router)
 api_router.include_router(clustering.router)
 api_router.include_router(matching.router)
 api_router.include_router(evacuee_family_profiles.router)
+api_router.include_router(community_profiles.router)
 api_router.include_router(auth.router)
 api_router.include_router(recommendations.router)

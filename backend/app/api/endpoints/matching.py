@@ -10,8 +10,10 @@ from app.agents.matchingAgent import (
     Agent1Response,
     ClusterDimensions,
     ClusterProfile,
+    match_community_to_cluster,
     match_family_to_cluster,
 )
+from app.models.community_profile import CommunityProfileBase
 from app.core.database import get_pool
 from app.models.evacuee_family_profiles import EvacueeFamilyProfile, EvacueeFamilyProfileBase
 from app.models.matching_result import MatchingResultResponse
@@ -19,6 +21,40 @@ from app.models.matching_result import MatchingResultResponse
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/matching", tags=["matching"])
+
+_COMMUNITY_PROFILE_SELECT_COLS = """
+    id, community_name, leader_name, contact_phone, contact_email,
+    total_families, total_people,
+    infants, preschool, elementary, youth, adults, seniors,
+    community_type, cohesion_importance, housing_preference,
+    needs_synagogue, needs_community_center, needs_education_institution,
+    infrastructure_notes
+""".replace("\n", " ").strip()
+
+
+def _row_to_community_base(row) -> CommunityProfileBase:
+    return CommunityProfileBase(
+        community_name=row["community_name"],
+        leader_name=row["leader_name"],
+        contact_phone=row["contact_phone"],
+        contact_email=row["contact_email"],
+        total_families=row["total_families"],
+        total_people=row["total_people"],
+        infants=row["infants"],
+        preschool=row["preschool"],
+        elementary=row["elementary"],
+        youth=row["youth"],
+        adults=row["adults"],
+        seniors=row["seniors"],
+        community_type=row["community_type"],
+        cohesion_importance=row["cohesion_importance"],
+        housing_preference=row["housing_preference"],
+        needs_synagogue=row["needs_synagogue"],
+        needs_community_center=row["needs_community_center"],
+        needs_education_institution=row["needs_education_institution"],
+        infrastructure_notes=row["infrastructure_notes"],
+    )
+
 
 _EVACUEE_PROFILE_SELECT_COLS = """
     id, uuid, created_at, updated_at,
@@ -164,6 +200,48 @@ async def _persist_matching_result(
         return inserted_id
 
 
+async def _persist_community_matching_result(
+    *,
+    community_profile_id: UUID,
+    run_id: UUID,
+    recommended_cluster_number: int,
+    alternative_cluster_number: int | None,
+    result: Agent1Response,
+) -> UUID:
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        inserted_id = await conn.fetchval(
+            """
+            INSERT INTO public.community_matching_results (
+                community_profile_id,
+                run_id,
+                recommended_cluster_number,
+                recommended_cluster,
+                confidence,
+                reasoning,
+                alternative_cluster_number,
+                alternative_cluster,
+                alternative_reasoning,
+                flags,
+                agent_output
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb)
+            RETURNING id
+            """,
+            community_profile_id,
+            run_id,
+            recommended_cluster_number,
+            result.recommended_cluster,
+            result.confidence,
+            result.reasoning,
+            alternative_cluster_number,
+            result.alternative_cluster,
+            result.alternative_reasoning,
+            json.dumps(result.flags or []),
+            json.dumps(result.model_dump()),
+        )
+        return inserted_id
+
+
 def _row_to_matching_result(row) -> MatchingResultResponse:
     flags = row["flags"]
     if isinstance(flags, str):
@@ -198,6 +276,45 @@ _MATCHING_RESULT_COLS = """
     mr.alternative_reasoning,
     mr.flags
 """
+
+
+@router.get("/result/community/{community_id}", response_model=MatchingResultResponse)
+async def get_community_matching_result(community_id: UUID) -> MatchingResultResponse:
+    """Return the macro matching result linked to a community_profiles row."""
+    pool = get_pool()
+    try:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                f"""
+                SELECT
+                    mr.id,
+                    mr.created_at,
+                    cp.id AS profile_uuid,
+                    mr.run_id,
+                    mr.recommended_cluster_number,
+                    mr.recommended_cluster,
+                    mr.confidence,
+                    mr.reasoning,
+                    mr.alternative_cluster_number,
+                    mr.alternative_cluster,
+                    mr.alternative_reasoning,
+                    mr.flags
+                FROM community_profiles cp
+                INNER JOIN community_matching_results mr ON mr.id = cp.selected_matching_result_id
+                WHERE cp.id = $1
+                """,
+                community_id,
+            )
+    except Exception as exc:
+        logger.exception("Community matching result lookup failed for %s", community_id)
+        raise HTTPException(status_code=500, detail=f"Database error: {exc}") from exc
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="No matching result linked to this community profile. Run matching first.",
+        )
+    return _row_to_matching_result(row)
 
 
 @router.get("/result/{profile_uuid}", response_model=MatchingResultResponse)
@@ -331,5 +448,64 @@ async def match_cluster_for_profile(profile_id: UUID) -> Agent1Response:
                 profile_id,
             )
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/cluster/community/{community_id}", response_model=Agent1Response)
+async def match_cluster_for_community_profile(community_id: UUID) -> Agent1Response:
+    """
+    Match an existing community_profiles row (collective group) to the best
+    neighborhood cluster from the latest clustering run.
+    """
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            f"SELECT {_COMMUNITY_PROFILE_SELECT_COLS} FROM community_profiles WHERE id = $1",
+            community_id,
+        )
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Community profile not found")
+
+    run_id, cluster_profiles = await _load_latest_cluster_profiles()
+    profile = _row_to_community_base(row)
+
+    try:
+        result = await match_community_to_cluster(profile, cluster_profiles)
+        name_to_cluster = {c.name: c.cluster for c in cluster_profiles}
+        recommended_cluster_number = name_to_cluster.get(result.recommended_cluster)
+        if recommended_cluster_number is None:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Agent returned a recommended_cluster name that does not match any cluster profile. "
+                    f"recommended_cluster={result.recommended_cluster!r}"
+                ),
+            )
+
+        alternative_cluster_number = name_to_cluster.get(result.alternative_cluster)
+
+        matching_result_id = await _persist_community_matching_result(
+            community_profile_id=community_id,
+            run_id=run_id,
+            recommended_cluster_number=recommended_cluster_number,
+            alternative_cluster_number=alternative_cluster_number,
+            result=result,
+        )
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE public.community_profiles
+                SET selected_matching_result_id = $1
+                WHERE id = $2
+                """,
+                matching_result_id,
+                community_id,
+            )
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
