@@ -8,6 +8,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 const MunicipalityDashboard = lazy(() => import('./user_dashboard/DashboardContainer'))
 const HotelManagementPage = lazy(() => import('./hotels_management/HotelManagementPage'))
 const PointOfInterestManagement = lazy(() => import('./poi_management/PointOfInterestManagement'))
+const FamilyDashboard = lazy(() => import('./family_portal/FamilyDashboard'))
+const FamilyEvacueeWizard = lazy(() => import('./family_portal/FamilyEvacueeWizard'))
 
 /** Map is public; use <ProtectedRoute> on future routes that require sign-in. */
 export default function App() {
@@ -60,6 +62,54 @@ export default function App() {
               }
             >
               <PointOfInterestManagement />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/family"
+        element={
+          <ProtectedRoute>
+            <Suspense
+              fallback={
+                <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+                  Loading…
+                </div>
+              }
+            >
+              <FamilyDashboard />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/family/profile/new"
+        element={
+          <ProtectedRoute>
+            <Suspense
+              fallback={
+                <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+                  Loading…
+                </div>
+              }
+            >
+              <FamilyEvacueeWizard />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/family/profile/:uuid/edit"
+        element={
+          <ProtectedRoute>
+            <Suspense
+              fallback={
+                <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+                  Loading…
+                </div>
+              }
+            >
+              <FamilyEvacueeWizard />
             </Suspense>
           </ProtectedRoute>
         }
