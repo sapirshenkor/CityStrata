@@ -40,6 +40,7 @@ export default function UserBar() {
   }
 
   const label = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email
+  const isVisitor = user.role === 'visitor'
 
   return (
     <div className="flex max-w-[22rem] flex-wrap items-center gap-2">
@@ -62,7 +63,9 @@ export default function UserBar() {
         size="sm"
         className="h-8 rounded-full border border-white/40 bg-transparent text-white hover:bg-white/15"
       >
-        <Link to="/municipality">Dashboard</Link>
+        <Link to={isVisitor ? '/family' : '/municipality'}>
+          {isVisitor ? 'Family' : 'Dashboard'}
+        </Link>
       </Button>
       <Button
         type="button"

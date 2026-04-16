@@ -179,5 +179,19 @@ export const getMatchingResultForCommunity = (communityId) => {
   return api.get(`/api/matching/result/community/${communityId}`)
 }
 
+// Family portal (JWT required; scoped to current user)
+export const getFamilyDashboard = () => api.get('/api/family/me/dashboard')
+
+export const getFamilyProfiles = () => api.get('/api/family/me/profiles')
+
+export const getFamilyProfile = (profileUuid) =>
+  api.get(`/api/family/me/profiles/${profileUuid}`)
+
+export const createFamilyProfile = (payload) =>
+  api.post('/api/family/me/profiles', payload)
+
+export const updateFamilyProfile = (profileUuid, payload) =>
+  api.patch(`/api/family/me/profiles/${profileUuid}`, payload)
+
 export default api
 

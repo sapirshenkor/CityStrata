@@ -82,7 +82,7 @@ async def signup(body: SignupRequest):
                     id, email, first_name, last_name, phone_number,
                     semel_yish, department, role
                 )
-                VALUES ($1, $2, $3, $4, $5, 2600, $6, 'editor')
+                VALUES ($1, $2, $3, $4, $5, 2600, $6, 'visitor')
                 """,
                 UUID(str(uid)),
                 str(body.email),
