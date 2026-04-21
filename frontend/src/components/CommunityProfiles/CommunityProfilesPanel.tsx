@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, type MouseEvent } from 'react'
+import type { AxiosResponse } from 'axios'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   communityProfilesKeys,
@@ -13,22 +14,28 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import '../Recommendations/RecommendationsPanel.css'
 
-function pid(id) {
+function pid(id: unknown) {
   return id != null ? String(id) : ''
 }
 
-function labelCommunityType(value) {
-  return COMMUNITY_TYPES.find((o) => o.value === value)?.label ?? value ?? '—'
+function labelCommunityType(value: unknown): string {
+  const label = COMMUNITY_TYPES.find((o) => o.value === value)?.label
+  if (label != null) return label
+  if (value == null || value === '') return '—'
+  return String(value)
 }
 
-function labelHousing(value) {
-  return HOUSING_PREFERENCES.find((o) => o.value === value)?.label ?? value ?? '—'
+function labelHousing(value: unknown): string {
+  const label = HOUSING_PREFERENCES.find((o) => o.value === value)?.label
+  if (label != null) return label
+  if (value == null || value === '') return '—'
+  return String(value)
 }
 
-function formatWhen(iso) {
+function formatWhen(iso: unknown) {
   if (!iso) return '—'
   try {
-    return new Date(iso).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })
+    return new Date(iso as string).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })
   } catch {
     return String(iso)
   }
@@ -38,13 +45,18 @@ const CONFIDENCE_LABELS = {
   high: { label: 'גבוהה' },
   medium: { label: 'בינונית' },
   low: { label: 'נמוכה' },
-}
+} as const
 
-function ConfidenceBadge({ value }) {
+type ConfidenceKey = keyof typeof CONFIDENCE_LABELS
+
+function ConfidenceBadge({ value }: { value?: string | null }) {
   const v = value?.toLowerCase()
   const variant =
     v === 'high' ? 'success' : v === 'medium' ? 'warning' : v === 'low' ? 'secondary' : 'outline'
-  const label = CONFIDENCE_LABELS[v]?.label ?? value ?? '—'
+  const label =
+    v && v in CONFIDENCE_LABELS
+      ? CONFIDENCE_LABELS[v as ConfidenceKey].label
+      : (value ?? '—')
   return (
     <Badge variant={variant} className="shrink-0">
       {label}
@@ -52,7 +64,18 @@ function ConfidenceBadge({ value }) {
   )
 }
 
-function CommunityMatchingBlock({ data }) {
+interface CommunityMatchingDetail {
+  created_at?: string
+  recommended_cluster_number?: number | null
+  recommended_cluster?: string
+  confidence?: string
+  reasoning?: string
+  alternative_cluster?: string
+  alternative_reasoning?: string
+  flags?: string[]
+}
+
+function CommunityMatchingBlock({ data }: { data: CommunityMatchingDetail | null }) {
   if (!data) return null
   const created = data.created_at
     ? new Date(data.created_at).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })
@@ -81,7 +104,7 @@ function CommunityMatchingBlock({ data }) {
         <span className="rec-matching-value">{data.alternative_cluster}</span>
       </div>
       <p className="rec-matching-reasoning rec-matching-reasoning--alt">{data.alternative_reasoning}</p>
-      {data.flags?.length > 0 && (
+      {data.flags && data.flags.length > 0 && (
         <div className="rec-matching-flags">
           <span className="rec-matching-label">דגלים</span>
           <ul>
@@ -95,25 +118,53 @@ function CommunityMatchingBlock({ data }) {
   )
 }
 
+/** Row shape from GET community profiles (used in list + detail). */
+export interface CommunityProfileRow {
+  id: unknown
+  community_name?: string | null
+  leader_name?: string | null
+  contact_email?: string | null
+  contact_phone?: string | null
+  community_type?: string | null
+  total_people?: number | null
+  selected_matching_result_id?: string | number | null
+  total_families?: number | null
+  infants?: number | null
+  preschool?: number | null
+  elementary?: number | null
+  youth?: number | null
+  adults?: number | null
+  seniors?: number | null
+  cohesion_importance?: number | null
+  housing_preference?: string | null
+  needs_synagogue?: boolean
+  needs_community_center?: boolean
+  needs_education_institution?: boolean
+  infrastructure_notes?: string | null
+  created_at?: string | null
+}
+
 /**
  * Sidebar tab: browse saved community_profiles (same list + detail pattern as Recommendations).
  */
 export default function CommunityProfilesPanel() {
   const queryClient = useQueryClient()
   const {
-    data: list = [],
+    data: rawList = [],
     isLoading: loading,
     error: queryError,
     refetch,
   } = useCommunityProfilesQuery()
 
+  const list = rawList as CommunityProfileRow[]
+
   const loadError = queryError ? String(queryError.message) : null
-  const [selected, setSelected] = useState(null)
+  const [selected, setSelected] = useState<CommunityProfileRow | null>(null)
   const [search, setSearch] = useState('')
-  const [matchingDetail, setMatchingDetail] = useState(null)
+  const [matchingDetail, setMatchingDetail] = useState<CommunityMatchingDetail | null>(null)
   const [matchingLoading, setMatchingLoading] = useState(false)
-  const [matchingBusy, setMatchingBusy] = useState(null)
-  const [actionError, setActionError] = useState(null)
+  const [matchingBusy, setMatchingBusy] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -137,7 +188,7 @@ export default function CommunityProfilesPanel() {
     await refetch()
   }
 
-  const handleRowClick = (row) => {
+  const handleRowClick = (row: CommunityProfileRow) => {
     if (selected && pid(selected.id) === pid(row.id)) {
       setSelected(null)
       setMatchingDetail(null)
@@ -157,8 +208,8 @@ export default function CommunityProfilesPanel() {
     let cancelled = false
     setMatchingLoading(true)
     getMatchingResultForCommunity(selected.id)
-      .then((res) => {
-        if (!cancelled) setMatchingDetail(res.data)
+      .then((res: AxiosResponse<unknown>) => {
+        if (!cancelled) setMatchingDetail(res.data as CommunityMatchingDetail)
       })
       .catch(() => {
         if (!cancelled) setMatchingDetail(null)
@@ -171,7 +222,7 @@ export default function CommunityProfilesPanel() {
     }
   }, [selected])
 
-  const handleRunMatching = async (e, row) => {
+  const handleRunMatching = async (e: MouseEvent, row: CommunityProfileRow) => {
     e.stopPropagation()
     setActionError(null)
     const key = pid(row.id)
@@ -180,19 +231,20 @@ export default function CommunityProfilesPanel() {
       await runMatchingForCommunityProfile(row.id)
       await queryClient.invalidateQueries({ queryKey: communityProfilesKeys.list() })
       const { data: freshList } = await refetch()
-      const listArr = freshList ?? []
+      const listArr = (freshList ?? []) as CommunityProfileRow[]
       const updated = listArr.find((r) => pid(r.id) === key)
       if (updated) {
         setSelected(updated)
         try {
           const m = await getMatchingResultForCommunity(updated.id)
-          setMatchingDetail(m.data)
+          setMatchingDetail(m.data as CommunityMatchingDetail)
         } catch {
           setMatchingDetail(null)
         }
       }
-    } catch (err) {
-      setActionError(err.response?.data?.detail ?? err.message ?? 'שגיאה')
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { detail?: string } }; message?: string }
+      setActionError(ax.response?.data?.detail ?? ax.message ?? 'שגיאה')
     } finally {
       setMatchingBusy(null)
     }
@@ -302,7 +354,9 @@ export default function CommunityProfilesPanel() {
                               <span className="rec-match-pill rec-match-pill--muted">ללא התאמת אשכול</span>
                             )}
                             <span className="rec-match-pill">{labelCommunityType(row.community_type)}</span>
-                            <span className="rec-zone-count">{row.total_people} נפשות</span>
+                            <span className="rec-zone-count">
+                              {row.total_people != null ? row.total_people : '—'} נפשות
+                            </span>
                           </div>
                         </div>
                         <div className="rec-item-actions">
@@ -416,7 +470,17 @@ export default function CommunityProfilesPanel() {
   )
 }
 
-function DetailRow({ label, value, mono, multiline }) {
+function DetailRow({
+  label,
+  value,
+  mono,
+  multiline,
+}: {
+  label: string
+  value: unknown
+  mono?: boolean
+  multiline?: boolean
+}) {
   const v = value == null || value === '' ? '—' : String(value)
   return (
     <div className="cp-detail-row">

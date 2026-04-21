@@ -46,7 +46,7 @@ export function Sidebar({
       </div>
 
       <nav className="dashboard-app__sidebar-nav flex flex-col gap-1 p-3">
-        <Link to="/" className="dashboard-app__nav-link">
+        <Link to="/map" className="dashboard-app__nav-link">
           <Home className="h-4 w-4 shrink-0" />
           Main map
         </Link>
