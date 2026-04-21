@@ -21,7 +21,7 @@ export default function LoginPage() {
   const { login, user, loading } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/'
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/map'
 
   useEffect(() => {
     if (!loading && user) {

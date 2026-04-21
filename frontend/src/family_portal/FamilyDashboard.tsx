@@ -11,7 +11,11 @@ import {
   runMatchingForProfile,
   runTacticalForProfile,
 } from '../services/api'
-import { ConfidenceBadge, MatchingResultBlock } from '../components/Recommendations/MatchingResultBlock'
+import {
+  ConfidenceBadge,
+  MatchingResultBlock,
+  type MatchingData,
+} from '../components/Recommendations/MatchingResultBlock'
 import '../components/Recommendations/RecommendationsPanel.css'
 import { useFamilyDashboard } from './hooks/useFamilyQueries'
 import { familyKeys } from './queryKeys'
@@ -21,12 +25,12 @@ function pid(u: string | null | undefined) {
   return u != null ? String(u) : ''
 }
 
-/** Dashboard payload from GET /api/family/me/dashboard */
-interface FamilyProfileRow {
-  uuid: string
-  family_name: string
-  created_at?: string
-  selected_matching_result_id?: string | null
+/** GET /api/recommendations/by-profile/{uuid} tactical row */
+interface TacticalRecData {
+  profile_uuid?: string
+  confidence?: string | null
+  radii_data?: Array<{ hub_label?: string; radius_m?: number }>
+  agent_output?: string
 }
 
 export default function FamilyDashboard() {
@@ -38,21 +42,22 @@ export default function FamilyDashboard() {
   const [tacticalBusy, setTacticalBusy] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const profiles = (data?.profiles ?? []) as FamilyProfileRow[]
+  const profiles = data?.profiles ?? []
   const expanded = profiles.find((p) => p.uuid === intelUuid)
 
   const { data: matchingDetail, isLoading: loadingMatching } = useQuery({
     queryKey: ['family', 'intel', 'matching', intelUuid],
-    queryFn: () => getMatchingResultForProfile(intelUuid!).then((r) => r.data),
+    queryFn: () =>
+      getMatchingResultForProfile(intelUuid!).then((r) => r.data as MatchingData),
     enabled: Boolean(intelUuid && expanded?.selected_matching_result_id),
   })
 
   const { data: tacticalRec, isLoading: loadingTactical } = useQuery({
     queryKey: ['family', 'intel', 'tactical', intelUuid],
-    queryFn: async () => {
+    queryFn: async (): Promise<TacticalRecData | null> => {
       try {
         const r = await getRecommendationByProfile(intelUuid!)
-        return r.data
+        return r.data as TacticalRecData
       } catch (e: unknown) {
         const status =
           typeof e === 'object' && e !== null && 'response' in e
@@ -134,16 +139,14 @@ export default function FamilyDashboard() {
           Try again
         </Button>
         <Button asChild variant="ghost" size="sm">
-          <Link to="/">Back to map</Link>
+          <Link to="/map">Back to map</Link>
         </Button>
       </div>
     )
   }
 
   const user = data?.user
-  const summary = data?.summary as
-    | { profile_count: number; profiles_with_matching_count: number }
-    | undefined
+  const summary = data?.summary
 
   const profileCount = summary?.profile_count ?? profiles.length
   const withMatching = summary?.profiles_with_matching_count ?? 0
@@ -164,7 +167,7 @@ export default function FamilyDashboard() {
             size="sm"
             className="h-9 shrink-0 border border-white/40 bg-white/10 text-white hover:bg-white/20"
           >
-            <Link to="/" className="inline-flex items-center gap-2">
+            <Link to="/map" className="inline-flex items-center gap-2">
               <ArrowLeft className="h-4 w-4" aria-hidden />
               חזרה למפה
             </Link>
@@ -205,7 +208,7 @@ export default function FamilyDashboard() {
 
               <ul className="space-y-2 rounded-lg border border-[#e9ecef] bg-white/80 px-3 py-2">
                 <li>
-                  <span className="text-[#666]">מספר פרופילים משפחיים: </span>
+                  <span className="text-[#666]">מספר פרופילים משפחתיים: </span>
                   <strong>{profileCount}</strong>
                 </li>
                 <li>
@@ -333,9 +336,9 @@ export default function FamilyDashboard() {
                                   <h4 className="rec-tactical-title mb-0">דוח טקטי (אזורים ונרטיב)</h4>
                                   <ConfidenceBadge value={tacticalRec.confidence} />
                                 </div>
-                                {tacticalRec.radii_data?.length > 0 && (
+                                {(tacticalRec.radii_data?.length ?? 0) > 0 && (
                                   <div className="rec-zones-summary">
-                                    {tacticalRec.radii_data.map((z: { hub_label?: string; radius_m?: number }, i: number) => (
+                                    {(tacticalRec.radii_data ?? []).map((z, i) => (
                                       <span
                                         key={z.hub_label ?? i}
                                         className={`rec-zone-badge rec-zone-badge--${i % 3}`}
@@ -349,7 +352,7 @@ export default function FamilyDashboard() {
                                   </div>
                                 )}
                                 <div className="rec-markdown">
-                                  <ReactMarkdown>{tacticalRec.agent_output}</ReactMarkdown>
+                                  <ReactMarkdown>{tacticalRec.agent_output ?? ''}</ReactMarkdown>
                                 </div>
                               </>
                             )}

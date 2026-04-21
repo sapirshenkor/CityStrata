@@ -23,7 +23,7 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate('/', { replace: true })
+      navigate('/map', { replace: true })
     }
   }, [user, loading, navigate])
 
@@ -49,7 +49,7 @@ export default function SignupPage() {
         phone_number: phone.trim() || '',
         department: department.trim() || null,
       })
-      navigate('/', { replace: true })
+      navigate('/map', { replace: true })
     } catch (err) {
       setError(formatApiError(err))
     } finally {

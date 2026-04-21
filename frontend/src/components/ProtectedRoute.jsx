@@ -1,5 +1,5 @@
 /**
- * Wrap routes (or sections) that require sign-in. The public map stays at `/`.
+ * Wrap routes (or sections) that require sign-in. The public map is at `/map`.
  *
  * Example (future):
  *   <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />

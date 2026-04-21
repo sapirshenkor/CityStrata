@@ -33,3 +33,14 @@ export function getMatchingResultForProfile(profileUuid: string): Promise<ApiRes
 export function runMatchingForProfile(profileUuid: string): Promise<ApiRes>
 export function runTacticalForProfile(profileUuid: string): Promise<ApiRes>
 export function runCommunityTactical(familyUuids: string[]): Promise<ApiRes>
+
+export function getCommunityProfiles(): Promise<ApiRes>
+export function getCommunityProfile(communityId: unknown): Promise<ApiRes>
+export function runMatchingForCommunityProfile(communityId: unknown): Promise<ApiRes>
+export function getMatchingResultForCommunity(communityId: unknown): Promise<ApiRes>
+
+export function getFamilyDashboard(): Promise<ApiRes>
+export function getFamilyProfiles(): Promise<ApiRes>
+export function getFamilyProfile(profileUuid: string): Promise<ApiRes>
+export function createFamilyProfile(payload: unknown): Promise<ApiRes>
+export function updateFamilyProfile(profileUuid: string, payload: unknown): Promise<ApiRes>

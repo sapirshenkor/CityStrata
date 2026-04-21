@@ -1,16 +1,16 @@
 import { Badge } from '@/components/ui/badge'
 
-const CONFIDENCE_LABELS = {
+const CONFIDENCE_LABELS: Record<string, { label: string }> = {
   high: { label: 'High' },
   medium: { label: 'Medium' },
   low: { label: 'Low' },
 }
 
-export function ConfidenceBadge({ value }) {
+export function ConfidenceBadge({ value }: { value?: string | null }) {
   const v = value?.toLowerCase()
   const variant =
     v === 'high' ? 'success' : v === 'medium' ? 'warning' : v === 'low' ? 'secondary' : 'outline'
-  const label = CONFIDENCE_LABELS[v]?.label ?? value ?? '—'
+  const label = (v && CONFIDENCE_LABELS[v]?.label) ?? value ?? '—'
   return (
     <Badge variant={variant} className="shrink-0">
       {label}
@@ -18,7 +18,18 @@ export function ConfidenceBadge({ value }) {
   )
 }
 
-export function MatchingResultBlock({ data }) {
+export interface MatchingData {
+  created_at?: string
+  recommended_cluster_number?: number | null
+  recommended_cluster?: string
+  confidence?: string | null
+  reasoning?: string
+  alternative_cluster?: string
+  alternative_reasoning?: string
+  flags?: string[]
+}
+
+export function MatchingResultBlock({ data }: { data?: MatchingData | null }) {
   if (!data) return null
   const created = data.created_at
     ? new Date(data.created_at).toLocaleString(undefined, {
@@ -54,7 +65,7 @@ export function MatchingResultBlock({ data }) {
         <span className="rec-matching-value">{data.alternative_cluster}</span>
       </div>
       <p className="rec-matching-reasoning rec-matching-reasoning--alt">{data.alternative_reasoning}</p>
-      {data.flags?.length > 0 && (
+      {data.flags && data.flags.length > 0 && (
         <div className="rec-matching-flags">
           <span className="rec-matching-label">Flags</span>
           <ul>
