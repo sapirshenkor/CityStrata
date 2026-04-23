@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { PageHeader, PageShell } from '@/components/layout/PageShell'
 import { HotelForm } from './HotelForm'
 import { HotelsTable } from './HotelsTable'
 import { formValuesToCreatePayload } from './hotelFormSchema'
@@ -111,21 +112,17 @@ export default function HotelManagementPage() {
   const submitting = createMut.isPending || updateMut.isPending
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border/80 bg-card shadow-soft">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Building2 className="h-6 w-6" strokeWidth={1.75} />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">Hotel management</h1>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Add and maintain hotels for your municipality. Addresses are geocoded automatically.
-              </p>
-            </div>
+    <PageShell>
+      <PageHeader
+        title="Hotel management"
+        description="Add and maintain hotels for your municipality. Addresses are geocoded automatically."
+        leading={
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Building2 className="h-6 w-6" strokeWidth={1.75} />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+        }
+        actions={
+          <>
             <Button variant="outline" size="sm" className="rounded-lg" asChild>
               <Link to="/municipality" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
@@ -136,9 +133,9 @@ export default function HotelManagementPage() {
               <Plus className="h-4 w-4" />
               Add hotel
             </Button>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <main className="mx-auto max-w-5xl px-4 py-8">
         {bannerError ? (
@@ -203,6 +200,6 @@ export default function HotelManagementPage() {
           />
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   )
 }

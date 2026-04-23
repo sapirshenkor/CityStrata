@@ -38,7 +38,7 @@ export default function MapApp() {
   const [filters, setFilters] = useState<Record<string, unknown>>(defaultFilters)
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#f8f9fa]">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#f8f9fa] text-slate-900">
       <AppHeader>
         <UserBar />
       </AppHeader>
@@ -60,16 +60,18 @@ export default function MapApp() {
         <div className="relative min-h-0 min-w-0 flex-1">
           <div className="map-shell h-full w-full p-3">
             <div className="h-full w-full overflow-hidden rounded-lg border border-[#e0e0e0] bg-white shadow-md">
-              <LeafletMap
-                selectedArea={selectedArea}
-                onSelectArea={setSelectedArea}
-                areaFilter={null}
-                layerVisibility={layerVisibility}
-                filters={filters}
-                showClusters={layerVisibility.clusters}
-                clusterAssignments={clusterAssignments}
-                selectedRecommendation={selectedRecommendation}
-              />
+              <div dir="ltr" className="h-full w-full min-h-0">
+                <LeafletMap
+                  selectedArea={selectedArea}
+                  onSelectArea={setSelectedArea}
+                  areaFilter={null}
+                  layerVisibility={layerVisibility}
+                  filters={filters}
+                  showClusters={layerVisibility.clusters}
+                  clusterAssignments={clusterAssignments}
+                  selectedRecommendation={selectedRecommendation}
+                />
+              </div>
             </div>
           </div>
         </div>

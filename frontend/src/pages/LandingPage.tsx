@@ -21,7 +21,7 @@ import { Separator } from '@/components/ui/separator'
 
 export default function LandingPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#f8f9fa]">
+    <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-slate-900">
       <AppHeader>
         <UserBar />
       </AppHeader>
@@ -29,7 +29,7 @@ export default function LandingPage() {
       <main className="flex-1">
         <section className="border-b border-[#e0e0e0] bg-white px-4 py-12 sm:py-16">
           <div className="mx-auto max-w-3xl text-center">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
               CityStrata
             </h1>
             <p className="mt-3 text-base text-muted-foreground sm:text-lg">
@@ -37,7 +37,7 @@ export default function LandingPage() {
               profiles, and intelligent recommendations in one place.
             </p>
             <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
-              <Button asChild size="lg" className="bg-[#667eea] hover:bg-[#5568d3]">
+              <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <Link to="/map">Enter system</Link>
               </Button>
               <Button asChild variant="outline" size="lg">
@@ -52,7 +52,7 @@ export default function LandingPage() {
 
         <div className="mx-auto max-w-5xl space-y-14 px-4 py-12 sm:py-16">
           <section aria-labelledby="problem-heading">
-            <h2 id="problem-heading" className="text-xl font-semibold text-foreground">
+            <h2 id="problem-heading" className="text-xl font-semibold">
               Why CityStrata
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
@@ -66,7 +66,7 @@ export default function LandingPage() {
 
           <section aria-labelledby="capabilities-heading" className="space-y-6">
             <div>
-              <h2 id="capabilities-heading" className="text-xl font-semibold text-foreground">
+              <h2 id="capabilities-heading" className="text-xl font-semibold">
                 Capabilities
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -132,7 +132,7 @@ export default function LandingPage() {
           <Separator className="bg-[#e0e0e0]" />
 
           <section aria-labelledby="how-heading" className="space-y-6">
-            <h2 id="how-heading" className="text-xl font-semibold text-foreground">
+            <h2 id="how-heading" className="text-xl font-semibold">
               How it works
             </h2>
             <ol className="grid gap-4 md:grid-cols-3">
@@ -173,7 +173,7 @@ export default function LandingPage() {
 
           <section aria-labelledby="preview-heading" className="space-y-4">
             <div>
-              <h2 id="preview-heading" className="text-xl font-semibold text-foreground">
+              <h2 id="preview-heading" className="text-xl font-semibold">
                 Preview
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -189,14 +189,14 @@ export default function LandingPage() {
                   <div className="absolute inset-0 bg-gradient-to-br from-[#e8eaf6] via-[#f8f9fa] to-[#ede7f6]" />
                   <div className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(90deg,hsl(var(--border))_1px,transparent_1px),linear-gradient(hsl(var(--border))_1px,transparent_1px)] [background-size:40px_40px]" />
                   <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2">
-                    <div className="rounded-full border-2 border-[#667eea]/50 bg-white p-3 shadow-md">
-                      <Map className="h-10 w-10 text-[#667eea]" />
+                    <div className="rounded-full border-2 border-primary/50 bg-white p-3 shadow-md">
+                      <Map className="h-10 w-10 text-primary" />
                     </div>
                     <span className="rounded-md border border-[#e0e0e0] bg-white/90 px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm">
                       Static preview
                     </span>
                   </div>
-                  <div className="absolute bottom-3 left-3 right-3 rounded-md border border-[#e0e0e0] bg-card/95 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
+                  <div className="absolute bottom-3 left-3 right-3 rounded-md border border-border/80 bg-card/95 px-3 py-2 text-xs text-slate-200 shadow-sm backdrop-blur-sm">
                     Full interactive map, clustering, and side panels are available after you open
                     the main map.
                   </div>
@@ -208,12 +208,12 @@ export default function LandingPage() {
           <Separator className="bg-[#e0e0e0]" />
 
           <section aria-labelledby="nav-heading" className="space-y-4">
-            <h2 id="nav-heading" className="text-xl font-semibold text-foreground">
+            <h2 id="nav-heading" className="text-xl font-semibold">
               Where to go next
             </h2>
             <Card className="border-[#e0e0e0] shadow-card">
               <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                <Button asChild variant="default" className="bg-[#667eea] hover:bg-[#5568d3]">
+                <Button asChild variant="default" className="bg-primary text-primary-foreground hover:bg-primary/90">
                   <Link to="/map" className="gap-2">
                     Open map
                     <ArrowRight className="h-4 w-4" aria-hidden />
@@ -239,7 +239,7 @@ export default function LandingPage() {
         <footer className="border-t border-[#e0e0e0] bg-white px-4 py-10">
           <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold text-foreground">CityStrata</p>
+              <p className="text-sm font-semibold">CityStrata</p>
               <p className="mt-1 text-xs text-muted-foreground">Eilat · evacuation mapping</p>
             </div>
             <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm">

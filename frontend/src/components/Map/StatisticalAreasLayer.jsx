@@ -1,13 +1,11 @@
-import { useMemo, useEffect, useRef } from 'react'
+import { useMemo, useEffect } from 'react'
 import { GeoJSON, useMap } from 'react-leaflet'
 import { useStatisticalAreas } from '../../hooks/useMapData'
 import { getAreaStyle, getClusterStyle } from '../../utils/colors'
-import L from 'leaflet'
 
 function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClusters, clusterAssignments }) {
   const { data, loading, error } = useStatisticalAreas()
   const map = useMap()
-  const labelsRef = useRef(new Map()) // Track added labels to avoid duplicates
 
   const statToCluster = useMemo(() => {
     if (!clusterAssignments || !Array.isArray(clusterAssignments)) return null
@@ -73,42 +71,7 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClu
 
   const onEachFeature = (feature, layer) => {
     const stat2022 = Number(feature.properties.stat_2022)
-    
-    // Add label at centroid (only once per area)
-    if (!labelsRef.current.has(stat2022)) {
-      if (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
-        const coords = feature.geometry.type === 'Polygon' 
-          ? feature.geometry.coordinates[0]
-          : feature.geometry.coordinates[0][0]
-        
-        // Calculate centroid (simplified)
-        let sumLat = 0
-        let sumLon = 0
-        let count = 0
-        
-        coords.forEach(coord => {
-          sumLon += coord[0]
-          sumLat += coord[1]
-          count++
-        })
-        
-        const centerLat = sumLat / count
-        const centerLon = sumLon / count
-        
-        const marker = L.marker([centerLat, centerLon], {
-          icon: L.divIcon({
-            className: 'area-label',
-            html: `<div class="area-label-text">${stat2022}</div>`,
-            iconSize: [30, 20],
-          }),
-          interactive: false,
-        })
-        
-        marker.addTo(map)
-        labelsRef.current.set(stat2022, marker)
-      }
-    }
-    
+
     // Click handler
     layer.on({
       click: () => {
@@ -133,16 +96,6 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClu
       direction: 'center',
     })
   }
-
-  // Clean up labels when component unmounts or areaFilter changes
-  useEffect(() => {
-    return () => {
-      labelsRef.current.forEach((marker) => {
-        map.removeLayer(marker)
-      })
-      labelsRef.current.clear()
-    }
-  }, [map, areaFilter])
 
   if (loading) return null
   if (error) return null

@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    /* Aligned with main map / municipality dashboard (purple SaaS) */
-    --background: 210 20% 97%;
-    --foreground: 216 19% 20%;
-    --card: 0 0% 100%;
-    --card-foreground: 216 19% 20%;
-    --muted: 210 17% 96%;
-    --muted-foreground: 215 16% 42%;
-    --border: 0 0% 88%;
-    --input: 214 20% 90%;
-    --primary: 237 91% 66%;
+    /* Dark-first + blue primary (.cursorrules); no purple */
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 14%;
+    --card-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --border: 215 25% 27%;
+    --input: 215 25% 27%;
+    --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 17% 96%;
-    --secondary-foreground: 216 19% 20%;
-    --accent: 237 91% 96%;
-    --accent-foreground: 237 50% 42%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --accent: 217 33% 20%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --ring: 237 91% 66%;
-    --radius: 0.5rem;
+    --ring: 221 83% 53%;
+    --radius: 0.75rem;
   }
 }
 

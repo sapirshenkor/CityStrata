@@ -31,7 +31,7 @@ export default function UserBar() {
         <Button
           asChild
           size="sm"
-          className="h-8 rounded-full bg-white text-[#667eea] hover:bg-white/90"
+          className="h-8 rounded-full bg-white text-primary hover:bg-white/90"
         >
           <Link to="/signup">Sign up</Link>
         </Button>
