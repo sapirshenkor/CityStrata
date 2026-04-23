@@ -26,7 +26,7 @@ export default function LandingPage() {
         <UserBar />
       </AppHeader>
 
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <section className="border-b border-[#e0e0e0] bg-white px-4 py-12 sm:py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -36,7 +36,11 @@ export default function LandingPage() {
               Geospatial evacuation support for Eilat — map-based situational awareness, family
               profiles, and intelligent recommendations in one place.
             </p>
-            <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
+            <div
+              className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center"
+              role="group"
+              aria-label="Primary actions"
+            >
               <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <Link to="/map">Enter system</Link>
               </Button>
@@ -242,7 +246,7 @@ export default function LandingPage() {
               <p className="text-sm font-semibold">CityStrata</p>
               <p className="mt-1 text-xs text-muted-foreground">Eilat · evacuation mapping</p>
             </div>
-            <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm" aria-label="Footer links">
               <Link to="/map" className="text-primary hover:underline">
                 Map
               </Link>

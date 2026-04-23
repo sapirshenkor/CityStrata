@@ -4,7 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from gotrue.errors import AuthApiError
+from supabase_auth.errors import AuthApiError
 from app.core.database import get_pool
 from app.core.supabase import get_supabase_anon, get_supabase_service
 from app.core.auth import get_current_user

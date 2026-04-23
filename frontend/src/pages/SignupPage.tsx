@@ -1,25 +1,20 @@
 import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-
-function formatApiError(err: unknown): string {
-  const e = err as { response?: { data?: { detail?: unknown } }; message?: string }
-  const d = e.response?.data?.detail
-  if (d == null) return e.message || 'Something went wrong'
-  if (typeof d === 'string') return d
-  if (Array.isArray(d)) {
-    return d.map((x) => (typeof x === 'string' ? x : (x as { msg?: string }).msg || JSON.stringify(x))).join(' ')
-  }
-  return String(d)
-}
+import { formatApiError } from '@/lib/formatApiError'
+import { signupFormSchema, toSignupPayload, type SignupFormValues } from '@/lib/authFormSchemas'
 
 export default function SignupPage() {
   const { signup, user, loading } = useAuth()
   const navigate = useNavigate()
+
+  const [serverError, setServerError] = useState('')
 
   useEffect(() => {
     if (!loading && user) {
@@ -27,33 +22,28 @@ export default function SignupPage() {
     }
   }, [user, loading, navigate])
 
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [department, setDepartment] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignupFormValues>({
+    resolver: zodResolver(signupFormSchema),
+    defaultValues: {
+      first_name: '',
+      last_name: '',
+      email: '',
+      phone: '',
+      department: '',
+      password: '',
+    },
+  })
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setSubmitting(true)
+  const onValid = async (values: SignupFormValues) => {
+    setServerError('')
     try {
-      await signup({
-        email: email.trim(),
-        password,
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        phone_number: phone.trim() || '',
-        department: department.trim() || null,
-      })
-      navigate('/map', { replace: true })
+      await signup(toSignupPayload(values))
     } catch (err) {
-      setError(formatApiError(err))
-    } finally {
-      setSubmitting(false)
+      setServerError(formatApiError(err))
     }
   }
 
@@ -70,10 +60,18 @@ export default function SignupPage() {
           </span>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            {error ? (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
+          <form
+            className="space-y-4"
+            onSubmit={handleSubmit(onValid)}
+            noValidate
+            aria-label="Create account"
+          >
+            {serverError ? (
+              <div
+                className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                role="alert"
+              >
+                {serverError}
               </div>
             ) : null}
 
@@ -83,20 +81,30 @@ export default function SignupPage() {
                 <Input
                   id="su-first"
                   autoComplete="given-name"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
+                  aria-invalid={errors.first_name ? 'true' : 'false'}
+                  aria-describedby={errors.first_name ? 'su-first-error' : undefined}
+                  {...register('first_name')}
                 />
+                {errors.first_name ? (
+                  <p id="su-first-error" className="text-sm text-destructive" role="alert">
+                    {errors.first_name.message}
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="su-last">Last name</Label>
                 <Input
                   id="su-last"
                   autoComplete="family-name"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
+                  aria-invalid={errors.last_name ? 'true' : 'false'}
+                  aria-describedby={errors.last_name ? 'su-last-error' : undefined}
+                  {...register('last_name')}
                 />
+                {errors.last_name ? (
+                  <p id="su-last-error" className="text-sm text-destructive" role="alert">
+                    {errors.last_name.message}
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -106,10 +114,15 @@ export default function SignupPage() {
                 id="su-email"
                 type="email"
                 autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                aria-invalid={errors.email ? 'true' : 'false'}
+                aria-describedby={errors.email ? 'su-email-error' : undefined}
+                {...register('email')}
               />
+              {errors.email ? (
+                <p id="su-email-error" className="text-sm text-destructive" role="alert">
+                  {errors.email.message}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -118,20 +131,14 @@ export default function SignupPage() {
                 id="su-phone"
                 type="tel"
                 autoComplete="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
                 placeholder="Optional"
+                {...register('phone')}
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="su-dept">Department</Label>
-              <Input
-                id="su-dept"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                placeholder="Optional"
-              />
+              <Input id="su-dept" placeholder="Optional" {...register('department')} />
             </div>
 
             <div className="space-y-2">
@@ -140,20 +147,24 @@ export default function SignupPage() {
                 id="su-pass"
                 type="password"
                 autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
                 placeholder="At least 8 characters"
+                aria-invalid={errors.password ? 'true' : 'false'}
+                aria-describedby={errors.password ? 'su-pass-error' : undefined}
+                {...register('password')}
               />
+              {errors.password ? (
+                <p id="su-pass-error" className="text-sm text-destructive" role="alert">
+                  {errors.password.message}
+                </p>
+              ) : null}
             </div>
 
             <Button
               type="submit"
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-              disabled={submitting}
+              disabled={isSubmitting}
             >
-              {submitting ? 'Creating account…' : 'Create account'}
+              {isSubmitting ? 'Creating account…' : 'Create account'}
             </Button>
           </form>
 

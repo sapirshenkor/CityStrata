@@ -1,21 +1,14 @@
 import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-
-function formatApiError(err: unknown): string {
-  const e = err as { response?: { data?: { detail?: unknown } }; message?: string }
-  const d = e.response?.data?.detail
-  if (d == null) return e.message || 'Something went wrong'
-  if (typeof d === 'string') return d
-  if (Array.isArray(d)) {
-    return d.map((x) => (typeof x === 'string' ? x : (x as { msg?: string }).msg || JSON.stringify(x))).join(' ')
-  }
-  return String(d)
-}
+import { formatApiError } from '@/lib/formatApiError'
+import { loginFormSchema, type LoginFormValues } from '@/lib/authFormSchemas'
 
 export default function LoginPage() {
   const { login, user, loading } = useAuth()
@@ -23,28 +16,29 @@ export default function LoginPage() {
   const location = useLocation()
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/map'
 
+  const [serverError, setServerError] = useState('')
+
   useEffect(() => {
     if (!loading && user) {
       navigate(from, { replace: true })
     }
   }, [user, loading, navigate, from])
 
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginFormSchema),
+    defaultValues: { email: '', password: '' },
+  })
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setSubmitting(true)
+  const onValid = async (data: LoginFormValues) => {
+    setServerError('')
     try {
-      await login(email.trim(), password)
-      navigate(from, { replace: true })
+      await login(data.email, data.password)
     } catch (err) {
-      setError(formatApiError(err))
-    } finally {
-      setSubmitting(false)
+      setServerError(formatApiError(err))
     }
   }
 
@@ -61,10 +55,18 @@ export default function LoginPage() {
           </span>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            {error ? (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
+          <form
+            className="space-y-4"
+            onSubmit={handleSubmit(onValid)}
+            noValidate
+            aria-label="Sign in"
+          >
+            {serverError ? (
+              <div
+                className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                role="alert"
+              >
+                {serverError}
               </div>
             ) : null}
 
@@ -74,11 +76,16 @@ export default function LoginPage() {
                 id="login-email"
                 type="email"
                 autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@municipality.gov.il"
-                required
+                aria-invalid={errors.email ? 'true' : 'false'}
+                aria-describedby={errors.email ? 'login-email-error' : undefined}
+                {...register('email')}
               />
+              {errors.email ? (
+                <p id="login-email-error" className="text-sm text-destructive" role="alert">
+                  {errors.email.message}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -87,20 +94,24 @@ export default function LoginPage() {
                 id="login-password"
                 type="password"
                 autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                required
-                minLength={8}
+                aria-invalid={errors.password ? 'true' : 'false'}
+                aria-describedby={errors.password ? 'login-password-error' : undefined}
+                {...register('password')}
               />
+              {errors.password ? (
+                <p id="login-password-error" className="text-sm text-destructive" role="alert">
+                  {errors.password.message}
+                </p>
+              ) : null}
             </div>
 
             <Button
               type="submit"
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-              disabled={submitting}
+              disabled={isSubmitting}
             >
-              {submitting ? 'Signing in…' : 'Sign in'}
+              {isSubmitting ? 'Signing in…' : 'Sign in'}
             </Button>
           </form>
 
