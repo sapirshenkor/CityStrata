@@ -23,12 +23,12 @@ export function StatsCard({
   return (
     <Card
       className={cn(
-        'overflow-hidden border-[#e0e0e0] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]',
+        'overflow-hidden rounded-xl border-border/80 bg-card shadow-card',
         className,
       )}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xs font-medium text-[#666]">{title}</CardTitle>
+        <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
         <div className="dashboard-app__kpi-icon p-2">
           <Icon className="h-4 w-4" strokeWidth={1.75} />
         </div>
@@ -37,10 +37,10 @@ export function StatsCard({
         {loading ? (
           <Skeleton className="dashboard-app__skeleton mb-1 h-8 w-24 rounded-md" />
         ) : (
-          <p className="text-2xl font-semibold tracking-tight text-[#333]">{value}</p>
+          <p className="text-2xl font-semibold tracking-tight text-card-foreground">{value}</p>
         )}
         {description != null && description !== '' && (
-          <p className="mt-1 text-xs text-[#666]">{description}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         )}
       </CardContent>
     </Card>

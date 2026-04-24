@@ -17,13 +17,27 @@ export interface PageHeaderProps {
   actions?: ReactNode
   leading?: ReactNode
   className?: string
+  /** Width constraint for inner content (e.g. `max-w-6xl` for wide tables). */
+  containerClassName?: string
 }
 
 /** Page title row: optional leading icon, title + subtitle, actions (RTL-aware via document dir). */
-export function PageHeader({ title, description, actions, leading, className }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  actions,
+  leading,
+  className,
+  containerClassName,
+}: PageHeaderProps) {
   return (
     <header className={cn('border-b border-border/80 bg-card shadow-soft', className)}>
-      <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className={cn(
+          'mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between',
+          containerClassName,
+        )}
+      >
         <div className="flex items-start gap-3">
           {leading}
           <div>

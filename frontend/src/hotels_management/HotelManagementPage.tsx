@@ -17,24 +17,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ApiErrorBanner } from '@/components/layout/ApiErrorBanner'
 import { PageHeader, PageShell } from '@/components/layout/PageShell'
+import { formatQueryError } from '@/lib/formatQueryError'
 import { HotelForm } from './HotelForm'
 import { HotelsTable } from './HotelsTable'
 import { formValuesToCreatePayload } from './hotelFormSchema'
 import { createHotel, deleteHotel, fetchHotels, updateHotel } from './hotelsApi'
 import { hotelManagementKeys } from './queryKeys'
 import type { HotelCreateInput, HotelRow, HotelUpdateInput } from './types'
-
-function apiErrorMessage(err: unknown): string {
-  if (err && typeof err === 'object' && 'response' in err) {
-    const r = err as { response?: { data?: { detail?: unknown } } }
-    const d = r.response?.data?.detail
-    if (typeof d === 'string') return d
-    if (Array.isArray(d)) return d.map((x) => JSON.stringify(x)).join(', ')
-  }
-  if (err instanceof Error) return err.message
-  return 'Something went wrong'
-}
 
 export default function HotelManagementPage() {
   const queryClient = useQueryClient()
@@ -59,7 +50,7 @@ export default function HotelManagementPage() {
       setEditing(null)
       await invalidateList()
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const updateMut = useMutation({
@@ -71,7 +62,7 @@ export default function HotelManagementPage() {
       setEditing(null)
       await invalidateList()
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const deleteMut = useMutation({
@@ -80,7 +71,7 @@ export default function HotelManagementPage() {
       setBannerError(null)
       await invalidateList()
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const openCreate = () => {
@@ -138,19 +129,14 @@ export default function HotelManagementPage() {
       />
 
       <main className="mx-auto max-w-5xl px-4 py-8">
-        {bannerError ? (
-          <div
-            className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-            role="alert"
-          >
-            {bannerError}
-          </div>
-        ) : null}
+        {bannerError ? <ApiErrorBanner message={bannerError} className="mb-6" /> : null}
 
         {listQuery.isError ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {apiErrorMessage(listQuery.error)}
-          </div>
+          <ApiErrorBanner
+            message={formatQueryError(listQuery.error)}
+            onRetry={() => void listQuery.refetch()}
+            className="mb-6"
+          />
         ) : (
           <Card className="rounded-2xl border-border/80 shadow-card">
             <CardHeader className="pb-2">
