@@ -232,7 +232,7 @@ export default function FamilyEvacueeWizard() {
     return (
       <div className="dashboard-app flex min-h-screen flex-col items-center justify-center">
         <div
-          className="h-9 w-9 animate-spin rounded-full border-2 border-[#667eea] border-t-transparent"
+          className="h-9 w-9 animate-spin rounded-full border-2 border-primary border-t-transparent"
           aria-hidden
         />
         <p className="mt-3 text-sm text-muted-foreground">Loading profile…</p>
@@ -269,13 +269,13 @@ export default function FamilyEvacueeWizard() {
         </Button>
       </header>
 
-      <div className="mx-auto max-w-[720px] p-4 pb-10">
-        <Card className="border-[#e0e0e0] shadow-md">
+      <div className="mx-auto max-w-[720px] min-w-0 p-4 pb-10">
+        <Card className="border-border bg-card shadow-md">
           <CardHeader className="space-y-4 pb-4">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
               <div>
-                <div className="text-lg font-bold text-[#333]">{current.title}</div>
-                <div className="mt-1 text-xs font-medium text-[#666]">
+                <div className="text-lg font-bold text-foreground">{current.title}</div>
+                <div className="mt-1 text-xs font-medium text-muted-foreground">
                   שלב {stepIdx + 1} מתוך {steps.length}
                   {isEdit ? ' · עריכה' : ' · יצירה'}
                 </div>
@@ -284,7 +284,7 @@ export default function FamilyEvacueeWizard() {
                 {steps.map((s, idx) => (
                   <div
                     key={s.key}
-                    className={`h-1.5 w-7 rounded-full ${idx === stepIdx ? 'bg-[#667eea]' : 'bg-[#e9ecef]'}`}
+                    className={`h-1.5 w-7 rounded-full ${idx === stepIdx ? 'bg-primary' : 'bg-muted'}`}
                   />
                 ))}
               </div>
@@ -308,7 +308,7 @@ export default function FamilyEvacueeWizard() {
               <CurrentComponent data={data} onChange={setField} errors={flatErrors} />
             </CardContent>
 
-            <CardFooter className="flex flex-wrap justify-end gap-2 border-t border-[#e9ecef] pt-4">
+            <CardFooter className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -319,18 +319,13 @@ export default function FamilyEvacueeWizard() {
               </Button>
 
               {!isLast ? (
-                <Button
-                  type="button"
-                  className="bg-[#667eea] hover:bg-[#5568d3]"
-                  onClick={() => void goNext()}
-                  disabled={submitting}
-                >
+                <Button type="button" onClick={() => void goNext()} disabled={submitting}>
                   הבא
                 </Button>
               ) : (
                 <Button
                   type="button"
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-emerald-600 text-white hover:bg-emerald-700"
                   disabled={submitting}
                   onClick={() => void handleSubmit(onSubmit)()}
                 >

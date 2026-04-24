@@ -84,3 +84,141 @@
 .dashboard-app__skeleton {
   background: hsl(var(--muted)) !important;
 }
+
+/* Family portal: embed `rec-*` intel UI (CSS from RecommendationsPanel.css) without editing that */
+/* file (Phase F). Only routes that add `family-portal` to `.dashboard-app` get this theme. */
+.dashboard-app.family-portal {
+  --rec-bg: hsl(222 47% 11%);
+  --rec-surface: hsl(222 47% 14%);
+  --rec-border: hsl(215 25% 27%);
+  --rec-border-strong: hsl(221 83% 53% / 0.5);
+  --rec-text: hsl(210 40% 98%);
+  --rec-text-muted: hsl(215 20% 65%);
+  --rec-accent: hsl(221 83% 53%);
+  --rec-accent-soft: hsl(221 83% 53% / 0.15);
+  --rec-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --rec-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.dashboard-app.family-portal .rec-action-btn:hover:not(:disabled) {
+  background: hsl(var(--muted) / 0.6);
+  color: hsl(var(--foreground));
+}
+
+.dashboard-app.family-portal .rec-action-btn--match {
+  border-color: hsl(221 83% 53% / 0.5);
+  color: hsl(221 83% 85%);
+  background: hsl(221 83% 53% / 0.12);
+}
+
+.dashboard-app.family-portal .rec-action-btn--match:hover:not(:disabled) {
+  background: hsl(221 83% 53% / 0.22);
+}
+
+.dashboard-app.family-portal .rec-action-btn--tactical {
+  border-color: hsl(142 71% 40% / 0.5);
+  color: hsl(142 69% 75%);
+  background: hsl(142 50% 20% / 0.4);
+}
+
+.dashboard-app.family-portal .rec-action-btn--tactical:hover:not(:disabled) {
+  background: hsl(142 50% 30% / 0.5);
+}
+
+.dashboard-app.family-portal .rec-matching-section {
+  background: hsl(222 47% 12%);
+  color: hsl(var(--foreground));
+}
+
+.dashboard-app.family-portal .rec-matching-title {
+  color: hsl(215 20% 82%);
+}
+
+.dashboard-app.family-portal .rec-matching-meta,
+.dashboard-app.family-portal .rec-matching-label,
+.dashboard-app.family-portal .rec-matching-reasoning--alt,
+.dashboard-app.family-portal .rec-matching-flags,
+.dashboard-app.family-portal .rec-matching-flags li {
+  color: hsl(var(--muted-foreground));
+}
+
+.dashboard-app.family-portal .rec-matching-value {
+  color: hsl(210 50% 96%);
+  font-weight: 700;
+}
+
+.dashboard-app.family-portal .rec-matching-reasoning,
+.dashboard-app.family-portal .rec-matching-run {
+  color: hsl(210 40% 90%);
+}
+
+.dashboard-app.family-portal .rec-matching-flags {
+  border-top-color: hsl(var(--border));
+}
+
+.dashboard-app.family-portal .rec-detail {
+  color: hsl(var(--foreground));
+}
+
+.dashboard-app.family-portal .rec-detail-header {
+  background: linear-gradient(180deg, hsl(222 47% 16%) 0%, hsl(222 47% 12%) 100%);
+  border-bottom-color: hsl(var(--border));
+}
+
+.dashboard-app.family-portal .rec-detail-pending,
+.dashboard-app.family-portal .rec-zones-summary {
+  background: hsl(222 47% 11%);
+  border-color: hsl(var(--border));
+}
+
+.dashboard-app.family-portal .rec-zone-badge--0 {
+  background: hsl(221 83% 53% / 0.2);
+  color: hsl(221 83% 90%);
+}
+
+.dashboard-app.family-portal .rec-tactical-title {
+  color: hsl(142 55% 65%);
+}
+
+.dashboard-app.family-portal .rec-markdown {
+  color: hsl(215 20% 90%);
+  background: hsl(222 47% 12%);
+}
+
+.dashboard-app.family-portal .rec-markdown h1,
+.dashboard-app.family-portal .rec-markdown h2,
+.dashboard-app.family-portal .rec-markdown h3 {
+  color: hsl(210 40% 98%);
+}
+
+.dashboard-app.family-portal .rec-markdown strong {
+  color: hsl(210 50% 98%);
+}
+
+.dashboard-app.family-portal .rec-markdown th,
+.dashboard-app.family-portal .rec-markdown td {
+  border-color: hsl(var(--border));
+}
+
+.dashboard-app.family-portal .rec-markdown th {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.dashboard-app.family-portal .rec-markdown hr {
+  border-top-color: hsl(var(--border));
+}
+
+.dashboard-app.family-portal .rec-markdown code {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.dashboard-app.family-portal .rec-detail-loading {
+  color: hsl(var(--muted-foreground));
+  border-top-color: hsl(var(--border));
+}
+
+.dashboard-app.family-portal .rec-detail-pending-text {
+  color: hsl(215 20% 75%);
+}
