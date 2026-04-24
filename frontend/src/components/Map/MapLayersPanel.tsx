@@ -132,18 +132,18 @@ export function MapLayersPanel({
   return (
     <div className="space-y-5 pr-1">
       <div className="space-y-1">
-        <h2 className="text-base font-semibold text-slate-900">Map layers</h2>
+        <h2 className="text-base font-semibold text-foreground">Map layers</h2>
         <p className="text-xs text-muted-foreground">
           Toggle overlays on the map. Turn on OSM facilities, then choose types below.
         </p>
       </div>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">Visibility</h3>
+        <h3 className="text-sm font-semibold text-foreground">Visibility</h3>
         <div className="space-y-3">
           {LAYER_DEFS.map(({ key, label }) => (
             <div key={key} className="flex items-center justify-between gap-4">
-              <Label htmlFor={`sidebar-layer-${key}`} className="cursor-pointer text-slate-900">
+              <Label htmlFor={`sidebar-layer-${key}`} className="cursor-pointer text-foreground">
                 {label}
               </Label>
               <Switch
@@ -155,7 +155,7 @@ export function MapLayersPanel({
           ))}
           <Separator />
           <div className="flex items-center justify-between gap-4">
-            <Label htmlFor="sidebar-layer-clusters" className="cursor-pointer text-slate-900">
+            <Label htmlFor="sidebar-layer-clusters" className="cursor-pointer text-foreground">
               Show clusters on map
             </Label>
             <Switch
@@ -168,7 +168,7 @@ export function MapLayersPanel({
       </section>
 
       <section className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-        <h3 className="text-sm font-semibold text-slate-900">Clustering</h3>
+        <h3 className="text-sm font-semibold text-foreground">Clustering</h3>
         <Button
           type="button"
           className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
@@ -177,7 +177,7 @@ export function MapLayersPanel({
         >
           {clusteringRunning ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="me-2 h-4 w-4 animate-spin" />
               Running…
             </>
           ) : (
@@ -195,7 +195,7 @@ export function MapLayersPanel({
       {layerVisibility.osmFacilities && (
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-slate-900">OSM facility types</h3>
+            <h3 className="text-sm font-semibold text-foreground">OSM facility types</h3>
             <div className="flex gap-1">
               <Button type="button" variant="outline" size="sm" onClick={selectAllFacilityTypes}>
                 All
@@ -243,7 +243,7 @@ export function MapLayersPanel({
                   type(s) selected
                 </p>
               ) : (
-                <p className="text-xs text-amber-700">Select at least one type to load OSM data.</p>
+                <p className="text-xs text-amber-500">Select at least one type to load OSM data.</p>
               )}
             </>
           )}

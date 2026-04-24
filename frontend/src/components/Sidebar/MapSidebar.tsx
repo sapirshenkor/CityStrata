@@ -39,31 +39,31 @@ export function MapSidebar({
   return (
     <aside
       className={cn(
-        'flex h-full w-[min(100%,380px)] shrink-0 flex-col border-r border-[#e0e0e0] bg-white text-slate-950 shadow-[2px_0_8px_rgba(0,0,0,0.08)]',
+        'flex h-full w-[min(100%,380px)] shrink-0 flex-col border-r border-border bg-card text-card-foreground shadow-sm shadow-black/20',
         className,
       )}
     >
       <Tabs defaultValue="form" className="flex h-full min-h-0 flex-col">
-        <TabsList className="mx-3 mt-3 grid h-auto w-full grid-cols-6 gap-1 rounded-lg bg-[#f8f9fa] p-1">
+        <TabsList className="mx-3 mt-3 grid h-auto w-full grid-cols-6 gap-1 rounded-xl bg-muted/60 p-1">
           {/* Row 1: Layers · Family · Community */}
           <TabsTrigger
             value="layers"
             title="Map layers"
-            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
+            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
           >
             Layers
           </TabsTrigger>
           <TabsTrigger
             value="form"
             title="Family profile form"
-            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
+            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
           >
             Family
           </TabsTrigger>
           <TabsTrigger
             value="community"
             title="Community / group profile"
-            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
+            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
           >
             Community
           </TabsTrigger>
@@ -71,14 +71,14 @@ export function MapSidebar({
           <TabsTrigger
             value="recommendations"
             title="Family recommendations & tactical reports"
-            className="col-span-3 min-h-[2.25rem] whitespace-normal px-1.5 text-center text-[10px] leading-snug data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-[11px]"
+            className="col-span-3 min-h-[2.25rem] whitespace-normal px-1.5 text-center text-[10px] leading-snug text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-[11px]"
           >
             recommend Family
           </TabsTrigger>
           <TabsTrigger
             value="communities"
             title="Community profiles & saved groups"
-            className="col-span-3 min-h-[2.25rem] whitespace-normal px-1.5 text-center text-[10px] leading-snug data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-[11px]"
+            className="col-span-3 min-h-[2.25rem] whitespace-normal px-1.5 text-center text-[10px] leading-snug text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-[11px]"
           >
             recommend Community
           </TabsTrigger>

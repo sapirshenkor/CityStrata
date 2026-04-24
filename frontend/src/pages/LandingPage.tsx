@@ -22,7 +22,7 @@ import { Separator } from '@/components/ui/separator'
 export default function LandingPage() {
   return (
     <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-slate-900">
-      <AppHeader>
+      <AppHeader variant="landing">
         <UserBar />
       </AppHeader>
 

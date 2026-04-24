@@ -1,8 +1,8 @@
 import { Circle, Tooltip } from 'react-leaflet'
 
 // Three visually distinct colours for zone_alpha / zone_beta / zone_gamma.
-// Ordered by rank: blue (best) → orange → green.
-const ZONE_COLORS = ['#667eea', '#e67e22', '#27ae60']
+// Ordered by rank: blue-600 (best) → orange → green. No brand purple.
+const ZONE_COLORS = ['#2563eb', '#e67e22', '#27ae60']
 
 function formatZoneLabel(hub_label) {
   return (hub_label || 'Zone')
