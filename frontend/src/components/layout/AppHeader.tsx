@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
 export type AppHeaderVariant = 'map' | 'landing'
@@ -36,7 +37,15 @@ export function AppHeader({
       )}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className={cn('text-lg font-bold tracking-tight', s.title)}>CityStrata</div>
+        <Link
+          to="/"
+          className={cn(
+            'text-lg font-bold tracking-tight transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
+            s.title,
+          )}
+        >
+          CityStrata
+        </Link>
         <span className={cn('hidden text-xs font-medium sm:inline', s.subtitle)}>
           Eilat evacuation mapping
         </span>

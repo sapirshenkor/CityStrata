@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import UserBar from '@/components/UserBar'
 import {
   Building2,
   Home,
@@ -38,11 +39,16 @@ export function Sidebar({
         <div className="flex items-center gap-2">
           <Building2 className="h-7 w-7 text-white" strokeWidth={1.75} />
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-white">CityStrata</h1>
+            <Link to="/" className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent">
+              <h1 className="text-lg font-bold tracking-tight text-white hover:underline">CityStrata</h1>
+            </Link>
             <p className="text-xs text-white/90">Eilat evacuation mapping</p>
           </div>
         </div>
         <p className="mt-2 text-xs font-medium text-white/85">Municipality dashboard</p>
+        <div className="mt-4 border-t border-white/20 pt-4">
+          <UserBar />
+        </div>
       </div>
 
       <nav className="dashboard-app__sidebar-nav flex flex-col gap-1 p-3">

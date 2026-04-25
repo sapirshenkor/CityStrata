@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatApiError } from '@/lib/formatApiError'
 import { loginFormSchema, type LoginFormValues } from '@/lib/authFormSchemas'
+import { AppHeader } from '@/components/layout/AppHeader'
+import UserBar from '@/components/UserBar'
 
 export default function LoginPage() {
   const { login, user, loading } = useAuth()
@@ -43,8 +45,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f8f9fa] p-4 text-slate-900">
-      <Card className="w-full max-w-md border-[#e0e0e0] shadow-lg">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <AppHeader variant="map">
+        <UserBar />
+      </AppHeader>
+      <div className="flex flex-1 items-center justify-center p-4">
+        <Card className="w-full max-w-md border-border shadow-lg">
         <CardHeader className="space-y-1 text-center">
           <div className="mx-auto mb-2 rounded-xl bg-gradient-to-br from-primary to-slate-800 px-4 py-3 text-primary-foreground">
             <CardTitle className="text-2xl font-bold text-primary-foreground">CityStrata</CardTitle>
@@ -123,6 +129,7 @@ export default function LoginPage() {
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

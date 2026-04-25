@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatApiError } from '@/lib/formatApiError'
 import { signupFormSchema, toSignupPayload, type SignupFormValues } from '@/lib/authFormSchemas'
+import { AppHeader } from '@/components/layout/AppHeader'
+import UserBar from '@/components/UserBar'
 
 export default function SignupPage() {
   const { signup, user, loading } = useAuth()
@@ -48,8 +50,12 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f8f9fa] p-4 text-slate-900">
-      <Card className="w-full max-w-lg border-[#e0e0e0] shadow-lg">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <AppHeader variant="map">
+        <UserBar />
+      </AppHeader>
+      <div className="flex flex-1 items-center justify-center p-4">
+        <Card className="w-full max-w-lg border-border shadow-lg">
         <CardHeader className="space-y-1 text-center">
           <div className="mx-auto mb-2 rounded-xl bg-gradient-to-br from-primary to-slate-800 px-4 py-3 text-primary-foreground">
             <CardTitle className="text-2xl font-bold text-primary-foreground">Create account</CardTitle>
@@ -176,6 +182,7 @@ export default function SignupPage() {
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

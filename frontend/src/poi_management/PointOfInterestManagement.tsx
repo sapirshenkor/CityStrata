@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ApiErrorBanner } from '@/components/layout/ApiErrorBanner'
+import UserBar from '@/components/UserBar'
 import { PageHeader, PageShell } from '@/components/layout/PageShell'
 import { formatQueryError } from '@/lib/formatQueryError'
 import { cn } from '@/lib/utils'
@@ -195,7 +196,8 @@ export default function PointOfInterestManagement() {
           </div>
         }
         actions={
-          <>
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <UserBar variant="onSurface" />
             <Button variant="outline" size="sm" className="rounded-lg" asChild>
               <Link to="/municipality" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
@@ -206,7 +208,7 @@ export default function PointOfInterestManagement() {
               <Plus className="h-4 w-4" />
               Add record
             </Button>
-          </>
+          </div>
         }
       />
 

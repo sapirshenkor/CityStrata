@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ApiErrorBanner } from '@/components/layout/ApiErrorBanner'
+import UserBar from '@/components/UserBar'
 import { PageHeader, PageShell } from '@/components/layout/PageShell'
 import { formatQueryError } from '@/lib/formatQueryError'
 import { HotelForm } from './HotelForm'
@@ -113,7 +114,8 @@ export default function HotelManagementPage() {
           </div>
         }
         actions={
-          <>
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <UserBar variant="onSurface" />
             <Button variant="outline" size="sm" className="rounded-lg" asChild>
               <Link to="/municipality" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
@@ -124,7 +126,7 @@ export default function HotelManagementPage() {
               <Plus className="h-4 w-4" />
               Add hotel
             </Button>
-          </>
+          </div>
         }
       />
 

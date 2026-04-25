@@ -21,13 +21,13 @@ import { Separator } from '@/components/ui/separator'
 
 export default function LandingPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-slate-900">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <AppHeader variant="landing">
         <UserBar />
       </AppHeader>
 
       <main id="main-content" className="flex-1">
-        <section className="border-b border-[#e0e0e0] bg-white px-4 py-12 sm:py-16">
+        <section className="border-b border-border bg-card/80 px-4 py-12 sm:py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
               CityStrata
@@ -66,7 +66,7 @@ export default function LandingPage() {
             </p>
           </section>
 
-          <Separator className="bg-[#e0e0e0]" />
+          <Separator className="bg-border" />
 
           <section aria-labelledby="capabilities-heading" className="space-y-6">
             <div>
@@ -78,7 +78,7 @@ export default function LandingPage() {
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Card className="border-[#e0e0e0] shadow-card">
+              <Card className="border-border shadow-card">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
@@ -91,7 +91,7 @@ export default function LandingPage() {
                   </CardDescription>
                 </CardHeader>
               </Card>
-              <Card className="border-[#e0e0e0] shadow-card">
+              <Card className="border-border shadow-card">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
@@ -104,7 +104,7 @@ export default function LandingPage() {
                   </CardDescription>
                 </CardHeader>
               </Card>
-              <Card className="border-[#e0e0e0] shadow-card">
+              <Card className="border-border shadow-card">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
@@ -117,7 +117,7 @@ export default function LandingPage() {
                   </CardDescription>
                 </CardHeader>
               </Card>
-              <Card className="border-[#e0e0e0] shadow-card">
+              <Card className="border-border shadow-card">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
@@ -133,7 +133,7 @@ export default function LandingPage() {
             </div>
           </section>
 
-          <Separator className="bg-[#e0e0e0]" />
+          <Separator className="bg-border" />
 
           <section aria-labelledby="how-heading" className="space-y-6">
             <h2 id="how-heading" className="text-xl font-semibold">
@@ -141,7 +141,7 @@ export default function LandingPage() {
             </h2>
             <ol className="grid gap-4 md:grid-cols-3">
               <li>
-                <Card className="h-full border-[#e0e0e0] shadow-card">
+                <Card className="h-full border-border shadow-card">
                   <CardHeader>
                     <CardTitle className="text-sm font-semibold">1 · Input</CardTitle>
                     <CardDescription>
@@ -151,7 +151,7 @@ export default function LandingPage() {
                 </Card>
               </li>
               <li>
-                <Card className="h-full border-[#e0e0e0] shadow-card">
+                <Card className="h-full border-border shadow-card">
                   <CardHeader>
                     <CardTitle className="text-sm font-semibold">2 · Analysis</CardTitle>
                     <CardDescription>
@@ -161,7 +161,7 @@ export default function LandingPage() {
                 </Card>
               </li>
               <li>
-                <Card className="h-full border-[#e0e0e0] shadow-card">
+                <Card className="h-full border-border shadow-card">
                   <CardHeader>
                     <CardTitle className="text-sm font-semibold">3 · Recommendation</CardTitle>
                     <CardDescription>
@@ -173,7 +173,7 @@ export default function LandingPage() {
             </ol>
           </section>
 
-          <Separator className="bg-[#e0e0e0]" />
+          <Separator className="bg-border" />
 
           <section aria-labelledby="preview-heading" className="space-y-4">
             <div>
@@ -184,23 +184,23 @@ export default function LandingPage() {
                 Illustrative only — open the main map for live layers and tools.
               </p>
             </div>
-            <Card className="overflow-hidden border-[#e0e0e0] shadow-card">
+            <Card className="overflow-hidden border-border shadow-card">
               <CardContent className="p-5 pt-5">
                 <div
-                  className="relative aspect-[16/10] w-full overflow-hidden rounded-lg border border-[#e0e0e0] bg-muted shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                  className="relative aspect-[16/10] w-full overflow-hidden rounded-lg border border-border bg-muted/80 shadow-sm"
                   aria-hidden
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#e8eaf6] via-[#f8f9fa] to-[#ede7f6]" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-muted via-background to-primary/10" />
                   <div className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(90deg,hsl(var(--border))_1px,transparent_1px),linear-gradient(hsl(var(--border))_1px,transparent_1px)] [background-size:40px_40px]" />
                   <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2">
-                    <div className="rounded-full border-2 border-primary/50 bg-white p-3 shadow-md">
+                    <div className="rounded-full border-2 border-primary/50 bg-card p-3 shadow-md">
                       <Map className="h-10 w-10 text-primary" />
                     </div>
-                    <span className="rounded-md border border-[#e0e0e0] bg-white/90 px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+                    <span className="rounded-md border border-border bg-card/95 px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm">
                       Static preview
                     </span>
                   </div>
-                  <div className="absolute bottom-3 left-3 right-3 rounded-md border border-border/80 bg-card/95 px-3 py-2 text-xs text-slate-200 shadow-sm backdrop-blur-sm">
+                  <div className="absolute bottom-3 left-3 right-3 rounded-md border border-border/80 bg-card/95 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
                     Full interactive map, clustering, and side panels are available after you open
                     the main map.
                   </div>
@@ -209,13 +209,13 @@ export default function LandingPage() {
             </Card>
           </section>
 
-          <Separator className="bg-[#e0e0e0]" />
+          <Separator className="bg-border" />
 
           <section aria-labelledby="nav-heading" className="space-y-4">
             <h2 id="nav-heading" className="text-xl font-semibold">
               Where to go next
             </h2>
-            <Card className="border-[#e0e0e0] shadow-card">
+            <Card className="border-border shadow-card">
               <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <Button asChild variant="default" className="bg-primary text-primary-foreground hover:bg-primary/90">
                   <Link to="/map" className="gap-2">
@@ -240,7 +240,7 @@ export default function LandingPage() {
           </section>
         </div>
 
-        <footer className="border-t border-[#e0e0e0] bg-white px-4 py-10">
+        <footer className="border-t border-border bg-card/60 px-4 py-10">
           <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold">CityStrata</p>

@@ -13,9 +13,9 @@ export default function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#f8f9fa] text-[#333]">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background text-muted-foreground">
         <div
-          className="h-9 w-9 animate-spin rounded-full border-2 border-[#667eea] border-t-transparent"
+          className="h-9 w-9 animate-spin rounded-full border-2 border-primary border-t-transparent"
           aria-hidden
         />
         <p className="text-sm">Loading…</p>

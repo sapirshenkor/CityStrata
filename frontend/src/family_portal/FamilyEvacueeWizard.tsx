@@ -15,6 +15,7 @@ import Step6Housing from '../components/EvacueeProfileForm/Step6Housing'
 import Step7Extra from '../components/EvacueeProfileForm/Step7Extra'
 import '../components/EvacueeProfileForm/EvacueeProfileForm.css'
 import '../user_dashboard/dashboard.css'
+import UserBar from '@/components/UserBar'
 import {
   evacueeFamilyProfileCreateSchema,
   toPayload,
@@ -256,17 +257,22 @@ export default function FamilyEvacueeWizard() {
   return (
     <div className="dashboard-app min-h-screen" dir="rtl">
       <header className="dashboard-app__gradient px-4 py-4 sm:px-6">
-        <Button
-          asChild
-          variant="secondary"
-          size="sm"
-          className="h-9 border border-white/40 bg-white/10 text-white hover:bg-white/20"
-        >
-          <Link to="/family" className="inline-flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            חזרה ללוח הבקרה
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button
+            asChild
+            variant="secondary"
+            size="sm"
+            className="h-9 border border-white/40 bg-white/10 text-white hover:bg-white/20"
+          >
+            <Link to="/family" className="inline-flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              חזרה ללוח הבקרה
+            </Link>
+          </Button>
+          <div className="min-w-0 max-w-full sm:max-w-[min(100%,22rem)]">
+            <UserBar />
+          </div>
+        </div>
       </header>
 
       <div className="mx-auto max-w-[720px] min-w-0 p-4 pb-10">

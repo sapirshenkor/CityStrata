@@ -20,6 +20,7 @@ import '../components/Recommendations/RecommendationsPanel.css'
 import { useFamilyDashboard } from './hooks/useFamilyQueries'
 import { familyKeys } from './queryKeys'
 import '../user_dashboard/dashboard.css'
+import UserBar from '@/components/UserBar'
 
 function pid(u: string | null | undefined) {
   return u != null ? String(u) : ''
@@ -161,17 +162,20 @@ export default function FamilyDashboard() {
               סקירה אישית של הפרופילים והסטטוס — לפי הנתונים מהמערכת.
             </p>
           </div>
-          <Button
-            asChild
-            variant="secondary"
-            size="sm"
-            className="h-9 shrink-0 border border-white/40 bg-white/10 text-white hover:bg-white/20"
-          >
-            <Link to="/map" className="inline-flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" aria-hidden />
-              חזרה למפה
-            </Link>
-          </Button>
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:max-w-[min(100%,28rem)] sm:shrink-0 sm:justify-end">
+            <UserBar />
+            <Button
+              asChild
+              variant="secondary"
+              size="sm"
+              className="h-9 shrink-0 border border-white/40 bg-white/10 text-white hover:bg-white/20"
+            >
+              <Link to="/map" className="inline-flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" aria-hidden />
+                חזרה למפה
+              </Link>
+            </Button>
+          </div>
         </div>
       </header>
 
