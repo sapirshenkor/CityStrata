@@ -13,7 +13,7 @@ const schoolIcon = L.divIcon({
 // Icon variant that signals multiple institutions share this point.
 const multiSchoolIcon = L.divIcon({
   className: 'custom-marker institution-marker',
-  html: '<div class="marker-icon" style="position:relative">🏫<span style="position:absolute;top:-4px;right:-6px;background:#667eea;color:#fff;border-radius:50%;font-size:10px;font-weight:700;width:16px;height:16px;display:flex;align-items:center;justify-content:center;line-height:1">+</span></div>',
+  html: '<div class="marker-icon" style="position:relative">🏫<span style="position:absolute;top:-4px;right:-6px;background:#2563eb;color:#fff;border-radius:50%;font-size:10px;font-weight:700;width:16px;height:16px;display:flex;align-items:center;justify-content:center;line-height:1">+</span></div>',
   iconSize: [30, 30],
   iconAnchor: [15, 30],
 })

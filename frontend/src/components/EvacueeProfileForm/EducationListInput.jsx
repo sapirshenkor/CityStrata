@@ -17,12 +17,12 @@ export default function EducationListInput({ items, onChange, error }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ fontWeight: 800, color: '#333' }}>דרישות חינוך חיוניות</div>
+    <div className="flex flex-col gap-2.5">
+      <div className="text-sm font-extrabold text-foreground">דרישות חינוך חיוניות</div>
 
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+      <div className="flex flex-col gap-2.5 min-[400px]:flex-row min-[400px]:items-center">
         <input
-          className="evpf-input"
+          className="evpf-input min-w-0 flex-1"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="הקלד/י ולחץ/י Enter"
@@ -33,11 +33,7 @@ export default function EducationListInput({ items, onChange, error }) {
             }
           }}
         />
-        <button
-          type="button"
-          onClick={add}
-          className="rounded-md bg-[#667eea] px-3 py-2 text-sm font-semibold text-white hover:bg-[#5568d3] disabled:opacity-50"
-        >
+        <button type="button" onClick={add} className="evpf-btn primary shrink-0 text-sm">
           הוסף
         </button>
       </div>

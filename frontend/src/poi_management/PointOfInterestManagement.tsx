@@ -6,7 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, Search } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -24,6 +24,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ApiErrorBanner } from '@/components/layout/ApiErrorBanner'
+import UserBar from '@/components/UserBar'
+import { PageHeader, PageShell } from '@/components/layout/PageShell'
+import { formatQueryError } from '@/lib/formatQueryError'
 import { cn } from '@/lib/utils'
 import { EntityForm } from './EntityForm'
 import { getPoiFormFieldConfig } from './poiFormConfig'
@@ -34,17 +38,6 @@ import { poiQueryKeys } from './queryKeys'
 import type { PoiCategory, PoiEntityRow } from './types'
 import { POI_CATEGORIES, isPoiCategory } from './types'
 import { PoiDataTable } from './PoiDataTable'
-
-function apiErrorMessage(err: unknown): string {
-  if (err && typeof err === 'object' && 'response' in err) {
-    const r = err as { response?: { data?: { detail?: unknown } } }
-    const d = r.response?.data?.detail
-    if (typeof d === 'string') return d
-    if (Array.isArray(d)) return d.map((x) => JSON.stringify(x)).join(', ')
-  }
-  if (err instanceof Error) return err.message
-  return 'Something went wrong'
-}
 
 export default function PointOfInterestManagement() {
   const queryClient = useQueryClient()
@@ -112,7 +105,7 @@ export default function PointOfInterestManagement() {
       setDialogOpen(false)
       await invalidateCategory(category)
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const updateMut = useMutation({
@@ -124,7 +117,7 @@ export default function PointOfInterestManagement() {
       setEditing(null)
       await invalidateCategory(category)
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const deleteMut = useMutation({
@@ -133,7 +126,7 @@ export default function PointOfInterestManagement() {
       setBannerError(null)
       await invalidateCategory(category)
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const openCreate = () => {
@@ -192,45 +185,35 @@ export default function PointOfInterestManagement() {
   const formFieldConfig = useMemo(() => getPoiFormFieldConfig(category), [category])
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border/80 bg-card shadow-soft">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <MapPin className="h-6 w-6" strokeWidth={1.75} />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                Point of interest management
-              </h1>
-              <p className="mt-0.5 max-w-xl text-sm text-muted-foreground">
-                Manage listings and venues by category. Data is scoped to your municipality on the server.
-              </p>
-            </div>
+    <PageShell>
+      <PageHeader
+        title="Point of interest management"
+        description="Manage listings and venues by category. Data is scoped to your municipality on the server."
+        containerClassName="max-w-6xl"
+        leading={
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <MapPin className="h-6 w-6" strokeWidth={1.75} />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+        }
+        actions={
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <UserBar variant="onSurface" />
             <Button variant="outline" size="sm" className="rounded-lg" asChild>
               <Link to="/municipality" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
                 Dashboard
               </Link>
             </Button>
-            <Button size="sm" className="rounded-lg" onClick={openCreate}>
+            <Button size="sm" className="rounded-lg gap-2" onClick={openCreate}>
+              <Plus className="h-4 w-4" />
               Add record
             </Button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <main className="mx-auto max-w-6xl px-4 py-8">
-        {bannerError ? (
-          <div
-            className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-            role="alert"
-          >
-            {bannerError}
-          </div>
-        ) : null}
+        {bannerError ? <ApiErrorBanner message={bannerError} className="mb-6" /> : null}
 
         <Tabs value={category} onValueChange={onTabChange} className="w-full">
           <TabsList
@@ -267,7 +250,7 @@ export default function PointOfInterestManagement() {
           <CardContent className="space-y-4">
             <div className="relative max-w-md">
               <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                 aria-hidden
               />
               <Input
@@ -275,13 +258,16 @@ export default function PointOfInterestManagement() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search this category…"
-                className="rounded-lg pl-9"
+                className="rounded-lg ps-9"
                 autoComplete="off"
                 aria-label="Search listings"
               />
             </div>
             {listQuery.isError ? (
-              <p className="text-sm text-destructive">{apiErrorMessage(listQuery.error)}</p>
+              <ApiErrorBanner
+                message={formatQueryError(listQuery.error)}
+                onRetry={() => void listQuery.refetch()}
+              />
             ) : (
               <>
                 <PoiDataTable
@@ -362,6 +348,6 @@ export default function PointOfInterestManagement() {
           />
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   )
 }

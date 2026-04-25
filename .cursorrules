@@ -1,28 +1,160 @@
 {
-  "project_context": "CityStrata is a geospatial emergency evacuation management system for Eilat.",
+  "project_context": {
+    "name": "CityStrata",
+    "description": "CityStrata is a geospatial emergency evacuation and community-matching system for Eilat.",
+    "product_goal": "Provide a high-trust, clear, and operationally safe interface for emergency mapping, profile management, and AI-assisted recommendations."
+  },
   "tech_stack": [
     "React 18 (Vite)",
     "TypeScript",
     "Tailwind CSS",
-    "Radix UI / Shadcn UI",
+    "Shadcn UI",
+    "Radix UI",
     "React Leaflet",
-    "TanStack Query (React Query)",
-    "Lucide React Icons"
+    "TanStack Query",
+    "Lucide React",
+    "React Hook Form",
+    "Zod"
+  ],
+  "global_priorities": [
+    "Do not break existing business logic or API integrations.",
+    "Preserve behavior before preserving old UI structure.",
+    "When existing UI conflicts with these rules, prefer these rules for all new or refactored screens.",
+    "Reuse existing components only if they align with the current design rules.",
+    "Do not copy inconsistent styling patterns just because they already exist in the codebase."
   ],
   "design_system": {
-    "theme": "Dark Mode prioritized, professional, high-trust emergency UI.",
+    "theme": "Dark mode first, professional, high-trust, calm emergency UI.",
+    "direction": "RTL is mandatory for Hebrew UI. Use logical spacing/alignment and avoid ad-hoc flex-row-reverse unless necessary.",
+    "visual_principles": [
+      "Clarity over decoration",
+      "Strong visual hierarchy",
+      "Low cognitive load",
+      "Consistent spacing and surface structure",
+      "Accessible contrast and interaction states",
+      "Operational trust and seriousness"
+    ],
     "colors": {
-      "primary": "Slate-900 (background), Blue-600 (actions)",
-      "status": "Red-500 (Critical), Amber-500 (Warning), Green-500 (Safe)",
-      "text": "Slate-50 (Heading), Slate-300 (Body)"
+      "background": "slate-950",
+      "surface": "slate-900",
+      "surface_alt": "slate-800",
+      "primary": "blue-600",
+      "primary_hover": "blue-500",
+      "border": "slate-700",
+      "text_heading": "slate-50",
+      "text_body": "slate-300",
+      "text_muted": "slate-400",
+      "status_critical": "red-500",
+      "status_warning": "amber-500",
+      "status_safe": "green-500",
+      "status_info": "sky-500"
     },
-    "border_radius": "rounded-lg (8px)",
-    "layout": "RTL (Hebrew) support is mandatory. Use 'flex-row-reverse' or logical properties where needed."
+    "radius": {
+      "card": "rounded-2xl",
+      "input": "rounded-xl",
+      "button": "rounded-xl",
+      "dialog": "rounded-2xl"
+    },
+    "spacing": {
+      "section_gap": "gap-6",
+      "card_padding": "p-6",
+      "panel_padding": "p-4",
+      "dense_padding": "p-3"
+    },
+    "elevation": {
+      "card": "shadow-sm shadow-black/20",
+      "modal": "shadow-xl shadow-black/40"
+    },
+    "interaction": {
+      "focus": "All interactive elements must have visible keyboard focus styles.",
+      "hover": "Hover states should be subtle and consistent.",
+      "disabled": "Disabled states must look intentionally inactive and remain readable."
+    }
+  },
+  "layout_rules": {
+    "app_shell": "Use a consistent page shell with clear header, page actions, content sections, and footer if needed.",
+    "screen_structure": [
+      "Page title + short contextual subtitle",
+      "Primary actions area",
+      "Main content divided into cards/sections",
+      "Secondary actions visually separated",
+      "Dangerous actions isolated and clearly labeled"
+    ],
+    "responsiveness": [
+      "Mobile-first but optimized for desktop operational use",
+      "Avoid crowded multi-column layouts on medium screens",
+      "Map-heavy screens should maintain a stable control hierarchy"
+    ]
+  },
+  "component_rules": {
+    "prefer": [
+      "Shadcn UI primitives for form controls, dialogs, drawers, tabs, tables, badges, and buttons",
+      "Lucide icons only",
+      "Shared wrapper components for page containers, section headers, stat cards, and empty states"
+    ],
+    "avoid": [
+      "Inline hard-coded colors unless mapped to design tokens",
+      "One-off spacing rules when an existing spacing pattern can be reused",
+      "Duplicated card/button/input variants across screens"
+    ],
+    "buttons": {
+      "primary": "Main page action only",
+      "secondary": "Supporting actions",
+      "ghost": "Low-emphasis actions",
+      "destructive": "Reserved for delete/reset/danger flows"
+    },
+    "cards": "All information blocks should use consistent card styling unless there is a strong UX reason not to.",
+    "forms": "All forms must use React Hook Form + Zod and present errors consistently.",
+    "tables_lists": "Use consistent empty states, loading states, and row actions."
   },
   "coding_standards": {
-    "components": "Functional components with explicit TypeScript interfaces.",
-    "state": "Use TanStack Query for server state and React Context/Zustand for global UI state.",
-    "icons": "Only use Lucide-React icons.",
-    "forms": "Use React-Hook-Form with Zod validation."
+    "components": "Use functional components with explicit TypeScript props/interfaces.",
+    "state": "Use TanStack Query for server state. Use Context or Zustand only for true cross-screen UI/global state.",
+    "styling": "Prefer composition of reusable utility patterns over long, screen-specific class strings.",
+    "icons": "Only Lucide React icons.",
+    "forms": "Use React Hook Form with Zod validation.",
+    "api": "Do not change API contracts unless explicitly requested."
+  },
+  "refactor_policy": {
+    "before_editing": [
+      "Scan the relevant screen and its related shared components.",
+      "Identify visual inconsistencies against these rules.",
+      "Separate business-logic dependencies from styling concerns."
+    ],
+    "when_redesigning": [
+      "Keep existing functionality intact.",
+      "Refactor styling and layout incrementally.",
+      "Extract reusable UI patterns when duplication appears 2+ times.",
+      "Do not perform broad unrelated refactors."
+    ],
+    "conflict_resolution": [
+      "If existing styling conflicts with these rules, document the conflict and propose the preferred new pattern.",
+      "Do not preserve inconsistent design for the sake of historical consistency."
+    ]
+  },
+  "delivery_process": {
+    "required_flow": [
+      "First scan the project and relevant files.",
+      "Then present findings: what exists, what is inconsistent, what should be reused, what should be replaced.",
+      "Then propose a step-by-step design/refactor plan.",
+      "Do not generate implementation code before explicit approval.",
+      "After approval, implement in small safe steps."
+    ],
+    "output_expectations": [
+      "List affected files",
+      "Explain reusable components to create/update",
+      "Explain UI risks",
+      "Explain how RTL/accessibility/responsiveness will be preserved"
+    ]
+  },
+  "accessibility": {
+    "mandatory": true,
+    "rules": [
+      "Preserve sufficient color contrast",
+      "Support keyboard navigation",
+      "Use semantic headings and landmarks",
+      "Provide visible focus states",
+      "Do not use color alone to convey critical meaning"
+    ]
   }
 }

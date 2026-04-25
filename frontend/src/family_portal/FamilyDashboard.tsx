@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
-import { ArrowLeft, ChevronDown, ChevronUp, FileText, PlusCircle, User } from 'lucide-react'
+import { ArrowLeft, Building2, ChevronDown, ChevronUp, FileText, PlusCircle, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
+  getMyPropertyListings,
   getMatchingResultForProfile,
   getRecommendationByProfile,
   runMatchingForProfile,
@@ -20,6 +21,7 @@ import '../components/Recommendations/RecommendationsPanel.css'
 import { useFamilyDashboard } from './hooks/useFamilyQueries'
 import { familyKeys } from './queryKeys'
 import '../user_dashboard/dashboard.css'
+import UserBar from '@/components/UserBar'
 
 function pid(u: string | null | undefined) {
   return u != null ? String(u) : ''
@@ -31,6 +33,23 @@ interface TacticalRecData {
   confidence?: string | null
   radii_data?: Array<{ hub_label?: string; radius_m?: number }>
   agent_output?: string
+}
+
+interface PropertyListingUnit {
+  id: string
+  rooms: number
+  monthly_price?: number | null
+  is_occupied?: boolean
+}
+
+interface PropertyListingRow {
+  id: string
+  property_type: string
+  city: string
+  street: string
+  house_number: string
+  neighborhood?: string | null
+  units: PropertyListingUnit[]
 }
 
 export default function FamilyDashboard() {
@@ -68,6 +87,14 @@ export default function FamilyDashboard() {
       }
     },
     enabled: Boolean(intelUuid),
+  })
+
+  const { data: myListings, isLoading: loadingListings } = useQuery({
+    queryKey: ['family', 'my-property-listings'],
+    queryFn: async (): Promise<PropertyListingRow[]> => {
+      const { data } = await getMyPropertyListings()
+      return data as PropertyListingRow[]
+    },
   })
 
   const detailLoading = Boolean(intelUuid) && (loadingMatching || loadingTactical)
@@ -119,9 +146,9 @@ export default function FamilyDashboard() {
 
   if (isLoading) {
     return (
-      <div className="dashboard-app flex min-h-screen flex-col items-center justify-center">
+      <div className="dashboard-app family-portal flex min-h-screen flex-col items-center justify-center">
         <div
-          className="h-9 w-9 animate-spin rounded-full border-2 border-[#667eea] border-t-transparent"
+          className="h-9 w-9 animate-spin rounded-full border-2 border-primary border-t-transparent"
           aria-hidden
         />
         <p className="mt-3 text-sm text-muted-foreground">Loading your dashboard…</p>
@@ -131,7 +158,7 @@ export default function FamilyDashboard() {
 
   if (isError) {
     return (
-      <div className="dashboard-app flex min-h-screen flex-col items-center justify-center gap-4 p-6">
+      <div className="dashboard-app family-portal flex min-h-screen flex-col items-center justify-center gap-4 p-6">
         <p className="text-center text-sm text-destructive">
           {error instanceof Error ? error.message : 'Could not load dashboard.'}
         </p>
@@ -150,9 +177,10 @@ export default function FamilyDashboard() {
 
   const profileCount = summary?.profile_count ?? profiles.length
   const withMatching = summary?.profiles_with_matching_count ?? 0
+  const listings = myListings ?? []
 
   return (
-    <div className="dashboard-app flex min-h-screen flex-col" dir="rtl">
+    <div className="dashboard-app family-portal flex min-h-screen flex-col" dir="rtl">
       <header className="dashboard-app__gradient px-4 py-5 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -161,58 +189,61 @@ export default function FamilyDashboard() {
               סקירה אישית של הפרופילים והסטטוס — לפי הנתונים מהמערכת.
             </p>
           </div>
-          <Button
-            asChild
-            variant="secondary"
-            size="sm"
-            className="h-9 shrink-0 border border-white/40 bg-white/10 text-white hover:bg-white/20"
-          >
-            <Link to="/map" className="inline-flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" aria-hidden />
-              חזרה למפה
-            </Link>
-          </Button>
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:max-w-[min(100%,28rem)] sm:shrink-0 sm:justify-end">
+            <UserBar />
+            <Button
+              asChild
+              variant="secondary"
+              size="sm"
+              className="h-9 shrink-0 border border-white/40 bg-white/10 text-white hover:bg-white/20"
+            >
+              <Link to="/map" className="inline-flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" aria-hidden />
+                חזרה למפה
+              </Link>
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 bg-[#f8f9fa] p-4 sm:p-6">
-        <div className="mx-auto flex max-w-3xl flex-col gap-4">
+      <main className="flex-1 p-4 sm:p-6">
+        <div className="mx-auto flex min-w-0 max-w-3xl flex-col gap-4">
           {actionError ? (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {actionError}
             </div>
           ) : null}
 
-          <Card className="border-[#e0e0e0] shadow-sm">
+          <Card className="border-border bg-card shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg text-[#333]">
-                <User className="h-5 w-5 text-[#667eea]" aria-hidden />
+              <CardTitle className="flex items-center gap-2 text-lg text-foreground">
+                <User className="h-5 w-5 text-primary" aria-hidden />
                 סטטוס
               </CardTitle>
-              <CardDescription className="text-[#666]">
+              <CardDescription>
                 מידע שמגיע מהשרת בלבד — ללא סטטוסים מומצאים.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 text-sm text-[#333]">
+            <CardContent className="space-y-4 text-sm text-foreground">
               {user ? (
-                <div className="flex flex-col gap-1 rounded-lg border border-[#e9ecef] bg-white/80 px-3 py-2">
-                  <span className="text-xs font-medium text-[#666]">משתמש רשום</span>
+                <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                  <span className="text-xs font-medium text-muted-foreground">משתמש רשום</span>
                   <span className="font-medium">{user.email}</span>
                   {(user.first_name || user.last_name) && (
-                    <span className="text-[#666]">
+                    <span className="text-muted-foreground">
                       {[user.first_name, user.last_name].filter(Boolean).join(' ')}
                     </span>
                   )}
                 </div>
               ) : null}
 
-              <ul className="space-y-2 rounded-lg border border-[#e9ecef] bg-white/80 px-3 py-2">
+              <ul className="space-y-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
                 <li>
-                  <span className="text-[#666]">מספר פרופילים משפחתיים: </span>
+                  <span className="text-muted-foreground">מספר פרופילים משפחתיים: </span>
                   <strong>{profileCount}</strong>
                 </li>
                 <li>
-                  <span className="text-[#666]">פרופילים עם בחירת התאמה (שדה נבחר במערכת): </span>
+                  <span className="text-muted-foreground">פרופילים עם בחירת התאמה (שדה נבחר במערכת): </span>
                   <strong>{withMatching}</strong>
                 </li>
               </ul>
@@ -220,27 +251,73 @@ export default function FamilyDashboard() {
           </Card>
 
           <div className="flex flex-wrap gap-2">
-            <Button asChild className="bg-[#667eea] hover:bg-[#5568d3]">
+            <Button asChild>
               <Link to="/family/profile/new" className="inline-flex items-center gap-2">
                 <PlusCircle className="h-4 w-4" aria-hidden />
                 יצירת פרופיל משפחה
               </Link>
             </Button>
+            <Button asChild variant="secondary">
+              <Link to="/family/property/new" className="inline-flex items-center gap-2">
+                <Building2 className="h-4 w-4" aria-hidden />
+                הוספת דירה
+              </Link>
+            </Button>
           </div>
 
-          <Card className="border-[#e0e0e0] shadow-sm">
+          <Card className="border-border bg-card shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg text-[#333]">
-                <FileText className="h-5 w-5 text-[#667eea]" aria-hidden />
+              <CardTitle className="flex items-center gap-2 text-lg text-foreground">
+                <FileText className="h-5 w-5 text-primary" aria-hidden />
+                המודעות שלך
+              </CardTitle>
+              <CardDescription>
+                רק מודעות הדיור המקושרות לחשבון שלך.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingListings ? (
+                <p className="text-sm text-muted-foreground">טוען מודעות...</p>
+              ) : listings.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  עדיין אין מודעה. לחצו על &quot;הוספת דירה&quot; כדי להתחיל.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {listings.map((listing) => (
+                    <li
+                      key={listing.id}
+                      className="rounded-lg border border-border bg-card p-3 shadow-sm transition hover:border-primary/40 hover:bg-muted/20"
+                    >
+                      <Link to={`/family/property/${listing.id}`} className="block">
+                        <div className="font-medium text-foreground">
+                          {listing.city}, {listing.street} {listing.house_number}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          סוג נכס: {listing.property_type} · יחידות: {listing.units.length}
+                          {listing.neighborhood ? ` · שכונה: ${listing.neighborhood}` : ''}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg text-foreground">
+                <FileText className="h-5 w-5 text-primary" aria-hidden />
                 הפרופילים שלך
               </CardTitle>
-              <CardDescription className="text-[#666]">
+              <CardDescription>
                 רק פרופילים המקושרים לחשבון שלך. ניתן להריץ התאמת אשכול וטקטיקה כמו בלוח ההמלצות הכללי.
               </CardDescription>
             </CardHeader>
             <CardContent>
               {profiles.length === 0 ? (
-                <p className="text-sm text-[#666]">
+                <p className="text-sm text-muted-foreground">
                   עדיין אין פרופיל. לחצו על &quot;יצירת פרופיל משפחה&quot; כדי להתחיל.
                 </p>
               ) : (
@@ -254,12 +331,12 @@ export default function FamilyDashboard() {
                     return (
                       <li
                         key={p.uuid}
-                        className="rounded-lg border border-[#e9ecef] bg-white p-3 shadow-sm"
+                        className="rounded-lg border border-border bg-card p-3 shadow-sm"
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <div className="font-medium text-[#333]">{p.family_name}</div>
-                            <div className="text-xs text-[#666]">
+                          <div className="min-w-0">
+                            <div className="font-medium text-foreground">{p.family_name}</div>
+                            <div className="text-xs text-muted-foreground">
                               {hasMatching
                                 ? 'נבחרה שורת התאמה במערכת (selected_matching_result_id).'
                                 : 'לא נבחרה שורת התאמה במערכת.'}
@@ -292,17 +369,17 @@ export default function FamilyDashboard() {
                               type="button"
                               variant="ghost"
                               size="sm"
-                              className="shrink-0 text-[#667eea]"
+                              className="shrink-0 text-primary"
                               onClick={() => setIntelUuid(showIntel ? null : p.uuid)}
                             >
                               {showIntel ? (
                                 <>
-                                  <ChevronUp className="ml-1 inline h-4 w-4" aria-hidden />
+                                  <ChevronUp className="ms-1 inline h-4 w-4" aria-hidden />
                                   הסתרת פרטי ניתוח
                                 </>
                               ) : (
                                 <>
-                                  <ChevronDown className="ml-1 inline h-4 w-4" aria-hidden />
+                                  <ChevronDown className="ms-1 inline h-4 w-4" aria-hidden />
                                   הצגת פרטי ניתוח
                                 </>
                               )}
@@ -311,10 +388,10 @@ export default function FamilyDashboard() {
                         </div>
 
                         {showIntel && (
-                          <div className="rec-detail mt-4 border-t border-[#e9ecef] pt-4 text-start">
+                          <div className="rec-detail mt-4 border-t border-border pt-4 text-start">
                             {detailLoading && (
-                              <div className="rec-detail-loading text-sm text-[#666]">
-                                <span className="rec-spinner mr-2 inline-block" aria-hidden />
+                              <div className="rec-detail-loading text-sm text-muted-foreground">
+                                <span className="rec-spinner me-2 inline-block" aria-hidden />
                                 טוען פרטי ניתוח…
                               </div>
                             )}
@@ -324,7 +401,7 @@ export default function FamilyDashboard() {
                             )}
 
                             {!detailLoading && !hasMatching && (
-                              <p className="rec-detail-pending-text text-sm text-[#666]">
+                              <p className="rec-detail-pending-text text-sm text-muted-foreground">
                                 <strong>המשך:</strong> להריץ <strong>התאמת אשכול</strong> כדי לשבץ
                                 אשכול, ואז <strong>טקטי</strong> לחישוב אזורים ודוח.
                               </p>
@@ -358,7 +435,7 @@ export default function FamilyDashboard() {
                             )}
 
                             {!detailLoading && hasMatching && !tacticalRec && (
-                              <p className="mt-3 text-sm text-[#666]">
+                              <p className="mt-3 text-sm text-muted-foreground">
                                 אין עדיין דוח טקטי שמור לפרופיל זה. להריץ &quot;הרצת טקטי&quot; לאחר
                                 התאמת האשכול.
                               </p>

@@ -11,6 +11,8 @@ const HotelManagementPage = lazy(() => import('./hotels_management/HotelManageme
 const PointOfInterestManagement = lazy(() => import('./poi_management/PointOfInterestManagement'))
 const FamilyDashboard = lazy(() => import('./family_portal/FamilyDashboard'))
 const FamilyEvacueeWizard = lazy(() => import('./family_portal/FamilyEvacueeWizard'))
+const PropertyListingWizard = lazy(() => import('./family_portal/PropertyListingWizard'))
+const PropertyListingDetails = lazy(() => import('./family_portal/PropertyListingDetails'))
 
 /** Landing and map are public; wrap authenticated areas with <ProtectedRoute>. */
 export default function App() {
@@ -80,6 +82,38 @@ export default function App() {
               }
             >
               <FamilyDashboard />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/family/property/:listingId"
+        element={
+          <ProtectedRoute>
+            <Suspense
+              fallback={
+                <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+                  Loading…
+                </div>
+              }
+            >
+              <PropertyListingDetails />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/family/property/new"
+        element={
+          <ProtectedRoute>
+            <Suspense
+              fallback={
+                <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+                  Loading…
+                </div>
+              }
+            >
+              <PropertyListingWizard />
             </Suspense>
           </ProtectedRoute>
         }

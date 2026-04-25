@@ -95,9 +95,13 @@ function buildColumns(
             </Button>
             <Button
               type="button"
-              variant="ghost"
+              variant="destructive"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              className={cn(
+                'h-8 w-8 border border-destructive/40 bg-destructive/10 text-destructive shadow-none',
+                'hover:bg-destructive/20 hover:text-destructive',
+                'focus-visible:ring-destructive/40 disabled:opacity-50',
+              )}
               onClick={() => onDelete(r)}
               disabled={busy}
               aria-label={`Delete ${r.name}`}

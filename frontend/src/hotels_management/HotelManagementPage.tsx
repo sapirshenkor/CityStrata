@@ -17,23 +17,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ApiErrorBanner } from '@/components/layout/ApiErrorBanner'
+import UserBar from '@/components/UserBar'
+import { PageHeader, PageShell } from '@/components/layout/PageShell'
+import { formatQueryError } from '@/lib/formatQueryError'
 import { HotelForm } from './HotelForm'
 import { HotelsTable } from './HotelsTable'
 import { formValuesToCreatePayload } from './hotelFormSchema'
 import { createHotel, deleteHotel, fetchHotels, updateHotel } from './hotelsApi'
 import { hotelManagementKeys } from './queryKeys'
 import type { HotelCreateInput, HotelRow, HotelUpdateInput } from './types'
-
-function apiErrorMessage(err: unknown): string {
-  if (err && typeof err === 'object' && 'response' in err) {
-    const r = err as { response?: { data?: { detail?: unknown } } }
-    const d = r.response?.data?.detail
-    if (typeof d === 'string') return d
-    if (Array.isArray(d)) return d.map((x) => JSON.stringify(x)).join(', ')
-  }
-  if (err instanceof Error) return err.message
-  return 'Something went wrong'
-}
 
 export default function HotelManagementPage() {
   const queryClient = useQueryClient()
@@ -58,7 +51,7 @@ export default function HotelManagementPage() {
       setEditing(null)
       await invalidateList()
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const updateMut = useMutation({
@@ -70,7 +63,7 @@ export default function HotelManagementPage() {
       setEditing(null)
       await invalidateList()
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const deleteMut = useMutation({
@@ -79,7 +72,7 @@ export default function HotelManagementPage() {
       setBannerError(null)
       await invalidateList()
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const openCreate = () => {
@@ -111,21 +104,18 @@ export default function HotelManagementPage() {
   const submitting = createMut.isPending || updateMut.isPending
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border/80 bg-card shadow-soft">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Building2 className="h-6 w-6" strokeWidth={1.75} />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">Hotel management</h1>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Add and maintain hotels for your municipality. Addresses are geocoded automatically.
-              </p>
-            </div>
+    <PageShell>
+      <PageHeader
+        title="Hotel management"
+        description="Add and maintain hotels for your municipality. Addresses are geocoded automatically."
+        leading={
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Building2 className="h-6 w-6" strokeWidth={1.75} />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+        }
+        actions={
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <UserBar variant="onSurface" />
             <Button variant="outline" size="sm" className="rounded-lg" asChild>
               <Link to="/municipality" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
@@ -137,23 +127,18 @@ export default function HotelManagementPage() {
               Add hotel
             </Button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <main className="mx-auto max-w-5xl px-4 py-8">
-        {bannerError ? (
-          <div
-            className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-            role="alert"
-          >
-            {bannerError}
-          </div>
-        ) : null}
+        {bannerError ? <ApiErrorBanner message={bannerError} className="mb-6" /> : null}
 
         {listQuery.isError ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {apiErrorMessage(listQuery.error)}
-          </div>
+          <ApiErrorBanner
+            message={formatQueryError(listQuery.error)}
+            onRetry={() => void listQuery.refetch()}
+            className="mb-6"
+          />
         ) : (
           <Card className="rounded-2xl border-border/80 shadow-card">
             <CardHeader className="pb-2">
@@ -203,6 +188,6 @@ export default function HotelManagementPage() {
           />
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   )
 }

@@ -5,6 +5,7 @@ import type { Feature, GeoJsonObject, GeoJsonProperties } from 'geojson'
 import icon from 'leaflet/dist/images/marker-icon.png'
 import iconShadow from 'leaflet/dist/images/marker-shadow.png'
 import 'leaflet/dist/leaflet.css'
+import { Button } from '@/components/ui/button'
 import { getAreaStyle } from '../utils/colors.js'
 import type { GeoJSONFeatureCollection } from '@/types/dashboard'
 
@@ -71,6 +72,10 @@ export interface MapViewProps {
   selectedStat2022: number | null
   onSelectStat2022: (stat2022: number) => void
   loading?: boolean
+  errorMessage?: string | null
+  onRetry?: () => void
+  /** True when the request succeeded but returned no features. */
+  isEmpty?: boolean
 }
 
 export function MapView({
@@ -78,6 +83,9 @@ export function MapView({
   selectedStat2022,
   onSelectStat2022,
   loading,
+  errorMessage,
+  onRetry,
+  isEmpty,
 }: MapViewProps) {
   const style = useCallback(
     (feature?: Feature) => {
@@ -104,33 +112,61 @@ export function MapView({
     [onSelectStat2022],
   )
 
-  if (loading || !geojson?.features?.length) {
+  if (loading) {
     return (
-      <div className="dashboard-app__map-frame flex h-full min-h-[420px] w-full items-center justify-center rounded-lg bg-[#f8f9fa]">
-        <p className="text-sm text-[#666]">Loading map…</p>
+      <div className="dashboard-app__map-frame dashboard-app__map-placeholder flex h-full min-h-[min(240px,42dvh)] w-full flex-1 items-center justify-center rounded-lg lg:min-h-0">
+        <p className="text-sm text-muted-foreground">Loading map…</p>
+      </div>
+    )
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="dashboard-app__map-frame flex h-full min-h-[min(240px,42dvh)] w-full flex-1 flex-col items-center justify-center gap-4 rounded-lg border-destructive/30 bg-destructive/5 p-6 text-center lg:min-h-0">
+        <p className="text-sm text-destructive" role="alert">
+          {errorMessage}
+        </p>
+        {onRetry ? (
+          <Button type="button" variant="outline" size="sm" className="rounded-lg" onClick={() => onRetry()}>
+            Retry
+          </Button>
+        ) : null}
+      </div>
+    )
+  }
+
+  if (isEmpty || !geojson?.features?.length) {
+    return (
+      <div className="dashboard-app__map-frame dashboard-app__map-placeholder flex h-full min-h-[min(240px,42dvh)] w-full flex-1 items-center justify-center rounded-lg p-6 text-center lg:min-h-0">
+        <p className="max-w-sm text-sm text-muted-foreground">
+          No statistical area boundaries were returned. KPIs need boundary data—try refreshing or check the
+          API.
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="dashboard-app__map-frame h-full min-h-[420px] w-full overflow-hidden rounded-lg">
-      <MapContainer
-        center={EILAT_CENTER}
-        zoom={DEFAULT_ZOOM}
-        className="h-full min-h-[420px] w-full"
-        scrollWheelZoom
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        <FitSelectedArea selectedStat2022={selectedStat2022} geojson={geojson} />
-        <GeoJSON
-          data={geojson as unknown as GeoJsonObject}
-          style={style}
-          onEachFeature={onEachFeature}
-        />
-      </MapContainer>
+    <div className="dashboard-app__map-frame flex h-full min-h-[min(240px,42dvh)] w-full flex-1 overflow-hidden rounded-lg lg:min-h-0">
+      <div dir="ltr" className="h-full min-h-0 w-full flex-1">
+        <MapContainer
+          center={EILAT_CENTER}
+          zoom={DEFAULT_ZOOM}
+          className="h-full min-h-[min(200px,35dvh)] w-full lg:min-h-0"
+          scrollWheelZoom
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <FitSelectedArea selectedStat2022={selectedStat2022} geojson={geojson} />
+          <GeoJSON
+            data={geojson as unknown as GeoJsonObject}
+            style={style}
+            onEachFeature={onEachFeature}
+          />
+        </MapContainer>
+      </div>
     </div>
   )
 }
