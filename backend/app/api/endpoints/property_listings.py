@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from geopy.exc import GeocoderServiceError, GeocoderTimedOut, GeocoderUnavailable
 from geopy.geocoders import Nominatim
 
-from app.core.auth import require_editor
+from app.core.auth import get_current_user
 from app.core.database import get_pool
 from app.models.municipality_user import MunicipalityUserRecord
 from app.models.property_listing import (
@@ -223,7 +223,7 @@ async def _fetch_listing_by_id(
 @router.post("", response_model=PropertyListingRead, status_code=status.HTTP_201_CREATED)
 async def create_property_listing(
     body: PropertyListingCreate,
-    current: Annotated[MunicipalityUserRecord, Depends(require_editor)],
+    current: Annotated[MunicipalityUserRecord, Depends(get_current_user)],
 ):
     latitude = body.latitude
     longitude = body.longitude
@@ -281,7 +281,7 @@ async def create_property_listing(
 
 @router.get("", response_model=list[PropertyListingRead])
 async def list_property_listings(
-    current: Annotated[MunicipalityUserRecord, Depends(require_editor)],
+    current: Annotated[MunicipalityUserRecord, Depends(get_current_user)],
     city: str | None = Query(default=None),
     property_type: PropertyType | None = Query(default=None),
     latitude: float | None = Query(default=None, ge=-90, le=90),
@@ -342,10 +342,36 @@ async def list_property_listings(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
 
 
+@router.get("/mine", response_model=list[PropertyListingRead])
+async def list_my_property_listings(
+    current: Annotated[MunicipalityUserRecord, Depends(get_current_user)],
+):
+    pool = get_pool()
+    try:
+        async with pool.acquire() as conn:
+            listing_rows = await conn.fetch(
+                f"""
+                SELECT {_LISTING_SELECT}
+                FROM public.property_listings pl
+                WHERE pl.municipality_user_id = $1
+                ORDER BY pl.created_at DESC
+                """,
+                current.id,
+            )
+            listing_ids = [row["id"] for row in listing_rows]
+            units_by_listing = await _get_units_for_listing_ids(conn, listing_ids)
+            return [
+                _map_listing(row, units_by_listing.get(row["id"], []))
+                for row in listing_rows
+            ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
+
+
 @router.get("/{listing_id}", response_model=PropertyListingRead)
 async def get_property_listing(
     listing_id: UUID,
-    current: Annotated[MunicipalityUserRecord, Depends(require_editor)],
+    current: Annotated[MunicipalityUserRecord, Depends(get_current_user)],
 ):
     _ = current
     pool = get_pool()
@@ -365,7 +391,7 @@ async def get_property_listing(
 async def update_property_listing(
     listing_id: UUID,
     body: PropertyListingUpdate,
-    current: Annotated[MunicipalityUserRecord, Depends(require_editor)],
+    current: Annotated[MunicipalityUserRecord, Depends(get_current_user)],
 ):
     data = body.model_dump(exclude_unset=True)
     units_data = data.pop("units", None)
@@ -499,7 +525,7 @@ async def update_property_listing(
 @router.delete("/{listing_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_property_listing(
     listing_id: UUID,
-    current: Annotated[MunicipalityUserRecord, Depends(require_editor)],
+    current: Annotated[MunicipalityUserRecord, Depends(get_current_user)],
 ):
     pool = get_pool()
     try:
