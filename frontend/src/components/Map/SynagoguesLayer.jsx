@@ -34,15 +34,15 @@ function SynagoguesLayer({ filters }) {
                 <p><strong>שם:</strong> {properties.name_he}</p>
               )}
               {properties.type && (
-                <p><strong>Type:</strong> {properties.type}</p>
+                <p><strong>סוג:</strong> {properties.type}</p>
               )}
               {properties.type_he && (
                 <p><strong>סוג:</strong> {properties.type_he}</p>
               )}
               {properties.address && (
-                <p><strong>Address:</strong> {properties.address}</p>
+                <p><strong>כתובת:</strong> {properties.address}</p>
               )}
-              <p><strong>Area:</strong> {properties.stat_2022}</p>
+              <p><strong>אזור:</strong> {properties.stat_2022}</p>
             </div>
           </Popup>
         </Marker>

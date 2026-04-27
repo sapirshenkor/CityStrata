@@ -2,8 +2,8 @@ import { z } from 'zod'
 import type { PoiCategory } from './types'
 
 const baseFields = {
-  name: z.string().trim().min(1, 'Name is required'),
-  address: z.string().trim().min(1, 'Address is required'),
+  name: z.string().trim().min(1, 'יש להזין שם'),
+  address: z.string().trim().min(1, 'יש להזין כתובת'),
   type: z.string().optional(),
 }
 
@@ -15,8 +15,8 @@ const ratingScoreOptional = z
   .pipe(
     z
       .number()
-      .min(0, 'Rating must be at least 0')
-      .max(5, 'Rating must be at most 5')
+      .min(0, 'הדירוג חייב להיות לפחות 0')
+      .max(5, 'הדירוג חייב להיות עד 5')
       .optional(),
   )
 
@@ -39,8 +39,8 @@ const optionalNonNegativeFloat = z
   .pipe(z.number().min(0).optional())
 
 const airbnbFields = {
-  name: z.string().trim().min(1, 'Title is required'),
-  address: z.string().trim().min(1, 'Location subtitle is required'),
+  name: z.string().trim().min(1, 'יש להזין כותרת'),
+  address: z.string().trim().min(1, 'יש להזין מיקום'),
   description: z.string().optional(),
   url: z.string().optional(),
   numNights: optionalIntNonNegative,
@@ -51,9 +51,9 @@ const airbnbFields = {
 }
 
 const educationFields = {
-  institutionCode: z.string().trim().min(1, 'Institution code is required'),
-  name: z.string().trim().min(1, 'Institution name is required'),
-  address: z.string().trim().min(1, 'Full address is required'),
+  institutionCode: z.string().trim().min(1, 'יש להזין קוד מוסד'),
+  name: z.string().trim().min(1, 'יש להזין שם מוסד'),
+  address: z.string().trim().min(1, 'יש להזין כתובת מלאה'),
   typeOfSupervision: z.string().optional(),
   typeOfEducation: z.string().optional(),
   educationPhase: z.string().optional(),
@@ -75,8 +75,8 @@ export function getPoiFormSchema(category: PoiCategory) {
   }
   if (category === 'coffee_shops') {
     return z.object({
-      name: z.string().trim().min(1, 'Title is required'),
-      address: z.string().trim().min(1, 'Street is required'),
+      name: z.string().trim().min(1, 'יש להזין כותרת'),
+      address: z.string().trim().min(1, 'יש להזין רחוב'),
       type: z.string().optional(),
       description: z.string().optional(),
       url: z.string().optional(),
@@ -95,15 +95,15 @@ export function getPoiFormSchema(category: PoiCategory) {
               return false
             }
           },
-          { message: 'Activity times must be valid JSON or empty' },
+          { message: 'שעות הפעילות חייבות להיות JSON תקין או ריקות' },
         ),
       institutionCode: z.string().optional(),
     })
   }
   if (category === 'restaurants') {
     return z.object({
-      name: z.string().trim().min(1, 'Title is required'),
-      address: z.string().trim().min(1, 'Street is required'),
+      name: z.string().trim().min(1, 'יש להזין כותרת'),
+      address: z.string().trim().min(1, 'יש להזין רחוב'),
       type: z.string().optional(),
       description: z.string().optional(),
       url: z.string().optional(),
@@ -114,8 +114,8 @@ export function getPoiFormSchema(category: PoiCategory) {
   }
   if (category === 'matnasim') {
     return z.object({
-      name: z.string().trim().min(1, 'Center name is required'),
-      address: z.string().trim().min(1, 'Full address is required'),
+      name: z.string().trim().min(1, 'יש להזין שם מרכז'),
+      address: z.string().trim().min(1, 'יש להזין כתובת מלאה'),
       personInCharge: z.string().optional(),
       phoneNumber: z.string().optional(),
       activityDays: z.string().optional(),
@@ -132,17 +132,17 @@ export function getPoiFormSchema(category: PoiCategory) {
       .object({
         name: z.string(),
         nameHe: z.string(),
-        address: z.string().trim().min(1, 'Address is required'),
+        address: z.string().trim().min(1, 'יש להזין כתובת'),
         type: z.string(),
         typeHe: z.string(),
         institutionCode: z.string().optional(),
       })
       .refine((d) => !!(d.name.trim() || d.nameHe.trim()), {
-        message: 'Provide name or Hebrew name',
+        message: 'יש להזין שם בעברית או באנגלית',
         path: ['name'],
       })
       .refine((d) => !!(d.type.trim() || d.typeHe.trim()), {
-        message: 'Provide type or Hebrew type',
+        message: 'יש להזין סוג בעברית או באנגלית',
         path: ['type'],
       })
   }

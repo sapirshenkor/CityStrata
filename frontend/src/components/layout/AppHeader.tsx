@@ -47,7 +47,7 @@ export function AppHeader({
           CityStrata
         </Link>
         <span className={cn('hidden text-xs font-medium sm:inline', s.subtitle)}>
-          Eilat evacuation mapping
+        אילת · מערכת לניהול פינוי
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-2">{children}</div>

@@ -18,7 +18,7 @@ export default function ProtectedRoute({ children }) {
           className="h-9 w-9 animate-spin rounded-full border-2 border-primary border-t-transparent"
           aria-hidden
         />
-        <p className="text-sm">Loading…</p>
+        <p className="text-sm">טוען...</p>
       </div>
     )
   }

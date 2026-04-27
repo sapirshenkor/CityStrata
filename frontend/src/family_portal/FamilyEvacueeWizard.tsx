@@ -222,7 +222,7 @@ export default function FamilyEvacueeWizard() {
           ? (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : null
       setSubmitError(
-        typeof detail === 'string' ? detail : e instanceof Error ? e.message : 'Save failed',
+        typeof detail === 'string' ? detail : e instanceof Error ? e.message : 'השמירה נכשלה',
       )
     }
   }
@@ -236,7 +236,7 @@ export default function FamilyEvacueeWizard() {
           className="h-9 w-9 animate-spin rounded-full border-2 border-primary border-t-transparent"
           aria-hidden
         />
-        <p className="mt-3 text-sm text-muted-foreground">Loading profile…</p>
+        <p className="mt-3 text-sm text-muted-foreground">טוען פרופיל...</p>
       </div>
     )
   }
@@ -245,10 +245,10 @@ export default function FamilyEvacueeWizard() {
     return (
       <div className="dashboard-app flex min-h-screen flex-col items-center justify-center gap-4 p-6">
         <p className="text-center text-sm text-destructive">
-          {loadErr instanceof Error ? loadErr.message : 'Could not load profile.'}
+          {loadErr instanceof Error ? loadErr.message : 'לא ניתן לטעון את הפרופיל.'}
         </p>
         <Button asChild variant="outline">
-          <Link to="/family">Back to dashboard</Link>
+          <Link to="/family">חזרה ללוח הבקרה</Link>
         </Button>
       </div>
     )

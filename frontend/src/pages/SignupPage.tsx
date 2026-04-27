@@ -58,11 +58,11 @@ export default function SignupPage() {
         <Card className="w-full max-w-lg border-border shadow-lg">
         <CardHeader className="space-y-1 text-center">
           <div className="mx-auto mb-2 rounded-xl bg-gradient-to-br from-primary to-slate-800 px-4 py-3 text-primary-foreground">
-            <CardTitle className="text-2xl font-bold text-primary-foreground">Create account</CardTitle>
-            <CardDescription className="text-primary-foreground/90">Municipality access for CityStrata</CardDescription>
+            <CardTitle className="text-2xl font-bold text-primary-foreground">יצירת חשבון</CardTitle>
+            <CardDescription className="text-primary-foreground/90">גישה לרשות מקומית ב־CityStrata</CardDescription>
           </div>
           <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-            Eilat · semel 2600
+            אילת · סמל יישוב 2600
           </span>
         </CardHeader>
         <CardContent>
@@ -70,7 +70,7 @@ export default function SignupPage() {
             className="space-y-4"
             onSubmit={handleSubmit(onValid)}
             noValidate
-            aria-label="Create account"
+            aria-label="יצירת חשבון"
           >
             {serverError ? (
               <div
@@ -83,7 +83,7 @@ export default function SignupPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="su-first">First name</Label>
+                <Label htmlFor="su-first">שם פרטי</Label>
                 <Input
                   id="su-first"
                   autoComplete="given-name"
@@ -98,7 +98,7 @@ export default function SignupPage() {
                 ) : null}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="su-last">Last name</Label>
+                <Label htmlFor="su-last">שם משפחה</Label>
                 <Input
                   id="su-last"
                   autoComplete="family-name"
@@ -115,7 +115,7 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="su-email">Work email</Label>
+              <Label htmlFor="su-email">דוא"ל עבודה</Label>
               <Input
                 id="su-email"
                 type="email"
@@ -132,28 +132,28 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="su-phone">Phone</Label>
+              <Label htmlFor="su-phone">טלפון</Label>
               <Input
                 id="su-phone"
                 type="tel"
                 autoComplete="tel"
-                placeholder="Optional"
+                placeholder="אופציונלי"
                 {...register('phone')}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="su-dept">Department</Label>
-              <Input id="su-dept" placeholder="Optional" {...register('department')} />
+              <Label htmlFor="su-dept">מחלקה</Label>
+              <Input id="su-dept" placeholder="אופציונלי" {...register('department')} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="su-pass">Password</Label>
+              <Label htmlFor="su-pass">סיסמה</Label>
               <Input
                 id="su-pass"
                 type="password"
                 autoComplete="new-password"
-                placeholder="At least 8 characters"
+                placeholder="לפחות 8 תווים"
                 aria-invalid={errors.password ? 'true' : 'false'}
                 aria-describedby={errors.password ? 'su-pass-error' : undefined}
                 {...register('password')}
@@ -170,14 +170,14 @@ export default function SignupPage() {
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Creating account…' : 'Create account'}
+              {isSubmitting ? 'יוצר חשבון...' : 'יצירת חשבון'}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Already registered?{' '}
+            כבר רשומים?{' '}
             <Link to="/login" className="font-semibold text-primary hover:underline">
-              Sign in
+              התחברות
             </Link>
           </p>
         </CardContent>

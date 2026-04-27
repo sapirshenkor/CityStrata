@@ -125,7 +125,7 @@ export default function FormWizard() {
       setErrors(formatZodErrors(parsed.error))
       setSubmitState({
         status: 'error',
-        message: 'Please fix the highlighted fields and try again.',
+        message: 'יש לתקן את השדות המסומנים ולנסות שוב.',
         result: null,
       })
       return
@@ -137,11 +137,11 @@ export default function FormWizard() {
 
       setSubmitState({
         status: 'success',
-        message: 'Profile submitted successfully.',
+        message: 'הפרופיל נשלח בהצלחה.',
         result: res.data,
       })
     } catch (e) {
-      const detail = e?.response?.data?.detail || e?.message || 'Submission failed'
+      const detail = e?.response?.data?.detail || e?.message || 'השליחה נכשלה'
       setSubmitState({
         status: 'error',
         message: detail,

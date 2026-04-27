@@ -48,39 +48,39 @@ export function MapSidebar({
           {/* Row 1: Layers · Family · Community */}
           <TabsTrigger
             value="layers"
-            title="Map layers"
+            title="שכבות מפה"
             className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
           >
-            Layers
+            שכבות
           </TabsTrigger>
           <TabsTrigger
             value="form"
-            title="Family profile form"
+            title="טופס פרופיל משפחה"
             className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
           >
-            Family
+            משפחה
           </TabsTrigger>
           <TabsTrigger
             value="community"
-            title="Community / group profile"
+            title="פרופיל קהילה / קבוצה"
             className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
           >
-            Community
+            קהילה
           </TabsTrigger>
           {/* Row 2: recommend Family · recommend Community */}
           <TabsTrigger
             value="recommendations"
-            title="Family recommendations & tactical reports"
+            title="המלצות משפחה ודוחות טקטיים"
             className="col-span-3 min-h-[2.25rem] whitespace-normal px-1.5 text-center text-[10px] leading-snug text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-[11px]"
           >
-            recommend Family
+            המלצות למשפחה
           </TabsTrigger>
           <TabsTrigger
             value="communities"
-            title="Community profiles & saved groups"
+            title="פרופילי קהילה וקבוצות שמורות"
             className="col-span-3 min-h-[2.25rem] whitespace-normal px-1.5 text-center text-[10px] leading-snug text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-[11px]"
           >
-            recommend Community
+            המלצות לקהילה
           </TabsTrigger>
         </TabsList>
         <TabsContent value="form" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">

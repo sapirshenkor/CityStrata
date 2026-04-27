@@ -2,8 +2,8 @@ import { z } from 'zod'
 
 /** Matches current login UI: email + password, min 8 characters (as HTML minLength on password). */
 export const loginFormSchema = z.object({
-  email: z.string().trim().min(1, 'Required').email('Invalid email'),
-  password: z.string().min(8, 'At least 8 characters'),
+  email: z.string().trim().min(1, 'שדה חובה').email('כתובת דוא"ל לא תקינה'),
+  password: z.string().min(8, 'לפחות 8 תווים'),
 })
 
 export type LoginFormValues = z.infer<typeof loginFormSchema>
@@ -14,12 +14,12 @@ export type LoginFormValues = z.infer<typeof loginFormSchema>
  * - optional phone and department, mapping to `phone_number: ''` and `department: null` when empty
  */
 export const signupFormSchema = z.object({
-  first_name: z.string().trim().min(1, 'Required'),
-  last_name: z.string().trim().min(1, 'Required'),
-  email: z.string().trim().min(1, 'Required').email('Invalid email'),
+  first_name: z.string().trim().min(1, 'שדה חובה'),
+  last_name: z.string().trim().min(1, 'שדה חובה'),
+  email: z.string().trim().min(1, 'שדה חובה').email('כתובת דוא"ל לא תקינה'),
   phone: z.string(),
   department: z.string(),
-  password: z.string().min(8, 'At least 8 characters'),
+  password: z.string().min(8, 'לפחות 8 תווים'),
 })
 
 export type SignupFormValues = z.infer<typeof signupFormSchema>

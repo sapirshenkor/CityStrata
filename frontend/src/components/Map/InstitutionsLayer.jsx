@@ -51,12 +51,12 @@ function InstitutionsLayer({ filters }) {
                 style={idx > 0 ? { borderTop: '1px solid #e0e0e0', paddingTop: 8, marginTop: 8 } : undefined}
               >
                 <h3 style={{ margin: '0 0 4px' }}>{p.institution_name}</h3>
-                <p style={{ margin: '2px 0' }}><strong>Code:</strong> {p.institution_code}</p>
-                {p.address && <p style={{ margin: '2px 0' }}><strong>Address:</strong> {p.address}</p>}
-                {p.education_phase && <p style={{ margin: '2px 0' }}><strong>Phase:</strong> {p.education_phase}</p>}
-                {p.type_of_education && <p style={{ margin: '2px 0' }}><strong>Type:</strong> {p.type_of_education}</p>}
-                {p.type_of_supervision && <p style={{ margin: '2px 0' }}><strong>Supervision:</strong> {p.type_of_supervision}</p>}
-                <p style={{ margin: '2px 0' }}><strong>Area:</strong> {p.stat_2022}</p>
+                <p style={{ margin: '2px 0' }}><strong>קוד:</strong> {p.institution_code}</p>
+                {p.address && <p style={{ margin: '2px 0' }}><strong>כתובת:</strong> {p.address}</p>}
+                {p.education_phase && <p style={{ margin: '2px 0' }}><strong>שלב חינוך:</strong> {p.education_phase}</p>}
+                {p.type_of_education && <p style={{ margin: '2px 0' }}><strong>סוג חינוך:</strong> {p.type_of_education}</p>}
+                {p.type_of_supervision && <p style={{ margin: '2px 0' }}><strong>פיקוח:</strong> {p.type_of_supervision}</p>}
+                <p style={{ margin: '2px 0' }}><strong>אזור:</strong> {p.stat_2022}</p>
               </div>
             ))}
           </Popup>

@@ -81,10 +81,10 @@ export function HotelForm({
       noValidate
     >
       <div className="space-y-2">
-        <Label htmlFor="hotel-name">Name</Label>
+        <Label htmlFor="hotel-name">שם</Label>
         <Input
           id="hotel-name"
-          placeholder="Hotel name"
+          placeholder="שם המלון"
           autoComplete="organization"
           {...form.register('name')}
         />
@@ -94,10 +94,10 @@ export function HotelForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="hotel-address">Address</Label>
+        <Label htmlFor="hotel-address">כתובת</Label>
         <Input
           id="hotel-address"
-          placeholder="Full street address"
+          placeholder="כתובת רחוב מלאה"
           autoComplete="street-address"
           {...form.register('location_fulladdress')}
         />
@@ -110,11 +110,11 @@ export function HotelForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="hotel-type">Type</Label>
-          <Input id="hotel-type" placeholder="e.g. Hotel, Resort" {...form.register('type')} />
+          <Label htmlFor="hotel-type">סוג</Label>
+          <Input id="hotel-type" placeholder="לדוגמה: מלון, ריזורט" {...form.register('type')} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="hotel-rating">Rating (0–5)</Label>
+          <Label htmlFor="hotel-rating">דירוג (0-5)</Label>
           <Input
             id="hotel-rating"
             type="number"
@@ -131,7 +131,7 @@ export function HotelForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="hotel-url">Website URL</Label>
+        <Label htmlFor="hotel-url">כתובת אתר</Label>
         <Input id="hotel-url" type="url" placeholder="https://…" {...form.register('url')} />
         {form.formState.errors.url ? (
           <p className="text-xs text-destructive">{form.formState.errors.url.message}</p>
@@ -139,10 +139,10 @@ export function HotelForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="hotel-desc">Description</Label>
+        <Label htmlFor="hotel-desc">תיאור</Label>
         <Textarea
           id="hotel-desc"
-          placeholder="Optional short description"
+          placeholder="תיאור קצר אופציונלי"
           rows={3}
           className="resize-none"
           {...form.register('description')}
@@ -151,11 +151,11 @@ export function HotelForm({
 
       <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-          Cancel
+          ביטול
         </Button>
         <Button type="submit" disabled={isSubmitting} className="gap-2">
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {mode === 'create' ? 'Add hotel' : 'Save changes'}
+          {mode === 'create' ? 'הוספת מלון' : 'שמירת שינויים'}
         </Button>
       </div>
     </form>

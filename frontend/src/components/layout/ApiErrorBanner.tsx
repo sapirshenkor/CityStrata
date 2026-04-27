@@ -13,7 +13,7 @@ export interface ApiErrorBannerProps {
 export function ApiErrorBanner({
   message,
   onRetry,
-  retryLabel = 'Retry',
+  retryLabel = 'נסו שוב',
   className,
   children,
 }: ApiErrorBannerProps) {

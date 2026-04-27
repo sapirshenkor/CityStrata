@@ -75,9 +75,9 @@ function OSMFacilitiesLayer({ filters }) {
         >
           <Popup>
             <div className="popup-content">
-              <h3>{properties.name || 'Unnamed Facility'}</h3>
-              <p><strong>Type:</strong> {properties.facility_type}</p>
-              <p><strong>Area:</strong> {properties.stat_2022}</p>
+              <h3>{properties.name || 'מתקן ללא שם'}</h3>
+              <p><strong>סוג:</strong> {properties.facility_type}</p>
+              <p><strong>אזור:</strong> {properties.stat_2022}</p>
             </div>
           </Popup>
         </Marker>

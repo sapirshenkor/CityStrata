@@ -166,9 +166,9 @@ export default function PointOfInterestManagement() {
   const handleDeleteCb = useCallback(
     (row: PoiEntityRow) => {
       const name = String(
-        row['title'] || row['name'] || row['matnas_name'] || row['institution_name'] || 'this row',
+        row['title'] || row['name'] || row['matnas_name'] || row['institution_name'] || 'רשומה זו',
       )
-      const ok = window.confirm(`Delete “${name}”? This cannot be undone.`)
+      const ok = window.confirm(`למחוק את “${name}”? לא ניתן לבטל פעולה זו.`)
       if (!ok) return
       deleteMut.mutate(getEntityId(row, category))
     },
@@ -187,8 +187,8 @@ export default function PointOfInterestManagement() {
   return (
     <PageShell>
       <PageHeader
-        title="Point of interest management"
-        description="Manage listings and venues by category. Data is scoped to your municipality on the server."
+        title="ניהול נקודות עניין"
+        description="ניהול רשומות ומקומות לפי קטגוריה. הנתונים מסוננים בצד השרת לפי הרשות המקומית שלך."
         containerClassName="max-w-6xl"
         leading={
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -201,12 +201,12 @@ export default function PointOfInterestManagement() {
             <Button variant="outline" size="sm" className="rounded-lg" asChild>
               <Link to="/municipality" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
-                Dashboard
+                לוח בקרה
               </Link>
             </Button>
             <Button size="sm" className="rounded-lg gap-2" onClick={openCreate}>
               <Plus className="h-4 w-4" />
-              Add record
+              הוספת רשומה
             </Button>
           </div>
         }
@@ -257,10 +257,10 @@ export default function PointOfInterestManagement() {
                 type="search"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search this category…"
+                placeholder="חיפוש בקטגוריה..."
                 className="rounded-lg ps-9"
                 autoComplete="off"
-                aria-label="Search listings"
+                aria-label="חיפוש רשומות"
               />
             </div>
             {listQuery.isError ? (
@@ -281,8 +281,7 @@ export default function PointOfInterestManagement() {
                 {!listQuery.isLoading && totalRecords > 0 ? (
                   <div className="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-muted-foreground">
-                      {totalRecords} record{totalRecords === 1 ? '' : 's'} · page {listPage?.page ?? page} of{' '}
-                      {totalPages}
+                      {totalRecords} רשומות · עמוד {listPage?.page ?? page} מתוך {totalPages}
                     </p>
                     <div className="flex items-center gap-2">
                       <Button
@@ -292,10 +291,10 @@ export default function PointOfInterestManagement() {
                         className="rounded-lg"
                         disabled={page <= 1 || listQuery.isFetching}
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        aria-label="Previous page"
+                        aria-label="העמוד הקודם"
                       >
                         <ChevronLeft className="h-4 w-4" />
-                        Previous
+                        הקודם
                       </Button>
                       <Button
                         type="button"
@@ -304,9 +303,9 @@ export default function PointOfInterestManagement() {
                         className="rounded-lg"
                         disabled={page >= totalPages || listQuery.isFetching}
                         onClick={() => setPage((p) => p + 1)}
-                        aria-label="Next page"
+                        aria-label="העמוד הבא"
                       >
-                        Next
+                        הבא
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
@@ -329,8 +328,8 @@ export default function PointOfInterestManagement() {
           <DialogHeader>
             <DialogTitle>
               {formMode === 'create'
-                ? `Add ${formFieldConfig.addRecordTitle}`
-                : `Edit ${formFieldConfig.addRecordTitle}`}
+                ? `הוספת ${formFieldConfig.addRecordTitle}`
+                : `עריכת ${formFieldConfig.addRecordTitle}`}
             </DialogTitle>
             <DialogDescription>{formFieldConfig.dialogDescription}</DialogDescription>
           </DialogHeader>

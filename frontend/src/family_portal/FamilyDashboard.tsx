@@ -91,7 +91,7 @@ export default function FamilyDashboard() {
         typeof err === 'object' && err !== null && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : null
-      setActionError(typeof detail === 'string' ? detail : err instanceof Error ? err.message : 'Matching failed')
+      setActionError(typeof detail === 'string' ? detail : err instanceof Error ? err.message : 'הרצת ההתאמה נכשלה')
     } finally {
       setMatchingBusy(null)
     }
@@ -112,7 +112,7 @@ export default function FamilyDashboard() {
         typeof err === 'object' && err !== null && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : null
-      setActionError(typeof detail === 'string' ? detail : err instanceof Error ? err.message : 'Tactical failed')
+      setActionError(typeof detail === 'string' ? detail : err instanceof Error ? err.message : 'הרצת הדוח הטקטי נכשלה')
     } finally {
       setTacticalBusy(null)
     }
@@ -125,7 +125,7 @@ export default function FamilyDashboard() {
           className="h-9 w-9 animate-spin rounded-full border-2 border-primary border-t-transparent"
           aria-hidden
         />
-        <p className="mt-3 text-sm text-muted-foreground">Loading your dashboard…</p>
+        <p className="mt-3 text-sm text-muted-foreground">טוען לוח בקרה...</p>
       </div>
     )
   }
@@ -134,13 +134,13 @@ export default function FamilyDashboard() {
     return (
       <div className="dashboard-app family-portal flex min-h-screen flex-col items-center justify-center gap-4 p-6">
         <p className="text-center text-sm text-destructive">
-          {error instanceof Error ? error.message : 'Could not load dashboard.'}
+          {error instanceof Error ? error.message : 'לא ניתן לטעון את לוח הבקרה.'}
         </p>
         <Button type="button" variant="outline" onClick={() => void refetch()}>
-          Try again
+          נסו שוב
         </Button>
         <Button asChild variant="ghost" size="sm">
-          <Link to="/map">Back to map</Link>
+          <Link to="/map">חזרה למפה</Link>
         </Button>
       </div>
     )
@@ -157,7 +157,7 @@ export default function FamilyDashboard() {
       <header className="dashboard-app__gradient px-4 py-5 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">Family portal</h1>
+            <h1 className="text-xl font-bold tracking-tight text-white">פורטל משפחה</h1>
             <p className="mt-1 text-sm text-white/90">
               סקירה אישית של הפרופילים והסטטוס — לפי הנתונים מהמערכת.
             </p>
@@ -347,7 +347,7 @@ export default function FamilyDashboard() {
                                         key={z.hub_label ?? i}
                                         className={`rec-zone-badge rec-zone-badge--${i % 3}`}
                                       >
-                                        {(z.hub_label ?? `zone_${i}`)
+                                        {(z.hub_label ?? `אזור_${i}`)
                                           .replace(/_/g, ' ')
                                           .replace(/\b\w/g, (c: string) => c.toUpperCase())}{' '}
                                         · {z.radius_m} m

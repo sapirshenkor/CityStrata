@@ -54,10 +54,10 @@ export default function LoginPage() {
         <CardHeader className="space-y-1 text-center">
           <div className="mx-auto mb-2 rounded-xl bg-gradient-to-br from-primary to-slate-800 px-4 py-3 text-primary-foreground">
             <CardTitle className="text-2xl font-bold text-primary-foreground">CityStrata</CardTitle>
-            <CardDescription className="text-primary-foreground/90">Sign in to continue</CardDescription>
+            <CardDescription className="text-primary-foreground/90">התחברו כדי להמשיך</CardDescription>
           </div>
           <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-            Eilat · Municipality
+            אילת · רשות מקומית
           </span>
         </CardHeader>
         <CardContent>
@@ -65,7 +65,7 @@ export default function LoginPage() {
             className="space-y-4"
             onSubmit={handleSubmit(onValid)}
             noValidate
-            aria-label="Sign in"
+            aria-label="התחברות"
           >
             {serverError ? (
               <div
@@ -77,7 +77,7 @@ export default function LoginPage() {
             ) : null}
 
             <div className="space-y-2">
-              <Label htmlFor="login-email">Email</Label>
+              <Label htmlFor="login-email">דוא"ל</Label>
               <Input
                 id="login-email"
                 type="email"
@@ -95,7 +95,7 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="login-password">Password</Label>
+              <Label htmlFor="login-password">סיסמה</Label>
               <Input
                 id="login-password"
                 type="password"
@@ -117,14 +117,14 @@ export default function LoginPage() {
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Signing in…' : 'Sign in'}
+              {isSubmitting ? 'מתחבר...' : 'התחברות'}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            No account?{' '}
+            אין חשבון?{' '}
             <Link to="/signup" className="font-semibold text-primary hover:underline">
-              Create one
+              צרו חשבון
             </Link>
           </p>
         </CardContent>

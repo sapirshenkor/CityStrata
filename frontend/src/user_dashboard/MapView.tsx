@@ -107,7 +107,7 @@ export function MapView({
           if (!Number.isNaN(stat)) onSelectStat2022(stat)
         },
       })
-      layer.bindTooltip(`Statistical area ${stat}`, { sticky: true })
+      layer.bindTooltip(`אזור סטטיסטי ${stat}`, { sticky: true })
     },
     [onSelectStat2022],
   )
@@ -115,7 +115,7 @@ export function MapView({
   if (loading) {
     return (
       <div className="dashboard-app__map-frame dashboard-app__map-placeholder flex h-full min-h-[min(240px,42dvh)] w-full flex-1 items-center justify-center rounded-lg lg:min-h-0">
-        <p className="text-sm text-muted-foreground">Loading map…</p>
+        <p className="text-sm text-muted-foreground">טוען מפה...</p>
       </div>
     )
   }
@@ -128,7 +128,7 @@ export function MapView({
         </p>
         {onRetry ? (
           <Button type="button" variant="outline" size="sm" className="rounded-lg" onClick={() => onRetry()}>
-            Retry
+            נסו שוב
           </Button>
         ) : null}
       </div>
@@ -139,8 +139,8 @@ export function MapView({
     return (
       <div className="dashboard-app__map-frame dashboard-app__map-placeholder flex h-full min-h-[min(240px,42dvh)] w-full flex-1 items-center justify-center rounded-lg p-6 text-center lg:min-h-0">
         <p className="max-w-sm text-sm text-muted-foreground">
-          No statistical area boundaries were returned. KPIs need boundary data—try refreshing or check the
-          API.
+          לא התקבלו גבולות של אזורים סטטיסטיים. מדדי לוח הבקרה דורשים נתוני גבולות -
+          נסו לרענן או בדקו את ה־API.
         </p>
       </div>
     )

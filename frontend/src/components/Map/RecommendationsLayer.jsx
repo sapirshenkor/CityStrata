@@ -5,7 +5,7 @@ import { Circle, Tooltip } from 'react-leaflet'
 const ZONE_COLORS = ['#2563eb', '#e67e22', '#27ae60']
 
 function formatZoneLabel(hub_label) {
-  return (hub_label || 'Zone')
+  return (hub_label || 'אזור')
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -42,15 +42,15 @@ function RecommendationsLayer({ recommendation }) {
           <strong style={{ display: 'block', marginBottom: 4 }}>
             {formatZoneLabel(zone.hub_label)}
           </strong>
-          <div>Radius: <b>{zone.radius_m} m</b></div>
+          <div>רדיוס: <b>{zone.radius_m} מ'</b></div>
           {zone.semantic_score != null && (
             <div>
-              Score:{' '}
+              ציון:{' '}
               <b>{(zone.semantic_score * 100).toFixed(1)}%</b>
             </div>
           )}
           {zone.total_amenities != null && (
-            <div>Amenities: <b>{zone.total_amenities}</b></div>
+            <div>שירותים זמינים: <b>{zone.total_amenities}</b></div>
           )}
         </div>
       </Tooltip>

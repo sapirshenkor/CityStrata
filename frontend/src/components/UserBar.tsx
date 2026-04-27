@@ -34,33 +34,33 @@ export default function UserBar({ variant = 'onPrimary' }: { variant?: UserBarVa
     if (onSurface) {
       return (
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="text-xs font-medium text-muted-foreground">Guest</span>
+          <span className="text-xs font-medium text-muted-foreground">אורח</span>
           <Button asChild variant="secondary" size="sm" className="h-8 rounded-full">
-            <Link to="/login">Sign in</Link>
+            <Link to="/login">התחברות</Link>
           </Button>
           <Button asChild size="sm" className="h-8 rounded-full">
-            <Link to="/signup">Sign up</Link>
+            <Link to="/signup">הרשמה</Link>
           </Button>
         </div>
       )
     }
     return (
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <span className="text-xs font-medium text-white/80">Guest</span>
+        <span className="text-xs font-medium text-white/80">אורח</span>
         <Button
           asChild
           variant="secondary"
           size="sm"
           className="h-8 rounded-full border-0 bg-white/15 text-white hover:bg-white/25"
         >
-          <Link to="/login">Sign in</Link>
+          <Link to="/login">התחברות</Link>
         </Button>
         <Button
           asChild
           size="sm"
           className="h-8 rounded-full bg-white text-primary hover:bg-white/90"
         >
-          <Link to="/signup">Sign up</Link>
+          <Link to="/signup">הרשמה</Link>
         </Button>
       </div>
     )
@@ -84,11 +84,11 @@ export default function UserBar({ variant = 'onPrimary' }: { variant?: UserBarVa
         ) : null}
         <Button asChild variant="outline" size="sm" className="h-8 rounded-full">
           <Link to={isVisitor ? '/family' : '/municipality'}>
-            {isVisitor ? 'Family' : 'Dashboard'}
+            {isVisitor ? 'פורטל משפחה' : 'לוח בקרה'}
           </Link>
         </Button>
         <Button type="button" variant="secondary" size="sm" className="h-8 rounded-full" onClick={() => logout()}>
-          Log out
+          התנתקות
         </Button>
       </div>
     )
@@ -116,7 +116,7 @@ export default function UserBar({ variant = 'onPrimary' }: { variant?: UserBarVa
         className="h-8 rounded-full border border-white/40 bg-transparent text-white hover:bg-white/15"
       >
         <Link to={isVisitor ? '/family' : '/municipality'}>
-          {isVisitor ? 'Family' : 'Dashboard'}
+          {isVisitor ? 'פורטל משפחה' : 'לוח בקרה'}
         </Link>
       </Button>
       <Button
@@ -126,7 +126,7 @@ export default function UserBar({ variant = 'onPrimary' }: { variant?: UserBarVa
         className="h-8 rounded-full border border-white/40 bg-transparent text-white hover:bg-white/15"
         onClick={() => logout()}
       >
-        Log out
+        התנתקות
       </Button>
     </div>
   )

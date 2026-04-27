@@ -92,8 +92,8 @@ export function formatApiError(err: unknown): string {
   if (fromBody) return fromBody
 
   if (e.response) {
-    return e.message || 'Something went wrong'
+    return e.message || 'אירעה שגיאה. נסו שוב.'
   }
 
-  return e.message || 'Something went wrong'
+  return e.message || 'אירעה שגיאה. נסו שוב.'
 }

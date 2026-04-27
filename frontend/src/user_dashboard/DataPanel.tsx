@@ -50,20 +50,20 @@ export function DataPanel({
   const chartData = useMemo(() => {
     if (!metrics) return []
     return [
-      { name: 'Coffee shops', value: metrics.coffee_shops_count },
-      { name: 'Restaurants', value: metrics.restaurants_count },
-      { name: 'Education', value: metrics.institutions_count },
-      { name: 'Airbnb listings', value: metrics.airbnb_count },
-      { name: 'Hotels', value: metrics.hotels_count },
-      { name: 'Matnasim', value: metrics.matnasim_count },
-      { name: 'OSM facilities', value: metrics.osm_facilities_count },
+      { name: 'בתי קפה', value: metrics.coffee_shops_count },
+      { name: 'מסעדות', value: metrics.restaurants_count },
+      { name: 'חינוך', value: metrics.institutions_count },
+      { name: 'נכסי Airbnb', value: metrics.airbnb_count },
+      { name: 'מלונות', value: metrics.hotels_count },
+      { name: 'מתנ"סים', value: metrics.matnasim_count },
+      { name: 'מתקני OSM', value: metrics.osm_facilities_count },
     ].filter((d) => d.value > 0)
   }, [metrics])
 
   const scopeLabel =
     selectedStat2022 == null
-      ? 'Whole city (aggregated statistical areas)'
-      : `Statistical area ${selectedStat2022}`
+      ? 'כל העיר (איגוד אזורים סטטיסטיים)'
+      : `אזור סטטיסטי ${selectedStat2022}`
 
   if (loading && !metrics) {
     return (
@@ -78,12 +78,12 @@ export function DataPanel({
     return (
       <Card className="h-full min-h-[min(220px,40dvh)] rounded-2xl border-border/80 bg-card shadow-card lg:min-h-0">
         <CardHeader>
-          <CardTitle className="text-base">Insights</CardTitle>
+          <CardTitle className="text-base">תובנות</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Insights cannot load while data requests are failing. Use Retry on the map or above the KPIs,
-            then Refresh data if needed.
+            לא ניתן לטעון תובנות בזמן שבקשות הנתונים נכשלות. השתמשו ב"נסו שוב" במפה או
+            מעל המדדים, ולאחר מכן רעננו נתונים במידת הצורך.
           </p>
         </CardContent>
       </Card>
@@ -94,12 +94,12 @@ export function DataPanel({
     return (
       <Card className="h-full min-h-[min(220px,40dvh)] rounded-2xl border-border/80 bg-card shadow-card lg:min-h-0">
         <CardHeader>
-          <CardTitle className="text-base">Insights</CardTitle>
+          <CardTitle className="text-base">תובנות</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
             {emptyDetail ??
-              'No metrics are available for this view yet. Ensure statistical areas loaded, then try Refresh.'}
+              'אין מדדים זמינים לתצוגה זו כרגע. ודאו שהאזורים הסטטיסטיים נטענו ולאחר מכן נסו לרענן.'}
           </p>
         </CardContent>
       </Card>
@@ -116,12 +116,12 @@ export function DataPanel({
     <div className="flex h-full min-h-[min(220px,40dvh)] flex-col gap-4 overflow-y-auto pe-1 lg:min-h-0">
       <Card className={cardClass}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Venue mix</CardTitle>
+          <CardTitle className="text-base">תמהיל מקומות</CardTitle>
           <p className="text-xs text-muted-foreground">{scopeLabel}</p>
         </CardHeader>
         <CardContent className="h-56">
           {chartData.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No venues in this selection.</p>
+            <p className="text-sm text-muted-foreground">אין מקומות בבחירה זו.</p>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -142,7 +142,7 @@ export function DataPanel({
                 <Tooltip
                   formatter={(value) => {
                     const n = typeof value === 'number' ? value : Number(value)
-                    return [Number.isFinite(n) ? n.toLocaleString() : '—', 'Count']
+                    return [Number.isFinite(n) ? n.toLocaleString() : '—', 'כמות']
                   }}
                   contentStyle={{
                     borderRadius: '8px',
@@ -161,16 +161,16 @@ export function DataPanel({
 
       <Card className={cardClass}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Area & capacity</CardTitle>
+          <CardTitle className="text-base">שטח וקיבולת</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-1 gap-3 text-sm text-card-foreground">
             <div className="flex justify-between gap-4 border-b border-border/80 pb-2">
-              <dt className="text-muted-foreground">Land area</dt>
+              <dt className="text-muted-foreground">שטח קרקע</dt>
               <dd className="font-medium tabular-nums">{formatArea(metrics.area_m2)}</dd>
             </div>
             <div className="flex justify-between gap-4 border-b border-border/80 pb-2">
-              <dt className="text-muted-foreground">Airbnb guest capacity (est.)</dt>
+              <dt className="text-muted-foreground">קיבולת אורחי Airbnb (הערכה)</dt>
               <dd className="font-medium tabular-nums">
                 {metrics.total_airbnb_capacity.toLocaleString()}
               </dd>
@@ -181,16 +181,16 @@ export function DataPanel({
 
       <Card className={cardClass}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Data sources</CardTitle>
+          <CardTitle className="text-base">מקורות נתונים</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Summary counts for education, Airbnb, restaurants, and coffee shops follow the backend{' '}
+            ספירות הסיכום עבור חינוך, Airbnb, מסעדות ובתי קפה מבוססות על מודל השרת{' '}
             <code className="rounded bg-muted px-1 py-0.5 text-card-foreground">
               StatisticalAreaSummary
-            </code>{' '}
-            model. Hotels, matnasim, and OSM points are counted from their GeoJSON endpoints for the active
-            filter ({selectedStat2022 == null ? 'municipality' : `area ${selectedStat2022}`}).
+            </code>
+            . מלונות, מתנ"סים ונקודות OSM נספרים מנקודות הקצה של GeoJSON עבור המסנן הפעיל
+            ({selectedStat2022 == null ? 'הרשות' : `אזור ${selectedStat2022}`}).
           </p>
         </CardContent>
       </Card>

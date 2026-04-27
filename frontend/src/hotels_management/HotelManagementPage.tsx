@@ -86,7 +86,7 @@ export default function HotelManagementPage() {
   }
 
   const handleDelete = (row: HotelRow) => {
-    const ok = window.confirm(`Delete “${row.name}”? This cannot be undone.`)
+    const ok = window.confirm(`למחוק את “${row.name}”? לא ניתן לבטל פעולה זו.`)
     if (!ok) return
     deleteMut.mutate(row.uuid)
   }
@@ -106,8 +106,8 @@ export default function HotelManagementPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Hotel management"
-        description="Add and maintain hotels for your municipality. Addresses are geocoded automatically."
+        title="ניהול מלונות"
+        description="הוספה ותחזוקה של מלונות עבור הרשות המקומית. כתובות עוברות גיאוקוד באופן אוטומטי."
         leading={
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Building2 className="h-6 w-6" strokeWidth={1.75} />
@@ -119,12 +119,12 @@ export default function HotelManagementPage() {
             <Button variant="outline" size="sm" className="rounded-lg" asChild>
               <Link to="/municipality" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
-                Dashboard
+                לוח בקרה
               </Link>
             </Button>
             <Button size="sm" className="rounded-lg gap-2" onClick={openCreate}>
               <Plus className="h-4 w-4" />
-              Add hotel
+              הוספת מלון
             </Button>
           </div>
         }
@@ -142,9 +142,9 @@ export default function HotelManagementPage() {
         ) : (
           <Card className="rounded-2xl border-border/80 shadow-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Hotels</CardTitle>
+              <CardTitle className="text-base font-semibold">מלונות</CardTitle>
               <CardDescription>
-                Showing listings for your municipality scope (filtered server-side by semel yish).
+                מציג רשומות בתחום הרשות המקומית שלך, לפי סינון סמל יישוב בצד השרת.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -169,11 +169,11 @@ export default function HotelManagementPage() {
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit hotel' : 'Add hotel'}</DialogTitle>
+            <DialogTitle>{editing ? 'עריכת מלון' : 'הוספת מלון'}</DialogTitle>
             <DialogDescription>
               {editing
-                ? 'Update details. Changing the full address will re-geocode the location.'
-                : 'Enter a name and address. We will geocode the address and save coordinates.'}
+                ? 'עדכנו פרטים. שינוי הכתובת המלאה יבצע גיאוקוד מחדש למיקום.'
+                : 'הזינו שם וכתובת. המערכת תבצע גיאוקוד לכתובת ותשמור קואורדינטות.'}
             </DialogDescription>
           </DialogHeader>
           <HotelForm

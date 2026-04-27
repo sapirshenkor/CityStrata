@@ -66,13 +66,13 @@ export default function DashboardContainer() {
 
   const insightsEmptyDetail = useMemo(() => {
     if (areasEmpty) {
-      return 'No statistical boundaries are available. KPIs cannot be computed until area geometry loads successfully.'
+      return 'אין גבולות אזורים סטטיסטיים זמינים. לא ניתן לחשב מדדי לוח בקרה עד שנתוני הגיאומטריה ייטענו בהצלחה.'
     }
     if (!metricsEmpty) return undefined
     if (statIds.length === 0) {
-      return 'No statistical areas were found in the boundary dataset, so city-wide KPIs cannot be aggregated.'
+      return 'לא נמצאו אזורים סטטיסטיים במערך הגבולות, ולכן לא ניתן לאגד מדדים לכל העיר.'
     }
-    return 'Summary data was not returned for the current scope. Try Refresh data or select another area.'
+    return 'לא התקבלו נתוני סיכום עבור ההיקף הנוכחי. נסו לרענן נתונים או לבחור אזור אחר.'
   }, [areasEmpty, metricsEmpty, statIds.length])
 
   return (
@@ -87,11 +87,11 @@ export default function DashboardContainer() {
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="dashboard-app__gradient shrink-0 px-6 py-5">
           <h2 className="text-xl font-bold tracking-tight text-white">
-            {selectedStat2022 == null ? 'City overview' : `Area ${selectedStat2022}`}
+            {selectedStat2022 == null ? 'סקירת עיר' : `אזור ${selectedStat2022}`}
           </h2>
           <p className="mt-1 text-sm text-white/90">
-            Click a statistical area on the map to filter KPIs and insights. Use Refresh to invalidate the
-            client cache and refetch.
+            לחצו על אזור סטטיסטי במפה כדי לסנן מדדים ותובנות. השתמשו ברענון כדי לטעון
+            נתונים עדכניים.
           </p>
         </header>
 
@@ -104,7 +104,7 @@ export default function DashboardContainer() {
         <div className="shrink-0 border-b border-border/80 bg-card px-6 py-4 shadow-sm">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
             <StatsCard
-              title="Education"
+              title="חינוך"
               value={metrics?.institutions_count?.toLocaleString() ?? '—'}
               icon={GraduationCap}
               loading={kpiLoading}
@@ -116,34 +116,34 @@ export default function DashboardContainer() {
               loading={kpiLoading}
             />
             <StatsCard
-              title="Restaurants"
+              title="מסעדות"
               value={metrics?.restaurants_count?.toLocaleString() ?? '—'}
               icon={UtensilsCrossed}
               loading={kpiLoading}
             />
             <StatsCard
-              title="Coffee shops"
+              title="בתי קפה"
               value={metrics?.coffee_shops_count?.toLocaleString() ?? '—'}
               icon={Coffee}
               loading={kpiLoading}
             />
             <StatsCard
-              title="Hotels"
+              title="מלונות"
               value={metrics?.hotels_count?.toLocaleString() ?? '—'}
               icon={Hotel}
               loading={kpiLoading}
             />
             <StatsCard
-              title="Matnasim"
+              title={'מתנ"סים'}
               value={metrics?.matnasim_count?.toLocaleString() ?? '—'}
               icon={Building}
               loading={kpiLoading}
             />
             <StatsCard
-              title="OSM facilities"
+              title="מתקני OSM"
               value={metrics?.osm_facilities_count?.toLocaleString() ?? '—'}
               icon={Store}
-              description="OpenStreetMap-derived points"
+              description="נקודות ממקור OpenStreetMap"
               loading={kpiLoading}
             />
           </div>

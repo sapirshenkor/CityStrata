@@ -7,5 +7,5 @@ export function formatQueryError(err: unknown): string {
     if (Array.isArray(d)) return d.map((x) => JSON.stringify(x)).join(', ')
   }
   if (err instanceof Error) return err.message
-  return 'Something went wrong'
+  return 'אירעה שגיאה. נסו שוב.'
 }

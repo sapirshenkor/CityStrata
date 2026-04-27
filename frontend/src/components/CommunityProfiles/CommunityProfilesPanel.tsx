@@ -313,7 +313,7 @@ export default function CommunityProfilesPanel() {
           </div>
           <strong>אין עדיין פרופילי קהילה</strong>
           <p style={{ margin: '8px 0 0' }}>
-            הוסיפו קהילה בלשונית Community, ואז חזרו לכאן לצפייה ברשימה.
+            הוסיפו קהילה בלשונית "קהילה", ואז חזרו לכאן לצפייה ברשימה.
           </p>
         </div>
       ) : (

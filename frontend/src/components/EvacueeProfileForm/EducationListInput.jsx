@@ -44,7 +44,7 @@ export default function EducationListInput({ items, onChange, error }) {
         {(items ?? []).map((it, idx) => (
           <span key={`${it}-${idx}`} className="evpf-chip">
             {it}
-            <button type="button" onClick={() => removeAt(idx)} aria-label="Remove">
+            <button type="button" onClick={() => removeAt(idx)} aria-label="הסרת פריט">
               ×
             </button>
           </span>

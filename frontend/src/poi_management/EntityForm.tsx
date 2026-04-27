@@ -128,16 +128,16 @@ export function EntityForm({
       {category === 'educational_institutions' ? (
         <>
           <div className="space-y-2">
-            <Label htmlFor="poi-edu-code">Institution code</Label>
+            <Label htmlFor="poi-edu-code">קוד מוסד</Label>
             <Input
               id="poi-edu-code"
-              placeholder="Unique code (institution_code)"
+              placeholder="קוד ייחודי"
               autoComplete="off"
               disabled={mode === 'edit'}
               {...form.register('institutionCode')}
             />
             {mode === 'edit' ? (
-              <p className="text-xs text-muted-foreground">Code cannot be changed after creation.</p>
+              <p className="text-xs text-muted-foreground">לא ניתן לשנות את הקוד לאחר יצירה.</p>
             ) : null}
             {form.formState.errors.institutionCode ? (
               <p className="text-xs text-destructive">{form.formState.errors.institutionCode.message}</p>
@@ -173,28 +173,28 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-edu-supervision">Type of supervision</Label>
+            <Label htmlFor="poi-edu-supervision">סוג פיקוח</Label>
             <Input
               id="poi-edu-supervision"
-              placeholder="Optional (type_of_supervision)"
+              placeholder="אופציונלי"
               {...form.register('typeOfSupervision')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-edu-type-education">Type of education</Label>
+            <Label htmlFor="poi-edu-type-education">סוג חינוך</Label>
             <Input
               id="poi-edu-type-education"
-              placeholder="Optional (type_of_education)"
+              placeholder="אופציונלי"
               {...form.register('typeOfEducation')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-edu-phase">Education phase</Label>
+            <Label htmlFor="poi-edu-phase">שלב חינוך</Label>
             <Input
               id="poi-edu-phase"
-              placeholder="Optional (education_phase)"
+              placeholder="אופציונלי"
               {...form.register('educationPhase')}
             />
           </div>
@@ -214,34 +214,34 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-airbnb-url">URL</Label>
+            <Label htmlFor="poi-airbnb-url">כתובת URL</Label>
             <Input
               id="poi-airbnb-url"
               type="url"
               inputMode="url"
-              placeholder="Listing URL (url)"
+              placeholder="כתובת הנכס"
               {...form.register('url')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-airbnb-description">Description</Label>
+            <Label htmlFor="poi-airbnb-description">תיאור</Label>
             <Textarea
               id="poi-airbnb-description"
-              placeholder="Optional (description)"
+              placeholder="אופציונלי"
               rows={3}
               {...form.register('description')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-airbnb-nights">Number of nights</Label>
+            <Label htmlFor="poi-airbnb-nights">מספר לילות</Label>
             <Input
               id="poi-airbnb-nights"
               type="number"
               min={0}
               step={1}
-              placeholder="Optional (num_nights)"
+              placeholder="אופציונלי"
               {...form.register('numNights', { valueAsNumber: true })}
             />
             {form.formState.errors.numNights ? (
@@ -250,13 +250,13 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-airbnb-price">Price per night</Label>
+            <Label htmlFor="poi-airbnb-price">מחיר ללילה</Label>
             <Input
               id="poi-airbnb-price"
               type="number"
               min={0}
               step={0.01}
-              placeholder="Optional (price_per_night)"
+              placeholder="אופציונלי"
               {...form.register('pricePerNight', { valueAsNumber: true })}
             />
             {form.formState.errors.pricePerNight ? (
@@ -265,14 +265,14 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-airbnb-rating">Rating (0–5)</Label>
+            <Label htmlFor="poi-airbnb-rating">דירוג (0-5)</Label>
             <Input
               id="poi-airbnb-rating"
               type="number"
               step="0.1"
               min={0}
               max={5}
-              placeholder="Optional (rating_value)"
+              placeholder="אופציונלי"
               {...form.register('ratingValue', { valueAsNumber: true })}
             />
             {form.formState.errors.ratingValue ? (
@@ -281,13 +281,13 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-airbnb-capacity">Person capacity</Label>
+            <Label htmlFor="poi-airbnb-capacity">קיבולת נפשות</Label>
             <Input
               id="poi-airbnb-capacity"
               type="number"
               min={0}
               step={1}
-              placeholder="Optional (person_capacity)"
+              placeholder="אופציונלי"
               {...form.register('personCapacity', { valueAsNumber: true })}
             />
             {form.formState.errors.personCapacity ? (
@@ -326,59 +326,59 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-coffee-description">Description</Label>
+            <Label htmlFor="poi-coffee-description">תיאור</Label>
             <Textarea
               id="poi-coffee-description"
-              placeholder="Optional (description)"
+              placeholder="אופציונלי"
               rows={3}
               {...form.register('description')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-coffee-category">Category</Label>
+            <Label htmlFor="poi-coffee-category">קטגוריה</Label>
             <Input
               id="poi-coffee-category"
-              placeholder="e.g. Café, Ice cream (category_name)"
+              placeholder="לדוגמה: קפה, גלידה"
               {...form.register('type')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-coffee-rating">Rating (0–5)</Label>
+            <Label htmlFor="poi-coffee-rating">דירוג (0-5)</Label>
             <Input
               id="poi-coffee-rating"
               type="number"
               step="0.1"
               min={0}
               max={5}
-              placeholder="Optional (total_score)"
+              placeholder="אופציונלי"
               {...form.register('ratingValue', { valueAsNumber: true })}
             />
-            <p className="text-xs text-muted-foreground">Venue score (total_score).</p>
+            <p className="text-xs text-muted-foreground">ציון המקום.</p>
             {form.formState.errors.ratingValue ? (
               <p className="text-xs text-destructive">{form.formState.errors.ratingValue.message}</p>
             ) : null}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-coffee-url">URL</Label>
+            <Label htmlFor="poi-coffee-url">כתובת URL</Label>
             <Input
               id="poi-coffee-url"
               type="url"
               inputMode="url"
-              placeholder="Optional (url)"
+              placeholder="אופציונלי"
               {...form.register('url')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-coffee-website">Website</Label>
+            <Label htmlFor="poi-coffee-website">אתר</Label>
             <Input
               id="poi-coffee-website"
               type="url"
               inputMode="url"
-              placeholder="Optional (website)"
+              placeholder="אופציונלי"
               {...form.register('website')}
             />
           </div>
@@ -400,16 +400,16 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-coffee-activity-times">Activity times (JSON)</Label>
+            <Label htmlFor="poi-coffee-activity-times">שעות פעילות (JSON)</Label>
             <Textarea
               id="poi-coffee-activity-times"
-              placeholder='e.g. {"mon": "08:00–18:00"} or []'
+              placeholder='לדוגמה: {"sun": "08:00-18:00"} או []'
               rows={4}
               className="font-mono text-xs"
               {...form.register('activityTimesJson')}
             />
             <p className="text-xs text-muted-foreground">
-              Stored as JSONB (activity_times). Leave empty if none.
+              נשמר כ־JSONB. השאירו ריק אם אין מידע.
             </p>
             {form.formState.errors.activityTimesJson ? (
               <p className="text-xs text-destructive">{form.formState.errors.activityTimesJson.message}</p>
@@ -431,59 +431,59 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-restaurant-description">Description</Label>
+            <Label htmlFor="poi-restaurant-description">תיאור</Label>
             <Textarea
               id="poi-restaurant-description"
-              placeholder="Optional (description)"
+              placeholder="אופציונלי"
               rows={3}
               {...form.register('description')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-restaurant-category">Category</Label>
+            <Label htmlFor="poi-restaurant-category">קטגוריה</Label>
             <Input
               id="poi-restaurant-category"
-              placeholder="e.g. Italian, Fast food (category_name)"
+              placeholder="לדוגמה: איטלקי, מזון מהיר"
               {...form.register('type')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-restaurant-rating">Rating (0–5)</Label>
+            <Label htmlFor="poi-restaurant-rating">דירוג (0-5)</Label>
             <Input
               id="poi-restaurant-rating"
               type="number"
               step="0.1"
               min={0}
               max={5}
-              placeholder="Optional (total_score)"
+              placeholder="אופציונלי"
               {...form.register('ratingValue', { valueAsNumber: true })}
             />
-            <p className="text-xs text-muted-foreground">Venue score (total_score).</p>
+            <p className="text-xs text-muted-foreground">ציון המקום.</p>
             {form.formState.errors.ratingValue ? (
               <p className="text-xs text-destructive">{form.formState.errors.ratingValue.message}</p>
             ) : null}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-restaurant-url">URL</Label>
+            <Label htmlFor="poi-restaurant-url">כתובת URL</Label>
             <Input
               id="poi-restaurant-url"
               type="url"
               inputMode="url"
-              placeholder="Optional (url)"
+              placeholder="אופציונלי"
               {...form.register('url')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-restaurant-website">Website</Label>
+            <Label htmlFor="poi-restaurant-website">אתר</Label>
             <Input
               id="poi-restaurant-website"
               type="url"
               inputMode="url"
-              placeholder="Optional (website)"
+              placeholder="אופציונלי"
               {...form.register('website')}
             />
           </div>
@@ -507,12 +507,12 @@ export function EntityForm({
       ) : category === 'hotel_listings' ? (
         <>
           <div className="space-y-2">
-            <Label htmlFor="poi-hotel-url">URL</Label>
+            <Label htmlFor="poi-hotel-url">כתובת URL</Label>
             <Input
               id="poi-hotel-url"
               type="url"
               inputMode="url"
-              placeholder="Optional (url)"
+              placeholder="אופציונלי"
               {...form.register('url')}
             />
           </div>
@@ -530,33 +530,33 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-hotel-description">Description</Label>
+            <Label htmlFor="poi-hotel-description">תיאור</Label>
             <Textarea
               id="poi-hotel-description"
-              placeholder="Optional (description)"
+              placeholder="אופציונלי"
               rows={3}
               {...form.register('description')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-hotel-type">Type</Label>
+            <Label htmlFor="poi-hotel-type">סוג</Label>
             <Input
               id="poi-hotel-type"
-              placeholder="e.g. Resort, Boutique (type)"
+              placeholder="לדוגמה: ריזורט, בוטיק"
               {...form.register('type')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-hotel-rating">Rating (0–5)</Label>
+            <Label htmlFor="poi-hotel-rating">דירוג (0-5)</Label>
             <Input
               id="poi-hotel-rating"
               type="number"
               step="0.1"
               min={0}
               max={5}
-              placeholder="Optional (rating_value)"
+              placeholder="אופציונלי"
               {...form.register('ratingValue', { valueAsNumber: true })}
             />
             {form.formState.errors.ratingValue ? (
@@ -611,42 +611,42 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-matnas-person">Person in charge</Label>
+            <Label htmlFor="poi-matnas-person">איש קשר</Label>
             <Input
               id="poi-matnas-person"
-              placeholder="Optional (person_in_charge)"
+              placeholder="אופציונלי"
               {...form.register('personInCharge')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-matnas-phone">Phone number</Label>
+            <Label htmlFor="poi-matnas-phone">מספר טלפון</Label>
             <Input
               id="poi-matnas-phone"
               type="tel"
               autoComplete="tel"
-              placeholder="Optional (phone_number)"
+              placeholder="אופציונלי"
               {...form.register('phoneNumber')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-matnas-activity-days">Activity days</Label>
+            <Label htmlFor="poi-matnas-activity-days">ימי פעילות</Label>
             <Input
               id="poi-matnas-activity-days"
-              placeholder="Optional (activity_days)"
+              placeholder="אופציונלי"
               {...form.register('activityDays')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-matnas-facility-area">Facility area (m²)</Label>
+            <Label htmlFor="poi-matnas-facility-area">שטח מתקן (מ"ר)</Label>
             <Input
               id="poi-matnas-facility-area"
               type="number"
               min={0}
               step={1}
-              placeholder="Optional (facility_area)"
+              placeholder="אופציונלי"
               {...form.register('facilityArea', { valueAsNumber: true })}
             />
             {form.formState.errors.facilityArea ? (
@@ -655,13 +655,13 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-matnas-occupancy">Occupancy</Label>
+            <Label htmlFor="poi-matnas-occupancy">תפוסה</Label>
             <Input
               id="poi-matnas-occupancy"
               type="number"
               min={0}
               step={1}
-              placeholder="Optional (occupancy)"
+              placeholder="אופציונלי"
               {...form.register('occupancy', { valueAsNumber: true })}
             />
             {form.formState.errors.occupancy ? (
@@ -670,19 +670,19 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-matnas-rooms">Number of activity rooms</Label>
+            <Label htmlFor="poi-matnas-rooms">מספר חדרי פעילות</Label>
             <Input
               id="poi-matnas-rooms"
-              placeholder="Optional (number_of_activity_rooms)"
+              placeholder="אופציונלי"
               {...form.register('numberOfActivityRooms')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-matnas-shelter">Shelter and where</Label>
+            <Label htmlFor="poi-matnas-shelter">מרחב מוגן ומיקום</Label>
             <Input
               id="poi-matnas-shelter"
-              placeholder="Optional (shelter_and_where)"
+              placeholder="אופציונלי"
               {...form.register('shelterAndWhere')}
             />
           </div>
@@ -690,7 +690,7 @@ export function EntityForm({
       ) : category === 'synagogues' ? (
         <>
           <div className="space-y-2">
-            <Label htmlFor="poi-syn-name">Name (English)</Label>
+            <Label htmlFor="poi-syn-name">שם (אנגלית)</Label>
             <Input
               id="poi-syn-name"
               placeholder={fieldConfig.namePlaceholder}
@@ -703,21 +703,21 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-syn-name-he">Name (Hebrew)</Label>
+            <Label htmlFor="poi-syn-name-he">שם (עברית)</Label>
             <Input
               id="poi-syn-name-he"
-              placeholder="Hebrew name (name_he)"
+              placeholder="שם בעברית"
               dir="rtl"
               {...form.register('nameHe')}
             />
-            <p className="text-xs text-muted-foreground">At least one of English or Hebrew name is required.</p>
+            <p className="text-xs text-muted-foreground">יש להזין לפחות שם אחד בעברית או באנגלית.</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-syn-type">Type (English)</Label>
+            <Label htmlFor="poi-syn-type">סוג (אנגלית)</Label>
             <Input
               id="poi-syn-type"
-              placeholder="e.g. Ashkenazi, Sephardi (type)"
+              placeholder="לדוגמה: אשכנזי, ספרדי"
               {...form.register('type')}
             />
             {form.formState.errors.type ? (
@@ -726,14 +726,14 @@ export function EntityForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="poi-syn-type-he">Type (Hebrew)</Label>
+            <Label htmlFor="poi-syn-type-he">סוג (עברית)</Label>
             <Input
               id="poi-syn-type-he"
-              placeholder="Hebrew type (type_he)"
+              placeholder="סוג בעברית"
               dir="rtl"
               {...form.register('typeHe')}
             />
-            <p className="text-xs text-muted-foreground">At least one of English or Hebrew type is required.</p>
+            <p className="text-xs text-muted-foreground">יש להזין לפחות סוג אחד בעברית או באנגלית.</p>
           </div>
 
           <div className="space-y-2">
@@ -789,11 +789,11 @@ export function EntityForm({
 
       <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-          Cancel
+          ביטול
         </Button>
         <Button type="submit" disabled={isSubmitting} className="gap-2">
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {mode === 'create' ? 'Create' : 'Save'}
+          {mode === 'create' ? 'יצירה' : 'שמירה'}
         </Button>
       </div>
     </form>

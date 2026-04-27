@@ -85,11 +85,11 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClu
     const clusterName =
       assignment?.cluster_name ??
       assignment?.cluster_label ??
-      (cluster !== undefined ? `Cluster ${cluster}` : null)
+      (cluster !== undefined ? `אשכול ${cluster}` : null)
     const tooltipText =
       showClusters && cluster !== undefined && clusterName
         ? clusterName
-        : `Area ${stat2022}`
+        : `אזור ${stat2022}`
 
     layer.bindTooltip(tooltipText, {
       permanent: false,

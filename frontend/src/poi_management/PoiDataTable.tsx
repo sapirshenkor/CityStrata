@@ -58,7 +58,7 @@ function buildColumns(
   const cols: ColumnDef<PoiEntityRow>[] = [
     {
       id: 'name',
-      header: 'Name',
+      header: 'שם',
       cell: ({ row }) => (
         <div className="max-w-[14rem] font-medium text-foreground">
           {getDisplayName(row.original, category)}
@@ -70,7 +70,7 @@ function buildColumns(
   if (showTypeColumn(category)) {
     cols.push({
       id: 'type',
-      header: 'Type',
+      header: 'סוג',
       cell: ({ row }) => {
         const t = getDisplayType(row.original, category)
         return <span className="text-muted-foreground">{t ?? '—'}</span>
@@ -81,7 +81,7 @@ function buildColumns(
   if (showRatingColumn(category)) {
     cols.push({
       id: 'rating',
-      header: 'Rating',
+      header: 'דירוג',
       cell: ({ row }) => {
         const v = getDisplayRating(row.original, category)
         if (v == null) return <span className="text-muted-foreground">—</span>
@@ -98,7 +98,7 @@ function buildColumns(
   cols.push(
     {
       id: 'address',
-      header: 'Address',
+      header: 'כתובת',
       cell: ({ row }) => {
         const addr = getDisplayAddress(row.original, category)
         if (!addr) return <span className="text-muted-foreground">—</span>
@@ -126,7 +126,7 @@ function buildColumns(
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
               onClick={() => onEdit(r)}
-              aria-label={`Edit ${label}`}
+              aria-label={`עריכת ${label}`}
             >
               <Pencil className="h-4 w-4" />
             </Button>
@@ -141,7 +141,7 @@ function buildColumns(
               )}
               onClick={() => onDelete(r)}
               disabled={busy}
-              aria-label={`Delete ${label}`}
+              aria-label={`מחיקת ${label}`}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -217,7 +217,7 @@ export function PoiDataTable({
                 colSpan={columns.length}
                 className="h-24 text-center text-sm text-muted-foreground"
               >
-                No records for this category yet.
+                אין עדיין רשומות בקטגוריה זו.
               </TableCell>
             </TableRow>
           )}
