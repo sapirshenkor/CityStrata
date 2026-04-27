@@ -291,7 +291,7 @@ export default function CommunityProfilesPanel() {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input
           type="search"
-          className="min-w-0 flex-1 rounded-md border border-[var(--rec-border)] bg-white px-2 py-1.5 text-xs"
+          className="min-w-0 flex-1 rounded-md border border-[var(--rec-border)] bg-card px-2 py-1.5 text-xs"
           placeholder="חיפוש לפי שם, איש קשר, טלפון…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -299,7 +299,7 @@ export default function CommunityProfilesPanel() {
         />
         <button
           type="button"
-          className="rounded-md border border-[var(--rec-border)] bg-white px-2 py-1.5 text-xs font-medium text-[var(--rec-text)] hover:bg-slate-50"
+          className="rounded-md border border-[var(--rec-border)] bg-card px-2 py-1.5 text-xs font-medium text-[var(--rec-text)] hover:bg-muted/50"
           onClick={() => refresh()}
         >
           רענון
@@ -313,7 +313,7 @@ export default function CommunityProfilesPanel() {
           </div>
           <strong>אין עדיין פרופילי קהילה</strong>
           <p style={{ margin: '8px 0 0' }}>
-            הוסיפו קהילה בלשונית Community, ואז חזרו לכאן לצפייה ברשימה.
+            הוסיפו קהילה בלשונית "קהילה", ואז חזרו לכאן לצפייה ברשימה.
           </p>
         </div>
       ) : (

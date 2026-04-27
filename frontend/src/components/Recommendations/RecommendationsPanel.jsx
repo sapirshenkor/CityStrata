@@ -257,7 +257,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
         <Skeleton className="h-8 w-full" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
-        <p className="text-center text-xs text-muted-foreground">Loading families…</p>
+        <p className="text-center text-xs text-muted-foreground">טוען משפחות...</p>
       </div>
     )
   }
@@ -266,7 +266,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
     return (
       <div className="rec-panel">
         <div className="rec-state rec-state--error" role="alert">
-          <strong>Could not load data</strong>
+          <strong>לא ניתן לטעון נתונים</strong>
           <br />
           {loadError}
         </div>
@@ -281,10 +281,10 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
           <div className="rec-state-icon" aria-hidden>
             📋
           </div>
-          <strong>No families yet</strong>
+          <strong>אין עדיין משפחות</strong>
           <p style={{ margin: '8px 0 0' }}>
-            Add evacuee family profiles in the Evacuee tab, then return here to run matching and
-            tactical recommendations.
+            הוסיפו פרופילי משפחות מפונות בלשונית המשפחה, ואז חזרו לכאן להרצת התאמות
+            והמלצות טקטיות.
           </p>
         </div>
       </div>
@@ -301,9 +301,9 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
   return (
     <div className="rec-panel">
       <header className="rec-panel-header">
-        <h1 className="rec-panel-title">Recommendations</h1>
+        <h1 className="rec-panel-title">המלצות</h1>
         <p className="rec-panel-subtitle">
-          Run matching for a cluster assignment, then tactical for zones. Open a family for details.
+          הריצו התאמה לשיוך אשכול, ולאחר מכן הריצו דוח טקטי לאזורים. פתחו משפחה לצפייה בפרטים.
         </p>
       </header>
 
@@ -313,13 +313,13 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
         </div>
       )}
 
-      <section className="rec-community" aria-label="Merge families into one community profile">
+      <section className="rec-community" aria-label="מיזוג משפחות לפרופיל קהילה אחד">
         <div className="rec-community-inner">
           <div className="rec-community-copy">
-            <span className="rec-community-kicker">Community merge</span>
+            <span className="rec-community-kicker">מיזוג קהילה</span>
             <p className="rec-community-lead">
-              Tick <strong>two or more</strong> rows that already have cluster matching. This creates
-              one merged profile and runs the community tactical step (several minutes).
+              סמנו <strong>שתי</strong> שורות או יותר שכבר עברו התאמת אשכול. הפעולה יוצרת
+              פרופיל מאוחד ומריצה שלב טקטי לקהילה (עשוי להימשך כמה דקות).
             </p>
           </div>
           <div className="rec-community-toolbar">
@@ -331,10 +331,10 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                   communityCanRun ? 'rec-community-status--ok' : 'rec-community-status--warn'
                 }`}
               >
-                {selectionCount} selected
-                {communityCanRun && ' · ready'}
-                {!communityCanRun && selectionCount >= 2 && ' · need cluster on all'}
-                {!communityCanRun && selectionCount < 2 && ' · pick one more'}
+                {selectionCount} נבחרו
+                {communityCanRun && ' · מוכן'}
+                {!communityCanRun && selectionCount >= 2 && ' · נדרש אשכול לכולן'}
+                {!communityCanRun && selectionCount < 2 && ' · בחרו עוד משפחה'}
               </span>
             )}
             <button
@@ -343,12 +343,12 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
               disabled={!communityCanRun || communityBusy}
               title={
                 !communityCanRun
-                  ? 'Select two or more families that already have macro matching'
-                  : 'Create merged profile and run community tactical'
+                  ? 'בחרו שתי משפחות או יותר שכבר עברו התאמת מאקרו'
+                  : 'יצירת פרופיל מאוחד והרצת דוח טקטי לקהילה'
               }
               onClick={handleCommunityTactical}
             >
-              {communityBusy ? 'Working…' : 'Merge & run'}
+              {communityBusy ? 'מבצע...' : 'מיזוג והרצה'}
             </button>
           </div>
         </div>
@@ -358,21 +358,21 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
         <div className="rec-layout-list">
           <div className="rec-list-section">
             <div className="rec-list-heading">
-              <h2 id="rec-families-heading">Families</h2>
+              <h2 id="rec-families-heading">משפחות</h2>
               <span className="rec-list-hint" id="rec-families-hint">
-                Click a row for details · Checkbox = include in community run
+                לחצו על שורה לפרטים · תיבת סימון = הכללה בהרצת קהילה
                 {hasActiveFilters && (
                   <>
                     {' '}
-                    · Showing {filteredOverview.length} of {overview.length}
+                    · מציג {filteredOverview.length} מתוך {overview.length}
                   </>
                 )}
               </span>
             </div>
-            <div className="rec-filters" role="group" aria-label="Filter families">
+            <div className="rec-filters" role="group" aria-label="סינון משפחות">
               <div className="rec-filters-row">
                 <label className="rec-filter-label" htmlFor="rec-filter-cluster">
-                  Cluster
+                  אשכול
                 </label>
                 <select
                   id="rec-filter-cluster"
@@ -380,15 +380,15 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                   value={clusterFilter}
                   onChange={(e) => setClusterFilter(e.target.value)}
                 >
-                  <option value="">All clusters</option>
+                  <option value="">כל האשכולות</option>
                   {selectedOverview?.cluster_number != null && (
                     <option value="follow">
-                      Same as selected (cluster #{selectedOverview.cluster_number})
+                      כמו הבחירה הנוכחית (אשכול #{selectedOverview.cluster_number})
                     </option>
                   )}
                   {clusterOptions.map((n) => (
                     <option key={n} value={String(n)}>
-                      Cluster #{n}
+                      אשכול #{n}
                     </option>
                   ))}
                 </select>
@@ -400,7 +400,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                     checked={filterMergedOnly}
                     onChange={(e) => setFilterMergedOnly(e.target.checked)}
                   />
-                  <span>Merged families</span>
+                  <span>משפחות ממוזגות</span>
                 </label>
                 <label className="rec-filter-chip">
                   <input
@@ -408,7 +408,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                     checked={filterNeedsCluster}
                     onChange={(e) => setFilterNeedsCluster(e.target.checked)}
                   />
-                  <span>Waiting for cluster</span>
+                  <span>ממתין לאשכול</span>
                 </label>
                 <label className="rec-filter-chip">
                   <input
@@ -416,20 +416,20 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                     checked={filterNeedsTactical}
                     onChange={(e) => setFilterNeedsTactical(e.target.checked)}
                   />
-                  <span>Waiting for tactical</span>
+                  <span>ממתין לטקטי</span>
                 </label>
                 {hasActiveFilters && (
                   <button type="button" className="rec-filters-clear" onClick={clearFilters}>
-                    Clear filters
+                    ניקוי מסננים
                   </button>
                 )}
               </div>
             </div>
             {filteredOverview.length === 0 ? (
               <div className="rec-filter-empty" role="status">
-                <p>No families match the current filters.</p>
+                <p>אין משפחות שתואמות למסננים הנוכחיים.</p>
                 <button type="button" className="rec-filters-clear" onClick={clearFilters}>
-                  Reset filters
+                  איפוס מסננים
                 </button>
               </div>
             ) : (
@@ -452,8 +452,8 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                 onClick={(e) => e.stopPropagation()}
                 title={
                   row.has_matching
-                    ? 'Include in community tactical run'
-                    : 'Run macro matching first'
+                    ? 'הכללה בהרצת דוח טקטי לקהילה'
+                    : 'יש להריץ קודם התאמת מאקרו'
                 }
               >
                 <input
@@ -461,7 +461,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                   checked={communitySelection.has(pid(row.profile_uuid))}
                   disabled={!row.has_matching}
                   onChange={() => toggleCommunityMember(row.profile_uuid)}
-                  aria-label={`Include ${row.family_name} in community run`}
+                  aria-label={`הכללת ${row.family_name} בהרצת קהילה`}
                 />
               </label>
               <div className="rec-item-body">
@@ -470,12 +470,12 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                   <span
                     className={`rec-status-pill ${row.has_tactical ? 'rec-status-pill--ok' : 'rec-status-pill--wait'}`}
                   >
-                    {row.has_tactical ? 'Tactical ready' : 'No tactical yet'}
+                    {row.has_tactical ? 'דוח טקטי מוכן' : 'אין עדיין דוח טקטי'}
                   </span>
                   {row.has_matching ? (
-                    <span className="rec-match-pill">Cluster assigned</span>
+                    <span className="rec-match-pill">הוקצה אשכול</span>
                   ) : (
-                    <span className="rec-match-pill rec-match-pill--muted">Matching needed</span>
+                    <span className="rec-match-pill rec-match-pill--muted">נדרשת התאמה</span>
                   )}
                 </div>
               </div>
@@ -488,7 +488,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                     disabled={matchingBusy === pid(row.profile_uuid)}
                     onClick={(e) => handleMatching(e, row.profile_uuid)}
                   >
-                    {matchingBusy === pid(row.profile_uuid) ? 'Running…' : 'Run matching'}
+                    {matchingBusy === pid(row.profile_uuid) ? 'מריץ...' : 'הרצת התאמה'}
                   </button>
                   <button
                     type="button"
@@ -496,10 +496,10 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                     disabled={
                       !row.has_matching || tacticalBusy === pid(row.profile_uuid)
                     }
-                    title={!row.has_matching ? 'Run matching first' : 'Generate tactical zones and report'}
+                    title={!row.has_matching ? 'יש להריץ קודם התאמה' : 'הפקת אזורים ודוח טקטי'}
                     onClick={(e) => handleTactical(e, row.profile_uuid)}
                   >
-                    {tacticalBusy === pid(row.profile_uuid) ? 'Running…' : 'Run tactical'}
+                    {tacticalBusy === pid(row.profile_uuid) ? 'מריץ...' : 'הרצת טקטי'}
                   </button>
                 </div>
               )}
@@ -515,10 +515,9 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
           {!selectedOverview && (
             <div className="rec-detail">
               <div className="rec-detail-placeholder">
-                <strong>Select a family</strong>
+                <strong>בחרו משפחה</strong>
                 <p style={{ margin: '8px 0 0', fontSize: 13 }}>
-                  Click a row in the list to view macro matching and the tactical report when
-                  available.
+                  לחצו על שורה ברשימה כדי לצפות בהתאמת המאקרו ובדוח הטקטי כאשר הם זמינים.
                 </p>
               </div>
             </div>
@@ -539,8 +538,8 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                   className="rec-detail-close"
                   type="button"
                   onClick={handleClose}
-                  title="Close panel"
-                  aria-label="Close detail panel"
+                  title="סגירת פאנל"
+                  aria-label="סגירת פאנל פרטים"
                 >
                   ✕
                 </button>
@@ -549,7 +548,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
               {detailLoading && (
                 <div className="rec-detail-loading">
                   <div className="rec-spinner" aria-hidden />
-                  Loading report…
+                  טוען דוח...
                 </div>
               )}
 
@@ -562,7 +561,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                 detailMatchesSelection &&
                 selectedRecommendation && (
                   <>
-                    <h4 className="rec-tactical-title">Tactical report (zones & narrative)</h4>
+                    <h4 className="rec-tactical-title">דוח טקטי (אזורים ונרטיב)</h4>
                     {selectedRecommendation.radii_data?.length > 0 && (
                       <div className="rec-zones-summary">
                         {selectedRecommendation.radii_data.map((z, i) => (
@@ -570,7 +569,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                             key={z.hub_label ?? i}
                             className={`rec-zone-badge rec-zone-badge--${i % 3}`}
                           >
-                            {(z.hub_label ?? `zone_${i}`)
+                            {(z.hub_label ?? `אזור_${i}`)
                               .replace(/_/g, ' ')
                               .replace(/\b\w/g, (c) => c.toUpperCase())}{' '}
                             · {z.radius_m} m
@@ -588,9 +587,8 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
               {!detailLoading && !selectedOverview.has_tactical && (
                 <div className="rec-detail-pending">
                   <p className="rec-detail-pending-text">
-                    <strong>Next steps:</strong> run <strong>matching</strong> to assign a cluster,
-                    then <strong>tactical</strong> to compute zones and generate the recommendation
-                    report.
+                    <strong>השלבים הבאים:</strong> הריצו <strong>התאמה</strong> לשיוך אשכול,
+                    ואז <strong>טקטי</strong> לחישוב אזורים והפקת דוח המלצה.
                   </p>
                   <div className="rec-detail-actions">
                     <button
@@ -600,8 +598,8 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                       onClick={(e) => handleMatching(e, selectedOverview.profile_uuid)}
                     >
                       {matchingBusy === pid(selectedOverview.profile_uuid)
-                        ? 'Running…'
-                        : '1. Run matching'}
+                        ? 'מריץ...'
+                        : '1. הרצת התאמה'}
                     </button>
                     <button
                       type="button"
@@ -613,8 +611,8 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
                       onClick={(e) => handleTactical(e, selectedOverview.profile_uuid)}
                     >
                       {tacticalBusy === pid(selectedOverview.profile_uuid)
-                        ? 'Running…'
-                        : '2. Run tactical'}
+                        ? 'מריץ...'
+                        : '2. הרצת טקטי'}
                     </button>
                   </div>
                 </div>

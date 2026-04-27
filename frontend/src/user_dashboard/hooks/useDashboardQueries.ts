@@ -5,6 +5,7 @@ import {
   fetchStatisticalAreas,
   fetchVenueFeatureCount,
 } from '@/services/dashboardApi'
+import { formatQueryError } from '@/lib/formatQueryError'
 import type { DashboardAggregateMetrics, StatisticalAreaSummary } from '@/types/dashboard'
 import { dashboardKeys } from '../queryKeys'
 
@@ -65,6 +66,8 @@ export function useAllAreaSummariesQuery(statIds: number[] | undefined, enabled:
 
   const isLoading = results.some((q) => q.isLoading)
   const isFetching = results.some((q) => q.isFetching)
+  const isError = results.some((q) => q.isError)
+  const failed = results.find((q) => q.isError)
   const summaries = results
     .map((q) => q.data)
     .filter((d): d is StatisticalAreaSummary => d != null)
@@ -73,6 +76,8 @@ export function useAllAreaSummariesQuery(statIds: number[] | undefined, enabled:
     summaries,
     isLoading,
     isFetching,
+    isError,
+    error: failed?.error ?? null,
   }
 }
 
@@ -99,6 +104,8 @@ export function useVenueCountsQuery(area: number | null) {
 
   const isLoading = hotels.isLoading || matnasim.isLoading || osm.isLoading
   const isFetching = hotels.isFetching || matnasim.isFetching || osm.isFetching
+  const isError = hotels.isError || matnasim.isError || osm.isError
+  const error = hotels.error ?? matnasim.error ?? osm.error ?? null
 
   return {
     hotels_count: hotels.data ?? 0,
@@ -106,6 +113,8 @@ export function useVenueCountsQuery(area: number | null) {
     osm_facilities_count: osm.data ?? 0,
     isLoading,
     isFetching,
+    isError,
+    error,
   }
 }
 
@@ -125,8 +134,13 @@ export function useDashboardMetrics(selectedStat2022: number | null) {
     [areasQuery.data],
   )
 
-  const { summaries, isLoading: allSummariesLoading, isFetching: allSummariesFetching } =
-    useAllAreaSummariesQuery(statIds, cityWide && statIds.length > 0)
+  const {
+    summaries,
+    isLoading: allSummariesLoading,
+    isFetching: allSummariesFetching,
+    isError: allSummariesError,
+    error: allSummariesErr,
+  } = useAllAreaSummariesQuery(statIds, cityWide && statIds.length > 0)
 
   const singleSummary = useStatisticalAreaSummaryQuery(
     selectedStat2022,
@@ -175,12 +189,46 @@ export function useDashboardMetrics(selectedStat2022: number | null) {
     (cityWide ? allSummariesFetching : singleSummary.isFetching) ||
     venue.isFetching
 
+  const metricsFetchFailed =
+    (cityWide && allSummariesError) ||
+    (!cityWide && singleSummary.isError) ||
+    venue.isError
+
+  const metricsErrorRaw =
+    (cityWide && allSummariesError ? allSummariesErr : null) ??
+    (!cityWide && singleSummary.isError ? singleSummary.error : null) ??
+    (venue.isError ? venue.error : null)
+
+  const metricsErrorMessage = metricsFetchFailed ? formatQueryError(metricsErrorRaw) : null
+
+  const metricsEmpty =
+    !loading &&
+    !metricsFetchFailed &&
+    metrics == null &&
+    areasQuery.isSuccess &&
+    !areasQuery.isError &&
+    (cityWide
+      ? statIds.length === 0 ||
+        (statIds.length > 0 &&
+          !allSummariesLoading &&
+          !allSummariesError &&
+          summaries.length === 0)
+      : selectedStat2022 != null &&
+        singleSummary.isFetched &&
+        !singleSummary.isLoading &&
+        !singleSummary.isError &&
+        singleSummary.data == null)
+
   return {
     metrics,
     loading,
     isFetching,
     areasError: areasQuery.error,
     refetchAreas: areasQuery.refetch,
+    statIds,
+    metricsFetchFailed,
+    metricsErrorMessage,
+    metricsEmpty,
   }
 }
 

@@ -32,18 +32,18 @@ function AirbnbLayer({ filters }) {
             <div className="popup-content">
               <h3>{properties.title}</h3>
               {properties.price_per_night && (
-                <p><strong>Price:</strong> {formatCurrency(properties.price_per_night)}/night</p>
+                <p><strong>מחיר:</strong> {formatCurrency(properties.price_per_night)} ללילה</p>
               )}
               {properties.person_capacity && (
-                <p><strong>Capacity:</strong> {properties.person_capacity} people</p>
+                <p><strong>קיבולת:</strong> {properties.person_capacity} נפשות</p>
               )}
               {properties.rating_value && (
-                <p><strong>Rating:</strong> {formatRating(properties.rating_value)}</p>
+                <p><strong>דירוג:</strong> {formatRating(properties.rating_value)}</p>
               )}
               {properties.url && (
-                <p><a href={properties.url} target="_blank" rel="noopener noreferrer">View Listing</a></p>
+                <p><a href={properties.url} target="_blank" rel="noopener noreferrer">צפייה בנכס</a></p>
               )}
-              <p><strong>Area:</strong> {properties.stat_2022}</p>
+              <p><strong>אזור:</strong> {properties.stat_2022}</p>
             </div>
           </Popup>
         </Marker>

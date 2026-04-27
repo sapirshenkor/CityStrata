@@ -27,7 +27,7 @@ export default function App() {
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-                  Loading dashboard…
+                  טוען לוח בקרה...
                 </div>
               }
             >
@@ -43,7 +43,7 @@ export default function App() {
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-                  Loading…
+                  טוען...
                 </div>
               }
             >
@@ -59,7 +59,7 @@ export default function App() {
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-                  Loading…
+                  טוען...
                 </div>
               }
             >
@@ -75,7 +75,7 @@ export default function App() {
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-                  Loading…
+                  טוען...
                 </div>
               }
             >
@@ -91,7 +91,7 @@ export default function App() {
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-                  Loading…
+                  טוען...
                 </div>
               }
             >
@@ -107,7 +107,7 @@ export default function App() {
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-                  Loading…
+                  טוען...
                 </div>
               }
             >

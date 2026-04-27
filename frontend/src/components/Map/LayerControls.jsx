@@ -9,19 +9,6 @@ function LayerControls() {
     // Add custom CSS for area labels
     const style = document.createElement('style')
     style.textContent = `
-      .area-label {
-        background: transparent !important;
-        border: none !important;
-      }
-      .area-label-text {
-        background: rgba(255, 255, 255, 0.9);
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-weight: bold;
-        font-size: 12px;
-        border: 1px solid #333;
-        text-align: center;
-      }
       .custom-marker {
         background: transparent !important;
         border: none !important;

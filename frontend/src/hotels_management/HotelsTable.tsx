@@ -35,21 +35,21 @@ function buildColumns(
   return [
     {
       accessorKey: 'name',
-      header: 'Name',
+      header: 'שם',
       cell: ({ row }) => (
         <div className="font-medium text-foreground">{row.original.name}</div>
       ),
     },
     {
       accessorKey: 'type',
-      header: 'Type',
+      header: 'סוג',
       cell: ({ getValue }) => (
         <span className="text-muted-foreground">{getValue<string | null>() ?? '—'}</span>
       ),
     },
     {
       accessorKey: 'rating_value',
-      header: 'Rating',
+      header: 'דירוג',
       cell: ({ getValue }) => {
         const v = getValue<number | null>()
         if (v == null) return <span className="text-muted-foreground">—</span>
@@ -63,7 +63,7 @@ function buildColumns(
     },
     {
       accessorKey: 'location_fulladdress',
-      header: 'Address',
+      header: 'כתובת',
       cell: ({ getValue }) => {
         const addr = getValue<string | null>()
         if (!addr) return <span className="text-muted-foreground">—</span>
@@ -89,18 +89,22 @@ function buildColumns(
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
               onClick={() => onEdit(r)}
-              aria-label={`Edit ${r.name}`}
+              aria-label={`עריכת ${r.name}`}
             >
               <Pencil className="h-4 w-4" />
             </Button>
             <Button
               type="button"
-              variant="ghost"
+              variant="destructive"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              className={cn(
+                'h-8 w-8 border border-destructive/40 bg-destructive/10 text-destructive shadow-none',
+                'hover:bg-destructive/20 hover:text-destructive',
+                'focus-visible:ring-destructive/40 disabled:opacity-50',
+              )}
               onClick={() => onDelete(r)}
               disabled={busy}
-              aria-label={`Delete ${r.name}`}
+              aria-label={`מחיקת ${r.name}`}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -165,7 +169,7 @@ export function HotelsTable({
           ) : (
             <TableRow>
               <TableCell colSpan={columns.length} className="h-24 text-center text-sm text-muted-foreground">
-                No hotels yet. Add one to get started.
+                אין עדיין מלונות. הוסיפו מלון כדי להתחיל.
               </TableCell>
             </TableRow>
           )}

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const nonEmptyString = z.string().trim().min(1)
+const nonEmptyString = z.string().trim().min(1, 'שדה חובה')
 
 const optionalNullableInt = z.preprocess((v) => {
   if (v === undefined || v === null) return null
@@ -10,7 +10,7 @@ const optionalNullableInt = z.preprocess((v) => {
     return Number(t)
   }
   return v
-}, z.number().int().min(0).nullable())
+}, z.number({ invalid_type_error: 'יש להזין מספר' }).int('יש להזין מספר שלם').min(0, 'לא ניתן להזין מספר שלילי').nullable())
 
 const optionalNullableString = z.preprocess((v) => {
   if (v === undefined || v === null) return null
@@ -22,17 +22,17 @@ const optionalNullableString = z.preprocess((v) => {
   return v
 }, z.string().nullable())
 
-const int0plus = z.coerce.number().int().min(0)
-const int1plus = z.coerce.number().int().min(1)
+const int0plus = z.coerce.number({ invalid_type_error: 'יש להזין מספר' }).int('יש להזין מספר שלם').min(0, 'לא ניתן להזין מספר שלילי')
+const int1plus = z.coerce.number({ invalid_type_error: 'יש להזין מספר' }).int('יש להזין מספר שלם').min(1, 'יש להזין מספר גדול מ-0')
 
-const importance1to5 = z.coerce.number().int().min(1).max(5)
+const importance1to5 = z.coerce.number({ invalid_type_error: 'יש להזין דירוג' }).int('יש להזין מספר שלם').min(1, 'הדירוג המינימלי הוא 1').max(5, 'הדירוג המקסימלי הוא 5')
 
 export const evacueeFamilyProfileCreateSchema = z.object({
   // Contact Info
   family_name: nonEmptyString,
   contact_name: nonEmptyString,
   contact_phone: nonEmptyString,
-  contact_email: z.string().trim().email(),
+  contact_email: z.string().trim().min(1, 'שדה חובה').email('כתובת דוא"ל לא תקינה'),
   home_stat_2022: optionalNullableInt,
   city_name: nonEmptyString,
   home_address: nonEmptyString,

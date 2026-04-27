@@ -32,15 +32,15 @@ function CoffeeShopsLayer({ filters }) {
             <div className="popup-content">
               <h3>{properties.title}</h3>
               {properties.category_name && (
-                <p><strong>Category:</strong> {properties.category_name}</p>
+                <p><strong>קטגוריה:</strong> {properties.category_name}</p>
               )}
               {properties.total_score && (
-                <p><strong>Score:</strong> {formatRating(properties.total_score)}</p>
+                <p><strong>ציון:</strong> {formatRating(properties.total_score)}</p>
               )}
               {properties.url && (
-                <p><a href={properties.url} target="_blank" rel="noopener noreferrer">View Details</a></p>
+                <p><a href={properties.url} target="_blank" rel="noopener noreferrer">צפייה בפרטים</a></p>
               )}
-              <p><strong>Area:</strong> {properties.stat_2022}</p>
+              <p><strong>אזור:</strong> {properties.stat_2022}</p>
             </div>
           </Popup>
         </Marker>

@@ -11,14 +11,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { DashboardAggregateMetrics } from '@/types/dashboard'
 
+/** Categorical fills: distinct, no purple (pie segments are not brand). */
 const CHART_COLORS = [
-  '#8B4513', // coffee
-  '#F39C12', // restaurants
-  '#52BE80', // institutions
-  '#E74C3C', // airbnb
-  '#667eea', // hotels (match main app primary)
-  '#9B59B6', // matnasim
-  '#1ABC9C', // osm
+  '#8B4513',
+  '#F39C12',
+  '#52BE80',
+  '#E74C3C',
+  '#2563EB',
+  '#0EA5E9',
+  '#14B8A6',
 ]
 
 function formatArea(m2: number) {
@@ -31,62 +32,96 @@ export interface DataPanelProps {
   metrics: DashboardAggregateMetrics | null
   selectedStat2022: number | null
   loading: boolean
+  /** True when areas or metrics queries failed — avoid empty-state copy; refer to map/banner. */
+  insightsBlocked?: boolean
+  /** Legitimate empty dataset (boundaries OK but nothing to aggregate). */
+  isEmpty?: boolean
+  emptyDetail?: string
 }
 
-export function DataPanel({ metrics, selectedStat2022, loading }: DataPanelProps) {
+export function DataPanel({
+  metrics,
+  selectedStat2022,
+  loading,
+  insightsBlocked,
+  isEmpty,
+  emptyDetail,
+}: DataPanelProps) {
   const chartData = useMemo(() => {
     if (!metrics) return []
     return [
-      { name: 'Coffee shops', value: metrics.coffee_shops_count },
-      { name: 'Restaurants', value: metrics.restaurants_count },
-      { name: 'Education', value: metrics.institutions_count },
-      { name: 'Airbnb listings', value: metrics.airbnb_count },
-      { name: 'Hotels', value: metrics.hotels_count },
-      { name: 'Matnasim', value: metrics.matnasim_count },
-      { name: 'OSM facilities', value: metrics.osm_facilities_count },
+      { name: 'בתי קפה', value: metrics.coffee_shops_count },
+      { name: 'מסעדות', value: metrics.restaurants_count },
+      { name: 'חינוך', value: metrics.institutions_count },
+      { name: 'נכסי Airbnb', value: metrics.airbnb_count },
+      { name: 'מלונות', value: metrics.hotels_count },
+      { name: 'מתנ"סים', value: metrics.matnasim_count },
+      { name: 'מתקני OSM', value: metrics.osm_facilities_count },
     ].filter((d) => d.value > 0)
   }, [metrics])
 
   const scopeLabel =
     selectedStat2022 == null
-      ? 'Whole city (aggregated statistical areas)'
-      : `Statistical area ${selectedStat2022}`
+      ? 'כל העיר (איגוד אזורים סטטיסטיים)'
+      : `אזור סטטיסטי ${selectedStat2022}`
 
   if (loading && !metrics) {
     return (
-      <div className="flex h-full min-h-[420px] flex-col gap-4">
+      <div className="flex h-full min-h-[min(220px,40dvh)] flex-col gap-4 lg:min-h-0">
         <Skeleton className="dashboard-app__skeleton h-40 w-full rounded-lg" />
         <Skeleton className="dashboard-app__skeleton h-48 w-full flex-1 rounded-lg" />
       </div>
     )
   }
 
-  if (!metrics) {
+  if (insightsBlocked && !metrics) {
     return (
-      <Card className="h-full min-h-[420px] border-[#e0e0e0] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+      <Card className="h-full min-h-[min(220px,40dvh)] rounded-2xl border-border/80 bg-card shadow-card lg:min-h-0">
         <CardHeader>
-          <CardTitle className="text-[#333]">Insights</CardTitle>
+          <CardTitle className="text-base">תובנות</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-[#666]">No metrics available yet.</p>
+          <p className="text-sm text-muted-foreground">
+            לא ניתן לטעון תובנות בזמן שבקשות הנתונים נכשלות. השתמשו ב"נסו שוב" במפה או
+            מעל המדדים, ולאחר מכן רעננו נתונים במידת הצורך.
+          </p>
         </CardContent>
       </Card>
     )
   }
 
-  const cardClass =
-    'border-[#e0e0e0] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
+  if (isEmpty && !metrics) {
+    return (
+      <Card className="h-full min-h-[min(220px,40dvh)] rounded-2xl border-border/80 bg-card shadow-card lg:min-h-0">
+        <CardHeader>
+          <CardTitle className="text-base">תובנות</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            {emptyDetail ??
+              'אין מדדים זמינים לתצוגה זו כרגע. ודאו שהאזורים הסטטיסטיים נטענו ולאחר מכן נסו לרענן.'}
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!metrics) {
+    return null
+  }
+
+  const cardClass = 'rounded-2xl border-border/80 bg-card shadow-card'
 
   return (
-    <div className="flex h-full min-h-[420px] flex-col gap-4 overflow-y-auto pr-1">
+    <div className="flex h-full min-h-[min(220px,40dvh)] flex-col gap-4 overflow-y-auto pe-1 lg:min-h-0">
       <Card className={cardClass}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base text-[#333]">Venue mix</CardTitle>
-          <p className="text-xs text-[#666]">{scopeLabel}</p>
+          <CardTitle className="text-base">תמהיל מקומות</CardTitle>
+          <p className="text-xs text-muted-foreground">{scopeLabel}</p>
         </CardHeader>
         <CardContent className="h-56">
           {chartData.length === 0 ? (
-            <p className="text-sm text-[#666]">No venues in this selection.</p>
+            <p className="text-sm text-muted-foreground">אין מקומות בבחירה זו.</p>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -107,12 +142,14 @@ export function DataPanel({ metrics, selectedStat2022, loading }: DataPanelProps
                 <Tooltip
                   formatter={(value) => {
                     const n = typeof value === 'number' ? value : Number(value)
-                    return [Number.isFinite(n) ? n.toLocaleString() : '—', 'Count']
+                    return [Number.isFinite(n) ? n.toLocaleString() : '—', 'כמות']
                   }}
                   contentStyle={{
                     borderRadius: '8px',
-                    border: '1px solid #e0e0e0',
+                    border: '1px solid hsl(var(--border))',
                     fontSize: '12px',
+                    background: 'hsl(var(--card))',
+                    color: 'hsl(var(--card-foreground))',
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
@@ -124,16 +161,16 @@ export function DataPanel({ metrics, selectedStat2022, loading }: DataPanelProps
 
       <Card className={cardClass}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base text-[#333]">Area & capacity</CardTitle>
+          <CardTitle className="text-base">שטח וקיבולת</CardTitle>
         </CardHeader>
         <CardContent>
-          <dl className="grid grid-cols-1 gap-3 text-sm text-[#333]">
-            <div className="flex justify-between gap-4 border-b border-[#e9ecef] pb-2">
-              <dt className="text-[#666]">Land area</dt>
+          <dl className="grid grid-cols-1 gap-3 text-sm text-card-foreground">
+            <div className="flex justify-between gap-4 border-b border-border/80 pb-2">
+              <dt className="text-muted-foreground">שטח קרקע</dt>
               <dd className="font-medium tabular-nums">{formatArea(metrics.area_m2)}</dd>
             </div>
-            <div className="flex justify-between gap-4 border-b border-[#e9ecef] pb-2">
-              <dt className="text-[#666]">Airbnb guest capacity (est.)</dt>
+            <div className="flex justify-between gap-4 border-b border-border/80 pb-2">
+              <dt className="text-muted-foreground">קיבולת אורחי Airbnb (הערכה)</dt>
               <dd className="font-medium tabular-nums">
                 {metrics.total_airbnb_capacity.toLocaleString()}
               </dd>
@@ -144,14 +181,16 @@ export function DataPanel({ metrics, selectedStat2022, loading }: DataPanelProps
 
       <Card className={cardClass}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base text-[#333]">Data sources</CardTitle>
+          <CardTitle className="text-base">מקורות נתונים</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-xs leading-relaxed text-[#666]">
-            Summary counts for education, Airbnb, restaurants, and coffee shops follow the backend{' '}
-            <code className="rounded bg-[#f8f9fa] px-1 py-0.5 text-[#333]">StatisticalAreaSummary</code>{' '}
-            model. Hotels, matnasim, and OSM points are counted from their GeoJSON endpoints for the
-            active filter ({selectedStat2022 == null ? 'municipality' : `area ${selectedStat2022}`}).
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            ספירות הסיכום עבור חינוך, Airbnb, מסעדות ובתי קפה מבוססות על מודל השרת{' '}
+            <code className="rounded bg-muted px-1 py-0.5 text-card-foreground">
+              StatisticalAreaSummary
+            </code>
+            . מלונות, מתנ"סים ונקודות OSM נספרים מנקודות הקצה של GeoJSON עבור המסנן הפעיל
+            ({selectedStat2022 == null ? 'הרשות' : `אזור ${selectedStat2022}`}).
           </p>
         </CardContent>
       </Card>

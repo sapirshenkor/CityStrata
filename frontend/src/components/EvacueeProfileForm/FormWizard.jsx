@@ -125,7 +125,7 @@ export default function FormWizard() {
       setErrors(formatZodErrors(parsed.error))
       setSubmitState({
         status: 'error',
-        message: 'Please fix the highlighted fields and try again.',
+        message: 'יש לתקן את השדות המסומנים ולנסות שוב.',
         result: null,
       })
       return
@@ -137,11 +137,11 @@ export default function FormWizard() {
 
       setSubmitState({
         status: 'success',
-        message: 'Profile submitted successfully.',
+        message: 'הפרופיל נשלח בהצלחה.',
         result: res.data,
       })
     } catch (e) {
-      const detail = e?.response?.data?.detail || e?.message || 'Submission failed'
+      const detail = e?.response?.data?.detail || e?.message || 'השליחה נכשלה'
       setSubmitState({
         status: 'error',
         message: detail,
@@ -153,12 +153,12 @@ export default function FormWizard() {
   const isLast = stepIdx === steps.length - 1
 
   return (
-    <Card className="max-w-[720px] border-[#e0e0e0] shadow-md" dir="rtl">
+    <Card className="max-w-[720px] border-border bg-card shadow-md" dir="rtl">
       <CardHeader className="space-y-4 pb-4">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
-            <div className="text-lg font-bold text-[#333]">{current.title}</div>
-            <div className="mt-1 text-xs font-medium text-[#666]">
+            <div className="text-lg font-bold text-foreground">{current.title}</div>
+            <div className="mt-1 text-xs font-medium text-muted-foreground">
               שלב {stepIdx + 1} מתוך {steps.length}
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function FormWizard() {
             {steps.map((s, idx) => (
               <div
                 key={s.key}
-                className={`h-1.5 w-7 rounded-full ${idx === stepIdx ? 'bg-[#667eea]' : 'bg-[#e9ecef]'}`}
+                className={`h-1.5 w-7 rounded-full ${idx === stepIdx ? 'bg-primary' : 'bg-muted'}`}
               />
             ))}
           </div>
@@ -176,7 +176,7 @@ export default function FormWizard() {
 
       <CardContent className="space-y-4">
         {submitState.status === 'success' ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-3 text-sm text-emerald-100">
             הפרופיל נשלח בהצלחה.
             <div className="mt-1.5 text-xs font-bold">
               מזהה: {submitState.result?.uuid ? String(submitState.result.uuid) : '(לא זמין)'}
@@ -193,7 +193,7 @@ export default function FormWizard() {
         <CurrentComponent data={data} onChange={setField} errors={errors} />
       </CardContent>
 
-      <CardFooter className="flex flex-wrap justify-end gap-2 border-t border-[#e9ecef] pt-4">
+      <CardFooter className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
         <Button
           type="button"
           variant="outline"
@@ -204,18 +204,13 @@ export default function FormWizard() {
         </Button>
 
         {!isLast ? (
-          <Button
-            type="button"
-            className="bg-[#667eea] hover:bg-[#5568d3]"
-            onClick={goNext}
-            disabled={submitState.status === 'submitting'}
-          >
+          <Button type="button" onClick={goNext} disabled={submitState.status === 'submitting'}>
             הבא
           </Button>
         ) : (
           <Button
             type="button"
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-emerald-600 text-white hover:bg-emerald-700"
             onClick={handleSubmit}
             disabled={submitState.status === 'submitting'}
           >

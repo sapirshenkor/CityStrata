@@ -16,12 +16,12 @@ export default function AreaDetails({ stat2022, onClose }: AreaDetailsProps) {
   const summary = data as StatisticalAreaSummary | null | undefined
 
   return (
-    <Card className="border-[#e0e0e0] shadow-sm">
+    <Card className="border-border/80 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base text-[#333]">Area {stat2022}</CardTitle>
+        <CardTitle className="text-base">אזור {stat2022}</CardTitle>
         <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose}>
           <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">סגירה</span>
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -32,33 +32,33 @@ export default function AreaDetails({ stat2022, onClose }: AreaDetailsProps) {
             <Skeleton className="h-4 w-2/3" />
           </div>
         )}
-        {error && <p className="text-sm text-destructive">Error: {error}</p>}
+        {error && <p className="text-sm text-destructive">שגיאה: {error}</p>}
         {summary && (
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between gap-2 border-b border-[#e9ecef] pb-2">
-              <dt className="text-[#666]">Area</dt>
-              <dd className="font-medium tabular-nums text-[#333]">{formatArea(summary.area_m2)}</dd>
+          <dl className="space-y-2 text-sm text-card-foreground">
+            <div className="flex justify-between gap-2 border-b border-border/80 pb-2">
+              <dt className="text-muted-foreground">שטח</dt>
+              <dd className="font-medium tabular-nums">{formatArea(summary.area_m2)}</dd>
             </div>
-            <div className="flex justify-between gap-2 border-b border-[#e9ecef] pb-2">
-              <dt className="text-[#666]">Institutions</dt>
+            <div className="flex justify-between gap-2 border-b border-border/80 pb-2">
+              <dt className="text-muted-foreground">מוסדות חינוך</dt>
               <dd className="font-medium tabular-nums">{formatNumber(summary.institutions_count)}</dd>
             </div>
-            <div className="flex justify-between gap-2 border-b border-[#e9ecef] pb-2">
-              <dt className="text-[#666]">Airbnb listings</dt>
+            <div className="flex justify-between gap-2 border-b border-border/80 pb-2">
+              <dt className="text-muted-foreground">נכסי Airbnb</dt>
               <dd className="font-medium tabular-nums">{formatNumber(summary.airbnb_count)}</dd>
             </div>
-            <div className="flex justify-between gap-2 border-b border-[#e9ecef] pb-2">
-              <dt className="text-[#666]">Total capacity</dt>
+            <div className="flex justify-between gap-2 border-b border-border/80 pb-2">
+              <dt className="text-muted-foreground">קיבולת כוללת</dt>
               <dd className="font-medium tabular-nums">
-                {formatNumber(summary.total_airbnb_capacity ?? 0)} people
+                {formatNumber(summary.total_airbnb_capacity ?? 0)} נפשות
               </dd>
             </div>
-            <div className="flex justify-between gap-2 border-b border-[#e9ecef] pb-2">
-              <dt className="text-[#666]">Restaurants</dt>
+            <div className="flex justify-between gap-2 border-b border-border/80 pb-2">
+              <dt className="text-muted-foreground">מסעדות</dt>
               <dd className="font-medium tabular-nums">{formatNumber(summary.restaurants_count)}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-[#666]">Coffee shops</dt>
+              <dt className="text-muted-foreground">בתי קפה</dt>
               <dd className="font-medium tabular-nums">{formatNumber(summary.coffee_shops_count)}</dd>
             </div>
           </dl>

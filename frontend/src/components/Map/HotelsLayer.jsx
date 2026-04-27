@@ -32,18 +32,18 @@ function HotelsLayer({ filters }) {
             <div className="popup-content">
               <h3>{properties.name}</h3>
               {properties.type && (
-                <p><strong>Type:</strong> {properties.type}</p>
+                <p><strong>סוג:</strong> {properties.type}</p>
               )}
               {properties.rating_value && (
-                <p><strong>Rating:</strong> {formatRating(properties.rating_value)}</p>
+                <p><strong>דירוג:</strong> {formatRating(properties.rating_value)}</p>
               )}
               {properties.location_fulladdress && (
-                <p><strong>Address:</strong> {properties.location_fulladdress}</p>
+                <p><strong>כתובת:</strong> {properties.location_fulladdress}</p>
               )}
               {properties.url && (
-                <p><a href={properties.url} target="_blank" rel="noopener noreferrer">View Details</a></p>
+                <p><a href={properties.url} target="_blank" rel="noopener noreferrer">צפייה בפרטים</a></p>
               )}
-              <p><strong>Area:</strong> {properties.stat_2022}</p>
+              <p><strong>אזור:</strong> {properties.stat_2022}</p>
             </div>
           </Popup>
         </Marker>

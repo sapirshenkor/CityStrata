@@ -17,23 +17,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ApiErrorBanner } from '@/components/layout/ApiErrorBanner'
+import UserBar from '@/components/UserBar'
+import { PageHeader, PageShell } from '@/components/layout/PageShell'
+import { formatQueryError } from '@/lib/formatQueryError'
 import { HotelForm } from './HotelForm'
 import { HotelsTable } from './HotelsTable'
 import { formValuesToCreatePayload } from './hotelFormSchema'
 import { createHotel, deleteHotel, fetchHotels, updateHotel } from './hotelsApi'
 import { hotelManagementKeys } from './queryKeys'
 import type { HotelCreateInput, HotelRow, HotelUpdateInput } from './types'
-
-function apiErrorMessage(err: unknown): string {
-  if (err && typeof err === 'object' && 'response' in err) {
-    const r = err as { response?: { data?: { detail?: unknown } } }
-    const d = r.response?.data?.detail
-    if (typeof d === 'string') return d
-    if (Array.isArray(d)) return d.map((x) => JSON.stringify(x)).join(', ')
-  }
-  if (err instanceof Error) return err.message
-  return 'Something went wrong'
-}
 
 export default function HotelManagementPage() {
   const queryClient = useQueryClient()
@@ -58,7 +51,7 @@ export default function HotelManagementPage() {
       setEditing(null)
       await invalidateList()
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const updateMut = useMutation({
@@ -70,7 +63,7 @@ export default function HotelManagementPage() {
       setEditing(null)
       await invalidateList()
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const deleteMut = useMutation({
@@ -79,7 +72,7 @@ export default function HotelManagementPage() {
       setBannerError(null)
       await invalidateList()
     },
-    onError: (e) => setBannerError(apiErrorMessage(e)),
+    onError: (e) => setBannerError(formatQueryError(e)),
   })
 
   const openCreate = () => {
@@ -93,7 +86,7 @@ export default function HotelManagementPage() {
   }
 
   const handleDelete = (row: HotelRow) => {
-    const ok = window.confirm(`Delete “${row.name}”? This cannot be undone.`)
+    const ok = window.confirm(`למחוק את “${row.name}”? לא ניתן לבטל פעולה זו.`)
     if (!ok) return
     deleteMut.mutate(row.uuid)
   }
@@ -111,55 +104,47 @@ export default function HotelManagementPage() {
   const submitting = createMut.isPending || updateMut.isPending
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border/80 bg-card shadow-soft">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Building2 className="h-6 w-6" strokeWidth={1.75} />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">Hotel management</h1>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Add and maintain hotels for your municipality. Addresses are geocoded automatically.
-              </p>
-            </div>
+    <PageShell>
+      <PageHeader
+        title="ניהול מלונות"
+        description="הוספה ותחזוקה של מלונות עבור הרשות המקומית. כתובות עוברות גיאוקוד באופן אוטומטי."
+        leading={
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Building2 className="h-6 w-6" strokeWidth={1.75} />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+        }
+        actions={
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <UserBar variant="onSurface" />
             <Button variant="outline" size="sm" className="rounded-lg" asChild>
               <Link to="/municipality" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
-                Dashboard
+                לוח בקרה
               </Link>
             </Button>
             <Button size="sm" className="rounded-lg gap-2" onClick={openCreate}>
               <Plus className="h-4 w-4" />
-              Add hotel
+              הוספת מלון
             </Button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <main className="mx-auto max-w-5xl px-4 py-8">
-        {bannerError ? (
-          <div
-            className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-            role="alert"
-          >
-            {bannerError}
-          </div>
-        ) : null}
+        {bannerError ? <ApiErrorBanner message={bannerError} className="mb-6" /> : null}
 
         {listQuery.isError ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {apiErrorMessage(listQuery.error)}
-          </div>
+          <ApiErrorBanner
+            message={formatQueryError(listQuery.error)}
+            onRetry={() => void listQuery.refetch()}
+            className="mb-6"
+          />
         ) : (
           <Card className="rounded-2xl border-border/80 shadow-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Hotels</CardTitle>
+              <CardTitle className="text-base font-semibold">מלונות</CardTitle>
               <CardDescription>
-                Showing listings for your municipality scope (filtered server-side by semel yish).
+                מציג רשומות בתחום הרשות המקומית שלך, לפי סינון סמל יישוב בצד השרת.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -184,11 +169,11 @@ export default function HotelManagementPage() {
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit hotel' : 'Add hotel'}</DialogTitle>
+            <DialogTitle>{editing ? 'עריכת מלון' : 'הוספת מלון'}</DialogTitle>
             <DialogDescription>
               {editing
-                ? 'Update details. Changing the full address will re-geocode the location.'
-                : 'Enter a name and address. We will geocode the address and save coordinates.'}
+                ? 'עדכנו פרטים. שינוי הכתובת המלאה יבצע גיאוקוד מחדש למיקום.'
+                : 'הזינו שם וכתובת. המערכת תבצע גיאוקוד לכתובת ותשמור קואורדינטות.'}
             </DialogDescription>
           </DialogHeader>
           <HotelForm
@@ -203,6 +188,6 @@ export default function HotelManagementPage() {
           />
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   )
 }

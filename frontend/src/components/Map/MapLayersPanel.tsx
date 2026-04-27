@@ -13,15 +13,15 @@ const LAYER_DEFS: {
   key: keyof LayerVisibility
   label: string
 }[] = [
-  { key: 'statisticalAreas', label: 'Statistical areas' },
-  { key: 'institutions', label: 'Educational institutions' },
-  { key: 'airbnb', label: 'Airbnb listings' },
-  { key: 'restaurants', label: 'Restaurants' },
-  { key: 'coffeeShops', label: 'Coffee shops' },
-  { key: 'hotels', label: 'Hotels' },
-  { key: 'matnasim', label: 'Matnasim' },
-  { key: 'osmFacilities', label: 'OSM facilities' },
-  { key: 'synagogues', label: 'Synagogues' },
+  { key: 'statisticalAreas', label: 'אזורים סטטיסטיים' },
+  { key: 'institutions', label: 'מוסדות חינוך' },
+  { key: 'airbnb', label: 'נכסי Airbnb' },
+  { key: 'restaurants', label: 'מסעדות' },
+  { key: 'coffeeShops', label: 'בתי קפה' },
+  { key: 'hotels', label: 'מלונות' },
+  { key: 'matnasim', label: 'מתנ"סים' },
+  { key: 'osmFacilities', label: 'מתקני OSM' },
+  { key: 'synagogues', label: 'בתי כנסת' },
 ]
 
 export type LayerVisibility = {
@@ -72,7 +72,7 @@ export function MapLayersPanel({
       onToggleLayer({ ...layerVisibility, clusters: true })
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string }
-      setClusteringError(e.response?.data?.detail ?? e.message ?? 'Clustering failed')
+      setClusteringError(e.response?.data?.detail ?? e.message ?? 'הרצת האשכול נכשלה')
     } finally {
       setClusteringRunning(false)
     }
@@ -132,18 +132,18 @@ export function MapLayersPanel({
   return (
     <div className="space-y-5 pr-1">
       <div className="space-y-1">
-        <h2 className="text-base font-semibold text-[#333]">Map layers</h2>
+        <h2 className="text-base font-semibold text-foreground">שכבות מפה</h2>
         <p className="text-xs text-muted-foreground">
-          Toggle overlays on the map. Turn on OSM facilities, then choose types below.
+          הפעילו שכבות על גבי המפה. להפעלת נתוני OSM יש לבחור סוגי מתקנים בהמשך.
         </p>
       </div>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-[#333]">Visibility</h3>
+        <h3 className="text-sm font-semibold text-foreground">הצגה</h3>
         <div className="space-y-3">
           {LAYER_DEFS.map(({ key, label }) => (
             <div key={key} className="flex items-center justify-between gap-4">
-              <Label htmlFor={`sidebar-layer-${key}`} className="cursor-pointer text-[#333]">
+              <Label htmlFor={`sidebar-layer-${key}`} className="cursor-pointer text-foreground">
                 {label}
               </Label>
               <Switch
@@ -155,8 +155,8 @@ export function MapLayersPanel({
           ))}
           <Separator />
           <div className="flex items-center justify-between gap-4">
-            <Label htmlFor="sidebar-layer-clusters" className="cursor-pointer text-[#333]">
-              Show clusters on map
+            <Label htmlFor="sidebar-layer-clusters" className="cursor-pointer text-foreground">
+              הצגת אשכולות במפה
             </Label>
             <Switch
               id="sidebar-layer-clusters"
@@ -168,26 +168,26 @@ export function MapLayersPanel({
       </section>
 
       <section className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-        <h3 className="text-sm font-semibold text-[#333]">Clustering</h3>
+        <h3 className="text-sm font-semibold text-foreground">אשכול</h3>
         <Button
           type="button"
-          className="w-full bg-[#667eea] hover:bg-[#5568d3]"
+          className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
           disabled={clusteringRunning}
           onClick={() => void handleRunClustering()}
         >
           {clusteringRunning ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Running…
+              <Loader2 className="me-2 h-4 w-4 animate-spin" />
+              מריץ...
             </>
           ) : (
-            'Run clustering'
+            'הרצת אשכול'
           )}
         </Button>
         {clusteringError ? <p className="text-sm text-destructive">{clusteringError}</p> : null}
         {clusterAssignments && (
           <p className="text-xs text-muted-foreground">
-            {clusterAssignments.length} areas in latest run
+            {clusterAssignments.length} אזורים בהרצה האחרונה
           </p>
         )}
       </section>
@@ -195,27 +195,27 @@ export function MapLayersPanel({
       {layerVisibility.osmFacilities && (
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-[#333]">OSM facility types</h3>
+            <h3 className="text-sm font-semibold text-foreground">סוגי מתקני OSM</h3>
             <div className="flex gap-1">
               <Button type="button" variant="outline" size="sm" onClick={selectAllFacilityTypes}>
-                All
+                הכול
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={deselectAllFacilityTypes}>
-                None
+                ללא
               </Button>
             </div>
           </div>
           {facilityTypesLoading ? (
-            <p className="text-sm text-muted-foreground">Loading types…</p>
+            <p className="text-sm text-muted-foreground">טוען סוגים...</p>
           ) : (
             <>
               <Input
-                placeholder="Search types…"
+                placeholder="חיפוש סוגים..."
                 value={facilityTypeSearch}
                 onChange={(e) => setFacilityTypeSearch(e.target.value)}
               />
               {filteredFacilityTypes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No types match.</p>
+                <p className="text-sm text-muted-foreground">אין סוגים תואמים.</p>
               ) : (
                 <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
                   {filteredFacilityTypes.map((type: string) => {
@@ -240,10 +240,10 @@ export function MapLayersPanel({
                 ?.length ? (
                 <p className="text-xs text-muted-foreground">
                   {(filters.osmFacilities as { facility_types: string[] }).facility_types.length}{' '}
-                  type(s) selected
+                  סוגים נבחרו
                 </p>
               ) : (
-                <p className="text-xs text-amber-700">Select at least one type to load OSM data.</p>
+                <p className="text-xs text-amber-500">יש לבחור לפחות סוג אחד לטעינת נתוני OSM.</p>
               )}
             </>
           )}

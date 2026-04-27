@@ -21,30 +21,34 @@ import { Separator } from '@/components/ui/separator'
 
 export default function LandingPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#f8f9fa]">
-      <AppHeader>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <AppHeader variant="landing">
         <UserBar />
       </AppHeader>
 
-      <main className="flex-1">
-        <section className="border-b border-[#e0e0e0] bg-white px-4 py-12 sm:py-16">
+      <main id="main-content" className="flex-1">
+        <section className="border-b border-border bg-card/80 px-4 py-12 sm:py-16">
           <div className="mx-auto max-w-3xl text-center">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
               CityStrata
             </h1>
             <p className="mt-3 text-base text-muted-foreground sm:text-lg">
-              Geospatial evacuation support for Eilat — map-based situational awareness, family
-              profiles, and intelligent recommendations in one place.
+            מערכת גיאו-מרחבית לניהול פינוי באילת: תמונת מצב מבוססת מפה, פרופילי משפחות
+            והמלצות חכמות בממשק אחד.
             </p>
-            <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
-              <Button asChild size="lg" className="bg-[#667eea] hover:bg-[#5568d3]">
-                <Link to="/map">Enter system</Link>
+            <div
+              className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center"
+              role="group"
+              aria-label="פעולות ראשיות"
+            >
+              <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
+                <Link to="/map">כניסה למפת המערכת</Link>
               </Button>
               <Button asChild variant="outline" size="lg">
-                <Link to="/family">Family dashboard</Link>
+                <Link to="/family">לוח בקרה משפחתי</Link>
               </Button>
               <Button asChild variant="secondary" size="lg">
-                <Link to="/login">Sign in</Link>
+                <Link to="/login">התחברות</Link>
               </Button>
             </div>
           </div>
@@ -52,116 +56,116 @@ export default function LandingPage() {
 
         <div className="mx-auto max-w-5xl space-y-14 px-4 py-12 sm:py-16">
           <section aria-labelledby="problem-heading">
-            <h2 id="problem-heading" className="text-xl font-semibold text-foreground">
-              Why CityStrata
+            <h2 id="problem-heading" className="text-xl font-semibold">
+            למה דווקא CityStrata
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              During large-scale evacuations, decisions depend on geography, infrastructure, and
-              household needs at the same time. CityStrata helps municipalities and families align
-              spatial data with structured profiles so responses stay coordinated and transparent.
+            באירועי פינוי רחבי היקף, קבלת ההחלטות תלויה בגיאוגרפיה, בתשתיות
+            ובצרכים של משקי הבית. CityStrata מסייעת לרשויות ולמשפחות לשלב בין נתונים
+            מרחביים לפרופילים מובנים, לצורך תגובה מתואמת, יעילה ושקופה לכל הצדדים.
             </p>
           </section>
 
-          <Separator className="bg-[#e0e0e0]" />
+          <Separator className="bg-border" />
 
           <section aria-labelledby="capabilities-heading" className="space-y-6">
             <div>
-              <h2 id="capabilities-heading" className="text-xl font-semibold text-foreground">
-                Capabilities
+              <h2 id="capabilities-heading" className="text-xl font-semibold">
+                יכולות
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Core tools available across the platform.
+              היכולות המרכזיות הזמינות במערכת.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Card className="border-[#e0e0e0] shadow-card">
+              <Card className="border-border shadow-card">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                       <Layers className="h-5 w-5" aria-hidden />
                     </span>
-                    <CardTitle className="text-base">GIS &amp; layers</CardTitle>
+                    <CardTitle className="text-base">GIS ושכבות</CardTitle>
                   </div>
                   <CardDescription>
-                    Statistical areas, facilities, and layered map data for Eilat-focused analysis.
+                    אזורים סטטיסטיים, מתקנים ושכבות מפה לניתוח ממוקד באילת.
                   </CardDescription>
                 </CardHeader>
               </Card>
-              <Card className="border-[#e0e0e0] shadow-card">
+              <Card className="border-border shadow-card">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                       <Users className="h-5 w-5" aria-hidden />
                     </span>
-                    <CardTitle className="text-base">Family profiles</CardTitle>
+                    <CardTitle className="text-base">פרופילי משפחות</CardTitle>
                   </div>
                   <CardDescription>
-                    Structured evacuee and community inputs to reflect real household constraints.
+                  ניהול מובנה של משפחות מפונות וקהילות, המשקף צרכים ואילוצים אמיתיים של משקי בית.
                   </CardDescription>
                 </CardHeader>
               </Card>
-              <Card className="border-[#e0e0e0] shadow-card">
+              <Card className="border-border shadow-card">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                       <Sparkles className="h-5 w-5" aria-hidden />
                     </span>
-                    <CardTitle className="text-base">Matching &amp; recommendations</CardTitle>
+                    <CardTitle className="text-base">התאמה והמלצות</CardTitle>
                   </div>
                   <CardDescription>
-                    Ranked options and tactical guidance informed by profile and map context.
+                  המלצות מדורגות והכוונה טקטית המבוססות על פרופיל המשפחה וההקשר המרחבי.
                   </CardDescription>
                 </CardHeader>
               </Card>
-              <Card className="border-[#e0e0e0] shadow-card">
+              <Card className="border-border shadow-card">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                       <Bot className="h-5 w-5" aria-hidden />
                     </span>
-                    <CardTitle className="text-base">Intelligent agents</CardTitle>
+                    <CardTitle className="text-base">סוכנים חכמים</CardTitle>
                   </div>
                   <CardDescription>
-                    Automated workflows that support analysis and follow-up across the stack.
+                    תהליכים אוטומטיים המסייעים בניתוח, מעקב וקבלת החלטות.
                   </CardDescription>
                 </CardHeader>
               </Card>
             </div>
           </section>
 
-          <Separator className="bg-[#e0e0e0]" />
+          <Separator className="bg-border" />
 
           <section aria-labelledby="how-heading" className="space-y-6">
-            <h2 id="how-heading" className="text-xl font-semibold text-foreground">
-              How it works
+            <h2 id="how-heading" className="text-xl font-semibold">
+              איך זה עובד
             </h2>
             <ol className="grid gap-4 md:grid-cols-3">
               <li>
-                <Card className="h-full border-[#e0e0e0] shadow-card">
+                <Card className="h-full border-border shadow-card">
                   <CardHeader>
-                    <CardTitle className="text-sm font-semibold">1 · Input</CardTitle>
+                    <CardTitle className="text-sm font-semibold">1 · קלט</CardTitle>
                     <CardDescription>
-                      Capture geographic focus areas and family or community profile data.
+                      מזינים אזורי מיקוד גיאוגרפיים ונתוני פרופיל משפחה או קהילה.
                     </CardDescription>
                   </CardHeader>
                 </Card>
               </li>
               <li>
-                <Card className="h-full border-[#e0e0e0] shadow-card">
+                <Card className="h-full border-border shadow-card">
                   <CardHeader>
-                    <CardTitle className="text-sm font-semibold">2 · Analysis</CardTitle>
+                    <CardTitle className="text-sm font-semibold">2 · ניתוח</CardTitle>
                     <CardDescription>
-                      Combine GIS layers, rules, and system intelligence for situational context.
+                      משלבים שכבות GIS, כללים ותובנות מערכת ליצירת הקשר תפעולי.
                     </CardDescription>
                   </CardHeader>
                 </Card>
               </li>
               <li>
-                <Card className="h-full border-[#e0e0e0] shadow-card">
+                <Card className="h-full border-border shadow-card">
                   <CardHeader>
-                    <CardTitle className="text-sm font-semibold">3 · Recommendation</CardTitle>
+                    <CardTitle className="text-sm font-semibold">3 · המלצה</CardTitle>
                     <CardDescription>
-                      Surface actionable matches and next steps for staff and families.
+                      מציגים התאמות מעשיות וצעדים הבאים לצוותים ולמשפחות.
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -169,88 +173,88 @@ export default function LandingPage() {
             </ol>
           </section>
 
-          <Separator className="bg-[#e0e0e0]" />
+          <Separator className="bg-border" />
 
           <section aria-labelledby="preview-heading" className="space-y-4">
             <div>
-              <h2 id="preview-heading" className="text-xl font-semibold text-foreground">
-                Preview
+              <h2 id="preview-heading" className="text-xl font-semibold">
+                תצוגה מקדימה
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Illustrative only — open the main map for live layers and tools.
+                המחשה בלבד - פתחו את המפה הראשית לשכבות וכלים בזמן אמת.
               </p>
             </div>
-            <Card className="overflow-hidden border-[#e0e0e0] shadow-card">
+            <Card className="overflow-hidden border-border shadow-card">
               <CardContent className="p-5 pt-5">
                 <div
-                  className="relative aspect-[16/10] w-full overflow-hidden rounded-lg border border-[#e0e0e0] bg-muted shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                  className="relative aspect-[16/10] w-full overflow-hidden rounded-lg border border-border bg-muted/80 shadow-sm"
                   aria-hidden
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#e8eaf6] via-[#f8f9fa] to-[#ede7f6]" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-muted via-background to-primary/10" />
                   <div className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(90deg,hsl(var(--border))_1px,transparent_1px),linear-gradient(hsl(var(--border))_1px,transparent_1px)] [background-size:40px_40px]" />
                   <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2">
-                    <div className="rounded-full border-2 border-[#667eea]/50 bg-white p-3 shadow-md">
-                      <Map className="h-10 w-10 text-[#667eea]" />
+                    <div className="rounded-full border-2 border-primary/50 bg-card p-3 shadow-md">
+                      <Map className="h-10 w-10 text-primary" />
                     </div>
-                    <span className="rounded-md border border-[#e0e0e0] bg-white/90 px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm">
-                      Static preview
+                    <span className="rounded-md border border-border bg-card/95 px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+                      תצוגה סטטית
                     </span>
                   </div>
-                  <div className="absolute bottom-3 left-3 right-3 rounded-md border border-[#e0e0e0] bg-card/95 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
-                    Full interactive map, clustering, and side panels are available after you open
-                    the main map.
+                  <div className="absolute bottom-3 left-3 right-3 rounded-md border border-border/80 bg-card/95 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
+                    המפה האינטראקטיבית, האשכולות והפאנלים הצדדיים זמינים לאחר פתיחת
+                    המפה הראשית.
                   </div>
                 </div>
               </CardContent>
             </Card>
           </section>
 
-          <Separator className="bg-[#e0e0e0]" />
+          <Separator className="bg-border" />
 
           <section aria-labelledby="nav-heading" className="space-y-4">
-            <h2 id="nav-heading" className="text-xl font-semibold text-foreground">
-              Where to go next
+            <h2 id="nav-heading" className="text-xl font-semibold">
+              לאן ממשיכים
             </h2>
-            <Card className="border-[#e0e0e0] shadow-card">
+            <Card className="border-border shadow-card">
               <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                <Button asChild variant="default" className="bg-[#667eea] hover:bg-[#5568d3]">
+                <Button asChild variant="default" className="bg-primary text-primary-foreground hover:bg-primary/90">
                   <Link to="/map" className="gap-2">
-                    Open map
+                    פתיחת מפה
                     <ArrowRight className="h-4 w-4" aria-hidden />
                   </Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link to="/family">Family dashboard</Link>
+                  <Link to="/family">לוח בקרה משפחתי</Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link to="/municipality">Municipality dashboard</Link>
+                  <Link to="/municipality">לוח בקרה לרשות המקומית</Link>
                 </Button>
                 <Button asChild variant="secondary">
-                  <Link to="/login">Login</Link>
+                  <Link to="/login">התחברות</Link>
                 </Button>
               </CardContent>
             </Card>
             <p className="text-xs text-muted-foreground">
-              Dashboard routes require sign-in; you will be redirected to login when needed.
+            הגישה ללוחות הבקרה דורשת התחברות; במידת הצורך תועברו למסך ההתחברות.
             </p>
           </section>
         </div>
 
-        <footer className="border-t border-[#e0e0e0] bg-white px-4 py-10">
+        <footer className="border-t border-border bg-card/60 px-4 py-10">
           <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold text-foreground">CityStrata</p>
-              <p className="mt-1 text-xs text-muted-foreground">Eilat · evacuation mapping</p>
+              <p className="text-sm font-semibold">CityStrata</p>
+              <p className="mt-1 text-xs text-muted-foreground">אילת · מערכת לניהול פינוי</p>
             </div>
-            <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm" aria-label="קישורי תחתית">
               <Link to="/map" className="text-primary hover:underline">
-                Map
+                מפה
               </Link>
               <Link to="/family" className="text-primary hover:underline">
-                Family
+                משפחה
               </Link>
               <Link to="/login" className="text-primary hover:underline">
-                Login
+                התחברות
               </Link>
             </nav>
           </div>

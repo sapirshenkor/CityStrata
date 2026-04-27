@@ -1,9 +1,9 @@
 import { Badge } from '@/components/ui/badge'
 
 const CONFIDENCE_LABELS: Record<string, { label: string }> = {
-  high: { label: 'High' },
-  medium: { label: 'Medium' },
-  low: { label: 'Low' },
+  high: { label: 'גבוהה' },
+  medium: { label: 'בינונית' },
+  low: { label: 'נמוכה' },
 }
 
 export function ConfidenceBadge({ value }: { value?: string | null }) {
@@ -41,33 +41,33 @@ export function MatchingResultBlock({ data }: { data?: MatchingData | null }) {
   return (
     <section className="rec-matching-section" aria-labelledby="rec-matching-heading">
       <h4 id="rec-matching-heading" className="rec-matching-title">
-        Macro matching (cluster)
+        התאמת מאקרו (אשכול)
       </h4>
       {created && (
         <p className="rec-matching-meta">
-          Saved {created}
+          נשמר {created}
           {data.recommended_cluster_number != null && (
             <span className="rec-matching-run">
               {' '}
-              · Cluster #{data.recommended_cluster_number}
+              · אשכול #{data.recommended_cluster_number}
             </span>
           )}
         </p>
       )}
       <div className="rec-matching-row">
-        <span className="rec-matching-label">Recommended</span>
+        <span className="rec-matching-label">מומלץ</span>
         <strong className="rec-matching-value">{data.recommended_cluster}</strong>
         <ConfidenceBadge value={data.confidence} />
       </div>
       <p className="rec-matching-reasoning">{data.reasoning}</p>
       <div className="rec-matching-row">
-        <span className="rec-matching-label">Alternative</span>
+        <span className="rec-matching-label">חלופה</span>
         <span className="rec-matching-value">{data.alternative_cluster}</span>
       </div>
       <p className="rec-matching-reasoning rec-matching-reasoning--alt">{data.alternative_reasoning}</p>
       {data.flags && data.flags.length > 0 && (
         <div className="rec-matching-flags">
-          <span className="rec-matching-label">Flags</span>
+          <span className="rec-matching-label">דגלים</span>
           <ul>
             {data.flags.map((f) => (
               <li key={f}>{f}</li>
