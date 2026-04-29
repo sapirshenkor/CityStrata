@@ -6,7 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, Plus, Search } from 'lucide-react'
+import { ArrowLeft, Building2, ChevronLeft, ChevronRight, MapPin, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -24,11 +24,24 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { ApiErrorBanner } from '@/components/layout/ApiErrorBanner'
 import UserBar from '@/components/UserBar'
 import { PageHeader, PageShell } from '@/components/layout/PageShell'
 import { formatQueryError } from '@/lib/formatQueryError'
 import { cn } from '@/lib/utils'
+import api from '@/services/api'
+import {
+  PropertyListingDetailsContent,
+  type PropertyListing,
+} from '@/family_portal/PropertyListingDetailsContent'
 import { EntityForm } from './EntityForm'
 import { getPoiFormFieldConfig } from './poiFormConfig'
 import { POI_CATEGORY_ICONS, POI_CATEGORY_META, DEFAULT_POI_CATEGORY } from './poiCategories'
@@ -39,13 +52,49 @@ import type { PoiCategory, PoiEntityRow } from './types'
 import { POI_CATEGORIES, isPoiCategory } from './types'
 import { PoiDataTable } from './PoiDataTable'
 
+type ManagementTab = PoiCategory | 'apartments'
+
+interface ApartmentUnitRow {
+  unit_id: string
+  listing_id: string
+  floor: number | null
+  publisher_name: string
+  phone_number: string
+  property_type: string
+  property_type_other: string | null
+  city: string
+  street: string
+  neighborhood: string | null
+  house_number: string
+  monthly_price: number | null
+  price: number | null
+}
+
+function formatCurrency(value: number | null) {
+  if (value == null) return '—'
+  return new Intl.NumberFormat('he-IL').format(value)
+}
+
+function buildAddress(row: ApartmentUnitRow) {
+  return [row.street, row.neighborhood, row.house_number].filter(Boolean).join(', ')
+}
+
+function propertyTypeLabel(row: ApartmentUnitRow) {
+  return row.property_type === 'other' && row.property_type_other
+    ? row.property_type_other
+    : row.property_type
+}
+
 export default function PointOfInterestManagement() {
   const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<ManagementTab>(DEFAULT_POI_CATEGORY)
   const [category, setCategory] = useState<PoiCategory>(DEFAULT_POI_CATEGORY)
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [apartmentDialogOpen, setApartmentDialogOpen] = useState(false)
+  const [selectedApartment, setSelectedApartment] = useState<ApartmentUnitRow | null>(null)
   const [editing, setEditing] = useState<PoiEntityRow | null>(null)
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create')
   const [bannerError, setBannerError] = useState<string | null>(null)
@@ -72,6 +121,25 @@ export default function PointOfInterestManagement() {
       if (prevCategory !== category || prevSearch !== debouncedSearch) return undefined
       return keepPreviousData(previousData)
     },
+    enabled: activeTab !== 'apartments',
+  })
+
+  const apartmentsQuery = useQuery({
+    queryKey: ['property-listings', 'units-table'],
+    queryFn: async () => {
+      const { data } = await api.get('/api/property-listings/units-table')
+      return data as ApartmentUnitRow[]
+    },
+    enabled: activeTab === 'apartments',
+  })
+  const selectedListingId = selectedApartment?.listing_id ?? null
+  const apartmentDetailsQuery = useQuery({
+    queryKey: ['municipality', 'property-listing-details', selectedListingId],
+    queryFn: async (): Promise<PropertyListing> => {
+      const { data } = await api.get(`/api/property-listings/${selectedListingId}`)
+      return data as PropertyListing
+    },
+    enabled: apartmentDialogOpen && Boolean(selectedListingId),
   })
 
   useEffect(() => {
@@ -148,7 +216,15 @@ export default function PointOfInterestManagement() {
   }
 
   const onTabChange = (value: string) => {
+    if (value === 'apartments') {
+      setActiveTab('apartments')
+      setBannerError(null)
+      setEditing(null)
+      setDialogOpen(false)
+      return
+    }
     if (!isPoiCategory(value)) return
+    setActiveTab(value)
     setCategory(value)
     setBannerError(null)
     setEditing(null)
@@ -183,6 +259,27 @@ export default function PointOfInterestManagement() {
   }, [category, formMode, editing])
 
   const formFieldConfig = useMemo(() => getPoiFormFieldConfig(category), [category])
+  const apartmentRows = apartmentsQuery.data ?? []
+  const filteredApartmentRows = useMemo(() => {
+    if (!debouncedSearch) return apartmentRows
+    const q = debouncedSearch.toLowerCase()
+    return apartmentRows.filter((row) =>
+      [
+        row.publisher_name,
+        row.phone_number,
+        propertyTypeLabel(row),
+        row.city,
+        row.street,
+        row.neighborhood ?? '',
+        row.house_number,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(q),
+    )
+  }, [apartmentRows, debouncedSearch])
+
+  const isApartmentsTab = activeTab === 'apartments'
 
   return (
     <PageShell>
@@ -204,10 +301,12 @@ export default function PointOfInterestManagement() {
                 לוח בקרה
               </Link>
             </Button>
-            <Button size="sm" className="rounded-lg gap-2" onClick={openCreate}>
-              <Plus className="h-4 w-4" />
-              הוספת רשומה
-            </Button>
+            {!isApartmentsTab ? (
+              <Button size="sm" className="rounded-lg gap-2" onClick={openCreate}>
+                <Plus className="h-4 w-4" />
+                הוספת רשומה
+              </Button>
+            ) : null}
           </div>
         }
       />
@@ -215,7 +314,7 @@ export default function PointOfInterestManagement() {
       <main className="mx-auto max-w-6xl px-4 py-8">
         {bannerError ? <ApiErrorBanner message={bannerError} className="mb-6" /> : null}
 
-        <Tabs value={category} onValueChange={onTabChange} className="w-full">
+        <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
           <TabsList
             className={cn(
               'mb-6 flex h-auto w-full flex-wrap justify-start gap-1 rounded-xl bg-muted/50 p-1.5',
@@ -236,6 +335,11 @@ export default function PointOfInterestManagement() {
                 </TabsTrigger>
               )
             })}
+            <TabsTrigger value="apartments" className="gap-1.5 rounded-lg px-3 py-2 text-xs sm:text-sm">
+              <Building2 className="h-4 w-4 shrink-0 opacity-80" />
+              <span className="hidden sm:inline">דירות</span>
+              <span className="sm:hidden">דירות</span>
+            </TabsTrigger>
           </TabsList>
 
         </Tabs>
@@ -243,9 +347,13 @@ export default function PointOfInterestManagement() {
         <Card className="rounded-2xl border-border/80 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">
-              {POI_CATEGORY_META[category].label}
+              {isApartmentsTab ? 'דירות' : POI_CATEGORY_META[category].label}
             </CardTitle>
-            <CardDescription>{POI_CATEGORY_META[category].description}</CardDescription>
+            <CardDescription>
+              {isApartmentsTab
+                ? 'כל יחידות הדיור מטבלת property_listings_units לפי פרסום נכס.'
+                : POI_CATEGORY_META[category].description}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="relative max-w-md">
@@ -257,13 +365,72 @@ export default function PointOfInterestManagement() {
                 type="search"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="חיפוש בקטגוריה..."
+                placeholder={isApartmentsTab ? 'חיפוש בדירות...' : 'חיפוש בקטגוריה...'}
                 className="rounded-lg ps-9"
                 autoComplete="off"
                 aria-label="חיפוש רשומות"
               />
             </div>
-            {listQuery.isError ? (
+            {isApartmentsTab ? (
+              apartmentsQuery.isError ? (
+                <ApiErrorBanner
+                  message={formatQueryError(apartmentsQuery.error)}
+                  onRetry={() => void apartmentsQuery.refetch()}
+                />
+              ) : (
+                <div className="w-full">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>משתמש מעלה</TableHead>
+                        <TableHead>מספר טלפון</TableHead>
+                        <TableHead>סוג הנכס</TableHead>
+                        <TableHead>עיר</TableHead>
+                        <TableHead>כתובת</TableHead>
+                        <TableHead>קומה</TableHead>
+                        <TableHead>מחיר חודשי</TableHead>
+                        <TableHead>מחיר</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {apartmentsQuery.isLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="h-24 text-center text-sm text-muted-foreground">
+                            טוען דירות...
+                          </TableCell>
+                        </TableRow>
+                      ) : filteredApartmentRows.length ? (
+                        filteredApartmentRows.map((row) => (
+                          <TableRow
+                            key={row.unit_id}
+                            className="cursor-pointer"
+                            onClick={() => {
+                              setSelectedApartment(row)
+                              setApartmentDialogOpen(true)
+                            }}
+                          >
+                            <TableCell>{row.publisher_name}</TableCell>
+                            <TableCell>{row.phone_number}</TableCell>
+                            <TableCell>{propertyTypeLabel(row)}</TableCell>
+                            <TableCell>{row.city}</TableCell>
+                            <TableCell>{buildAddress(row)}</TableCell>
+                            <TableCell>{row.floor ?? '—'}</TableCell>
+                            <TableCell>{formatCurrency(row.monthly_price)}</TableCell>
+                            <TableCell>{formatCurrency(row.price)}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={8} className="h-24 text-center text-sm text-muted-foreground">
+                            אין עדיין דירות להצגה.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )
+            ) : listQuery.isError ? (
               <ApiErrorBanner
                 message={formatQueryError(listQuery.error)}
                 onRetry={() => void listQuery.refetch()}
@@ -345,6 +512,32 @@ export default function PointOfInterestManagement() {
             }}
             isSubmitting={submitting}
           />
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={apartmentDialogOpen}
+        onOpenChange={(open) => {
+          setApartmentDialogOpen(open)
+          if (!open) setSelectedApartment(null)
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-4xl" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>פרטי דירה</DialogTitle>
+            <DialogDescription>תצוגה מלאה כמו בפורטל המשפחה.</DialogDescription>
+          </DialogHeader>
+          {apartmentDetailsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">טוען מודעה...</p>
+          ) : apartmentDetailsQuery.isError ? (
+            <ApiErrorBanner
+              message={formatQueryError(apartmentDetailsQuery.error)}
+              onRetry={() => void apartmentDetailsQuery.refetch()}
+            />
+          ) : apartmentDetailsQuery.data ? (
+            <PropertyListingDetailsContent data={apartmentDetailsQuery.data} />
+          ) : (
+            <p className="text-sm text-muted-foreground">לא נמצאו נתוני מודעה.</p>
+          )}
         </DialogContent>
       </Dialog>
     </PageShell>

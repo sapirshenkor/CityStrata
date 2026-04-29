@@ -19,6 +19,7 @@ const LAYER_DEFS: {
   { key: 'restaurants', label: 'מסעדות' },
   { key: 'coffeeShops', label: 'בתי קפה' },
   { key: 'hotels', label: 'מלונות' },
+  { key: 'apartments', label: 'דירות' },
   { key: 'matnasim', label: 'מתנ"סים' },
   { key: 'osmFacilities', label: 'מתקני OSM' },
   { key: 'synagogues', label: 'בתי כנסת' },
@@ -31,6 +32,7 @@ export type LayerVisibility = {
   restaurants: boolean
   coffeeShops: boolean
   hotels: boolean
+  apartments: boolean
   matnasim: boolean
   osmFacilities: boolean
   synagogues: boolean

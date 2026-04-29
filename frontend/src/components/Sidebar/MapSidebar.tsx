@@ -6,6 +6,7 @@ import CommunityForm from '../CommunityForm/CommunityForm'
 import RecommendationsPanel from '../Recommendations/RecommendationsPanel'
 import CommunityProfilesPanel from '../CommunityProfiles/CommunityProfilesPanel'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 export type { LayerVisibility }
 
@@ -36,6 +37,67 @@ export function MapSidebar({
   onSelectArea,
   className,
 }: MapSidebarProps) {
+  const { user } = useAuth()
+  const userRole = user?.role ?? null
+  const isVisitor = userRole === 'visitor'
+  const hasFullAccess = userRole === 'editor' || userRole === 'admin'
+
+  const showLayersTab = true
+  const showFamilyTab = isVisitor || hasFullAccess
+  const showCommunityTab = hasFullAccess
+  const showFamilyRecommendationsTab = isVisitor || hasFullAccess
+  const showCommunityRecommendationsTab = hasFullAccess
+
+  const tabDefinitions = [
+    {
+      key: 'layers',
+      visible: showLayersTab,
+      value: 'layers',
+      title: 'שכבות מפה',
+      label: 'שכבות',
+      compact: false,
+    },
+    {
+      key: 'family',
+      visible: showFamilyTab,
+      value: 'form',
+      title: 'טופס פרופיל משפחה',
+      label: 'משפחה',
+      compact: false,
+    },
+    {
+      key: 'community',
+      visible: showCommunityTab,
+      value: 'community',
+      title: 'פרופיל קהילה / קבוצה',
+      label: 'קהילה',
+      compact: false,
+    },
+    {
+      key: 'family-recommendations',
+      visible: showFamilyRecommendationsTab,
+      value: 'recommendations',
+      title: 'המלצות משפחה ודוחות טקטיים',
+      label: 'המלצות למשפחה',
+      compact: true,
+    },
+    {
+      key: 'community-recommendations',
+      visible: showCommunityRecommendationsTab,
+      value: 'communities',
+      title: 'פרופילי קהילה וקבוצות שמורות',
+      label: 'המלצות לקהילה',
+      compact: true,
+    },
+  ] as const
+
+  const visibleTabs = tabDefinitions.filter((tab) => tab.visible)
+  const visibleTabsCount = visibleTabs.length
+  const hasTwoRows = visibleTabsCount > 3
+  const firstRowCount = hasTwoRows ? Math.ceil(visibleTabsCount / 2) : visibleTabsCount
+
+  const defaultTabValue = showFamilyTab ? 'form' : 'layers'
+
   return (
     <aside
       className={cn(
@@ -43,59 +105,56 @@ export function MapSidebar({
         className,
       )}
     >
-      <Tabs defaultValue="form" className="flex h-full min-h-0 flex-col">
+      <Tabs defaultValue={defaultTabValue} className="flex h-full min-h-0 flex-col">
         <TabsList className="mx-3 mt-3 grid h-auto w-full grid-cols-6 gap-1 rounded-xl bg-muted/60 p-1">
-          {/* Row 1: Layers · Family · Community */}
-          <TabsTrigger
-            value="layers"
-            title="שכבות מפה"
-            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
-          >
-            שכבות
-          </TabsTrigger>
-          <TabsTrigger
-            value="form"
-            title="טופס פרופיל משפחה"
-            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
-          >
-            משפחה
-          </TabsTrigger>
-          <TabsTrigger
-            value="community"
-            title="פרופיל קהילה / קבוצה"
-            className="col-span-2 min-h-[2.25rem] px-1.5 text-center text-[11px] leading-tight text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-xs"
-          >
-            קהילה
-          </TabsTrigger>
-          {/* Row 2: recommend Family · recommend Community */}
-          <TabsTrigger
-            value="recommendations"
-            title="המלצות משפחה ודוחות טקטיים"
-            className="col-span-3 min-h-[2.25rem] whitespace-normal px-1.5 text-center text-[10px] leading-snug text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-[11px]"
-          >
-            המלצות למשפחה
-          </TabsTrigger>
-          <TabsTrigger
-            value="communities"
-            title="פרופילי קהילה וקבוצות שמורות"
-            className="col-span-3 min-h-[2.25rem] whitespace-normal px-1.5 text-center text-[10px] leading-snug text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm sm:text-[11px]"
-          >
-            המלצות לקהילה
-          </TabsTrigger>
+          {visibleTabs.map((tab, index) => {
+            const inFirstRow = index < firstRowCount
+            const rowCount = hasTwoRows
+              ? inFirstRow
+                ? firstRowCount
+                : visibleTabsCount - firstRowCount
+              : visibleTabsCount
+
+            const spanClass = rowCount === 2 ? 'col-span-3' : 'col-span-2'
+            const centeredStart = rowCount === 1 ? 'col-start-3' : null
+            const compactText = tab.compact && rowCount >= 2
+
+            return (
+              <TabsTrigger
+                key={tab.key}
+                value={tab.value}
+                title={tab.title}
+                className={cn(
+                  spanClass,
+                  'min-h-[2.25rem] px-1.5 text-center text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm',
+                  compactText
+                    ? 'whitespace-normal text-[10px] leading-snug sm:text-[11px]'
+                    : 'text-[11px] leading-tight sm:text-xs',
+                  centeredStart,
+                )}
+              >
+                {tab.label}
+              </TabsTrigger>
+            )
+          })}
         </TabsList>
-        <TabsContent value="form" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
-          <ScrollArea className="h-full flex-1 px-3 pb-4 pt-3">
-            <EvacueeProfileForm />
-          </ScrollArea>
-        </TabsContent>
-        <TabsContent
-          value="community"
-          className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
-        >
-          <ScrollArea className="h-full flex-1 px-3 pb-4 pt-3">
-            <CommunityForm />
-          </ScrollArea>
-        </TabsContent>
+        {showFamilyTab ? (
+          <TabsContent value="form" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+            <ScrollArea className="h-full flex-1 px-3 pb-4 pt-3">
+              <EvacueeProfileForm />
+            </ScrollArea>
+          </TabsContent>
+        ) : null}
+        {showCommunityTab ? (
+          <TabsContent
+            value="community"
+            className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+          >
+            <ScrollArea className="h-full flex-1 px-3 pb-4 pt-3">
+              <CommunityForm />
+            </ScrollArea>
+          </TabsContent>
+        ) : null}
         <TabsContent
           value="layers"
           className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
@@ -113,25 +172,29 @@ export function MapSidebar({
             />
           </ScrollArea>
         </TabsContent>
-        <TabsContent
-          value="recommendations"
-          className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
-        >
-          <ScrollArea className="h-full flex-1 px-1 pb-4 pt-2">
-            <RecommendationsPanel
-              selectedRecommendation={selectedRecommendation}
-              onSelectRecommendation={onSelectRecommendation}
-            />
-          </ScrollArea>
-        </TabsContent>
-        <TabsContent
-          value="communities"
-          className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
-        >
-          <ScrollArea className="h-full flex-1 px-1 pb-4 pt-2">
-            <CommunityProfilesPanel />
-          </ScrollArea>
-        </TabsContent>
+        {showFamilyRecommendationsTab ? (
+          <TabsContent
+            value="recommendations"
+            className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+          >
+            <ScrollArea className="h-full flex-1 px-1 pb-4 pt-2">
+              <RecommendationsPanel
+                selectedRecommendation={selectedRecommendation}
+                onSelectRecommendation={onSelectRecommendation}
+              />
+            </ScrollArea>
+          </TabsContent>
+        ) : null}
+        {showCommunityRecommendationsTab ? (
+          <TabsContent
+            value="communities"
+            className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+          >
+            <ScrollArea className="h-full flex-1 px-1 pb-4 pt-2">
+              <CommunityProfilesPanel />
+            </ScrollArea>
+          </TabsContent>
+        ) : null}
       </Tabs>
     </aside>
   )

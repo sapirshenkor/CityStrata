@@ -9,6 +9,7 @@ import {
   getMatnasim,
   getOSMFacilities,
   getOSMFacilityTypes,
+  getPropertyListings,
   getRestaurants,
   getStatisticalAreaSummary,
   getStatisticalAreas,
@@ -147,6 +148,15 @@ export function useSynagogues(filters: Record<string, unknown> = {}) {
   const q = useQuery({
     queryKey: [...mapQueryKeys.all, 'synagogues', filtersKey(filters)] as const,
     queryFn: async () => (await getSynagogues(filters)).data,
+    staleTime: STALE_MS,
+  })
+  return { data: q.data ?? null, loading: q.isLoading, isFetching: q.isFetching, error: errMsg(q.error) }
+}
+
+export function usePropertyListings(filters: Record<string, unknown> = {}) {
+  const q = useQuery({
+    queryKey: [...mapQueryKeys.all, 'property-listings', filtersKey(filters)] as const,
+    queryFn: async () => (await getPropertyListings(filters)).data,
     staleTime: STALE_MS,
   })
   return { data: q.data ?? null, loading: q.isLoading, isFetching: q.isFetching, error: errMsg(q.error) }

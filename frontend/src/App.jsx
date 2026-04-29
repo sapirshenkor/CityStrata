@@ -73,7 +73,7 @@ export default function App() {
       <Route
         path="/family"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['visitor']} redirectTo="/map">
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
@@ -89,7 +89,7 @@ export default function App() {
       <Route
         path="/family/property/:listingId"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['visitor']} redirectTo="/map">
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
@@ -105,7 +105,7 @@ export default function App() {
       <Route
         path="/family/property/new"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['visitor']} redirectTo="/map">
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
@@ -121,7 +121,7 @@ export default function App() {
       <Route
         path="/family/profile/new"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['visitor']} redirectTo="/map">
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
@@ -137,7 +137,7 @@ export default function App() {
       <Route
         path="/family/profile/:uuid/edit"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['visitor']} redirectTo="/map">
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">

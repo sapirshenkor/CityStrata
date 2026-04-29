@@ -1,14 +1,18 @@
 """Evacuee Family Profile API endpoints (CRUD)."""
 
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException
 from uuid import UUID
 
+from app.core.auth import get_current_user
 from app.core.database import get_pool
 from app.models.evacuee_family_profiles import (
     EvacueeFamilyProfile,
     EvacueeFamilyProfileCreate,
     EvacueeFamilyProfileUpdate,
 )
+from app.models.municipality_user import MunicipalityUserRecord
 
 
 router = APIRouter(prefix="/evacuee-family-profiles", tags=["evacuee-family-profiles"])
@@ -102,7 +106,10 @@ async def get_evacuee_family_profile(profile_id: UUID):
 
 
 @router.post("", response_model=EvacueeFamilyProfile, status_code=201)
-async def create_evacuee_family_profile(body: EvacueeFamilyProfileCreate):
+async def create_evacuee_family_profile(
+    body: EvacueeFamilyProfileCreate,
+    current: Annotated[MunicipalityUserRecord, Depends(get_current_user)],
+):
     """Create a new evacuee family profile."""
     pool = get_pool()
     try:
@@ -110,6 +117,7 @@ async def create_evacuee_family_profile(body: EvacueeFamilyProfileCreate):
             row = await conn.fetchrow(
                 """
                 INSERT INTO evacuee_family_profiles (
+                    user_id,
                     family_name, contact_name, contact_phone, contact_email,
                     home_stat_2022, city_name, home_address,
                     total_people, infants, preschool, elementary, youth, adults, seniors,
@@ -122,7 +130,7 @@ async def create_evacuee_family_profile(body: EvacueeFamilyProfileCreate):
                 ) VALUES (
                     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
                     $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
-                    $27, $28, $29
+                    $27, $28, $29, $30
                 )
                 RETURNING id, uuid, created_at, updated_at, selected_matching_result_id,
                     family_name, contact_name, contact_phone, contact_email, home_stat_2022,
@@ -135,6 +143,7 @@ async def create_evacuee_family_profile(body: EvacueeFamilyProfileCreate):
                     accommodation_preference, estimated_stay_duration,
                     needs_medical_proximity, services_importance, notes
                 """,
+                current.id,
                 body.family_name,
                 body.contact_name,
                 body.contact_phone,

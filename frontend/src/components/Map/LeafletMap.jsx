@@ -6,6 +6,7 @@ import AirbnbLayer from './AirbnbLayer'
 import RestaurantsLayer from './RestaurantsLayer'
 import CoffeeShopsLayer from './CoffeeShopsLayer'
 import HotelsLayer from './HotelsLayer'
+import ApartmentsLayer from './ApartmentsLayer'
 import MatnasimLayer from './MatnasimLayer'
 import OSMFacilitiesLayer from './OSMFacilitiesLayer'
 import SynagoguesLayer from './SynagoguesLayer'
@@ -37,6 +38,7 @@ function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, f
   const restaurantsFilters = { ...filters.restaurants, ...(areaFilter && { area: areaFilter }) }
   const coffeeShopsFilters = { ...filters.coffeeShops, ...(areaFilter && { area: areaFilter }) }
   const hotelsFilters = { ...filters.hotels, ...(areaFilter && { area: areaFilter }) }
+  const apartmentsFilters = { ...filters.apartments, ...(areaFilter && { area: areaFilter }) }
   const matnasimFilters = { ...filters.matnasim, ...(areaFilter && { area: areaFilter }) }
   const osmFacilitiesFilters = { ...filters.osmFacilities, ...(areaFilter && { area: areaFilter }) }
   const synagoguesFilters = { ...filters.synagogues, ...(areaFilter && { area: areaFilter }) }
@@ -81,6 +83,10 @@ function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, f
 
       {layerVisibility.hotels && (
         <HotelsLayer filters={hotelsFilters} />
+      )}
+
+      {layerVisibility.apartments && (
+        <ApartmentsLayer filters={apartmentsFilters} />
       )}
 
       {layerVisibility.matnasim && (

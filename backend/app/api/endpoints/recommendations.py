@@ -10,14 +10,17 @@ Exposes:
 
 import json
 import logging
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+from app.core.auth import get_current_user
 from app.core.database import get_pool
+from app.models.municipality_user import MunicipalityUserRecord
 from app.models.tactical_agent_response import TacticalAgentResponse
 from app.models.recommendations_overview import FamilyRecommendationOverview
 from app.services.tactical_pipeline import (
@@ -97,6 +100,23 @@ _OVERVIEW_SQL = """
         ON mr.id = mfp.selected_matching_result_id
 """
 
+_OVERVIEW_SQL_BY_USER = """
+    SELECT
+        efp.uuid AS profile_uuid,
+        efp.family_name,
+        (efp.selected_matching_result_id IS NOT NULL) AS has_matching,
+        (ftr.id IS NOT NULL) AS has_tactical,
+        ftr.created_at AS tactical_created_at,
+        mr.recommended_cluster_number AS cluster_number,
+        FALSE AS is_merged_profile
+    FROM evacuee_family_profiles efp
+    LEFT JOIN family_tactical_responses ftr
+        ON ftr.profile_uuid = efp.uuid
+    LEFT JOIN matching_results mr
+        ON mr.id = efp.selected_matching_result_id
+    WHERE efp.user_id = $1
+"""
+
 _ALL_RESPONSES_SQL = """
     SELECT id, created_at, profile_uuid, confidence,
            agent_output, radii_data, family_name
@@ -171,15 +191,23 @@ def _row_to_recommendation(row) -> TacticalAgentResponse:
 
 
 @router.get("/overview", response_model=list[FamilyRecommendationOverview])
-async def list_families_recommendation_overview():
+async def list_families_recommendation_overview(
+    current: Annotated[MunicipalityUserRecord, Depends(get_current_user)],
+):
     """All evacuee families + multi-family groups with agent status."""
     pool = get_pool()
     try:
         async with pool.acquire() as conn:
-            rows = await conn.fetch(
-                "SELECT * FROM (" + _OVERVIEW_SQL + ") overview "
-                "ORDER BY is_merged_profile, family_name"
-            )
+            if current.role == "visitor":
+                rows = await conn.fetch(
+                    _OVERVIEW_SQL_BY_USER + " ORDER BY family_name",
+                    current.id,
+                )
+            else:
+                rows = await conn.fetch(
+                    "SELECT * FROM (" + _OVERVIEW_SQL + ") overview "
+                    "ORDER BY is_merged_profile, family_name"
+                )
             return [_row_to_overview(row) for row in rows]
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Database error: {exc}")

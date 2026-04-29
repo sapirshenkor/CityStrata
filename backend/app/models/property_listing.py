@@ -120,3 +120,21 @@ class PropertyListingRead(PropertyListingBase):
     units: list[PropertyListingUnitRead]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PropertyListingUnitTableRow(BaseModel):
+    unit_id: UUID
+    listing_id: UUID
+    floor: int | None = None
+    publisher_name: str
+    phone_number: str
+    property_type: PropertyType
+    property_type_other: str | None = None
+    city: str
+    street: str
+    neighborhood: str | None = None
+    house_number: str
+    monthly_price: Decimal | None = None
+    price: Decimal | None = None
+
+    model_config = ConfigDict(from_attributes=True)

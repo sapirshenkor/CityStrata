@@ -196,11 +196,17 @@ export const updateFamilyProfile = (profileUuid, payload) =>
 export const createPropertyListing = (payload) =>
   api.post('/api/property-listings', payload)
 
+export const getPropertyListings = (params = {}) =>
+  api.get('/api/property-listings', { params })
+
 export const getMyPropertyListings = () =>
   api.get('/api/property-listings/mine')
 
 export const getPropertyListing = (listingId) =>
   api.get(`/api/property-listings/${listingId}`)
+
+export const getPropertyListingUnitsTable = () =>
+  api.get('/api/property-listings/units-table')
 
 export default api
 
