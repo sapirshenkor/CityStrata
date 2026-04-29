@@ -15,6 +15,7 @@ from app.models.municipality_user import MunicipalityUserRecord
 from app.models.property_listing import (
     PropertyListingCreate,
     PropertyListingRead,
+    PropertyListingUnitTableRow,
     PropertyListingUnitCreate,
     PropertyListingUnitRead,
     PropertyListingUpdate,
@@ -281,14 +282,12 @@ async def create_property_listing(
 
 @router.get("", response_model=list[PropertyListingRead])
 async def list_property_listings(
-    current: Annotated[MunicipalityUserRecord, Depends(get_current_user)],
     city: str | None = Query(default=None),
     property_type: PropertyType | None = Query(default=None),
     latitude: float | None = Query(default=None, ge=-90, le=90),
     longitude: float | None = Query(default=None, ge=-180, le=180),
     distance_meters: float | None = Query(default=None, gt=0),
 ):
-    _ = current
     has_geo_filter = (
         latitude is not None and longitude is not None and distance_meters is not None
     )
@@ -363,6 +362,58 @@ async def list_my_property_listings(
             return [
                 _map_listing(row, units_by_listing.get(row["id"], []))
                 for row in listing_rows
+            ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
+
+
+@router.get("/units-table", response_model=list[PropertyListingUnitTableRow])
+async def list_property_listing_units_table(
+    current: Annotated[MunicipalityUserRecord, Depends(get_current_user)],
+):
+    _ = current
+    pool = get_pool()
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT
+                    u.id AS unit_id,
+                    u.listing_id,
+                    u.floor,
+                    pl.publisher_name,
+                    pl.phone_number,
+                    pl.property_type,
+                    pl.property_type_other,
+                    pl.city,
+                    pl.street,
+                    pl.neighborhood,
+                    pl.house_number,
+                    u.monthly_price,
+                    u.monthly_price AS price
+                FROM public.property_listing_units u
+                JOIN public.property_listings pl
+                    ON pl.id = u.listing_id
+                ORDER BY pl.created_at DESC, u.created_at ASC
+                """
+            )
+            return [
+                PropertyListingUnitTableRow(
+                    unit_id=row["unit_id"],
+                    listing_id=row["listing_id"],
+                    floor=row["floor"],
+                    publisher_name=row["publisher_name"],
+                    phone_number=row["phone_number"],
+                    property_type=row["property_type"],
+                    property_type_other=row["property_type_other"],
+                    city=row["city"],
+                    street=row["street"],
+                    neighborhood=row["neighborhood"],
+                    house_number=row["house_number"],
+                    monthly_price=row["monthly_price"],
+                    price=row["price"],
+                )
+                for row in rows
             ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e

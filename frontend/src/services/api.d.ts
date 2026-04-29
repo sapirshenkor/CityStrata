@@ -44,3 +44,8 @@ export function getFamilyProfiles(): Promise<ApiRes>
 export function getFamilyProfile(profileUuid: string): Promise<ApiRes>
 export function createFamilyProfile(payload: unknown): Promise<ApiRes>
 export function updateFamilyProfile(profileUuid: string, payload: unknown): Promise<ApiRes>
+export function createPropertyListing(payload: unknown): Promise<ApiRes>
+export function getPropertyListings(params?: Record<string, unknown>): Promise<ApiRes>
+export function getMyPropertyListings(): Promise<ApiRes>
+export function getPropertyListing(listingId: string): Promise<ApiRes>
+export function getPropertyListingUnitsTable(): Promise<ApiRes>
