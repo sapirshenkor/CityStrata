@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
-import { ArrowLeft, ChevronDown, ChevronUp, FileText, PlusCircle, User } from 'lucide-react'
+import { ArrowLeft, Building2, ChevronDown, ChevronUp, FileText, PlusCircle, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
+  getMyPropertyListings,
   getMatchingResultForProfile,
   getRecommendationByProfile,
   runMatchingForProfile,
@@ -32,6 +33,23 @@ interface TacticalRecData {
   confidence?: string | null
   radii_data?: Array<{ hub_label?: string; radius_m?: number }>
   agent_output?: string
+}
+
+interface PropertyListingUnit {
+  id: string
+  rooms: number
+  monthly_price?: number | null
+  is_occupied?: boolean
+}
+
+interface PropertyListingRow {
+  id: string
+  property_type: string
+  city: string
+  street: string
+  house_number: string
+  neighborhood?: string | null
+  units: PropertyListingUnit[]
 }
 
 export default function FamilyDashboard() {
@@ -69,6 +87,14 @@ export default function FamilyDashboard() {
       }
     },
     enabled: Boolean(intelUuid),
+  })
+
+  const { data: myListings, isLoading: loadingListings } = useQuery({
+    queryKey: ['family', 'my-property-listings'],
+    queryFn: async (): Promise<PropertyListingRow[]> => {
+      const { data } = await getMyPropertyListings()
+      return data as PropertyListingRow[]
+    },
   })
 
   const detailLoading = Boolean(intelUuid) && (loadingMatching || loadingTactical)
@@ -151,6 +177,7 @@ export default function FamilyDashboard() {
 
   const profileCount = summary?.profile_count ?? profiles.length
   const withMatching = summary?.profiles_with_matching_count ?? 0
+  const listings = myListings ?? []
 
   return (
     <div className="dashboard-app family-portal flex min-h-screen flex-col" dir="rtl">
@@ -230,7 +257,53 @@ export default function FamilyDashboard() {
                 יצירת פרופיל משפחה
               </Link>
             </Button>
+            <Button asChild variant="secondary">
+              <Link to="/family/property/new" className="inline-flex items-center gap-2">
+                <Building2 className="h-4 w-4" aria-hidden />
+                הוספת דירה
+              </Link>
+            </Button>
           </div>
+
+          <Card className="border-border bg-card shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg text-foreground">
+                <FileText className="h-5 w-5 text-primary" aria-hidden />
+                המודעות שלך
+              </CardTitle>
+              <CardDescription>
+                רק מודעות הדיור המקושרות לחשבון שלך.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingListings ? (
+                <p className="text-sm text-muted-foreground">טוען מודעות...</p>
+              ) : listings.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  עדיין אין מודעה. לחצו על &quot;הוספת דירה&quot; כדי להתחיל.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {listings.map((listing) => (
+                    <li
+                      key={listing.id}
+                      className="rounded-lg border border-border bg-card p-3 shadow-sm transition hover:border-primary/40 hover:bg-muted/20"
+                    >
+                      <Link to={`/family/property/${listing.id}`} className="block">
+                        <div className="font-medium text-foreground">
+                          {listing.city}, {listing.street} {listing.house_number}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          סוג נכס: {listing.property_type} · יחידות: {listing.units.length}
+                          {listing.neighborhood ? ` · שכונה: ${listing.neighborhood}` : ''}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
 
           <Card className="border-border bg-card shadow-sm">
             <CardHeader className="pb-2">

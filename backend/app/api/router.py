@@ -23,6 +23,7 @@ from app.api.endpoints import (
     auth,
     recommendations,
     family,
+    property_listings,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -48,3 +49,4 @@ api_router.include_router(community_profiles.router)
 api_router.include_router(auth.router)
 api_router.include_router(family.router)
 api_router.include_router(recommendations.router)
+api_router.include_router(property_listings.router)

@@ -193,5 +193,14 @@ export const createFamilyProfile = (payload) =>
 export const updateFamilyProfile = (profileUuid, payload) =>
   api.patch(`/api/family/me/profiles/${profileUuid}`, payload)
 
+export const createPropertyListing = (payload) =>
+  api.post('/api/property-listings', payload)
+
+export const getMyPropertyListings = () =>
+  api.get('/api/property-listings/mine')
+
+export const getPropertyListing = (listingId) =>
+  api.get(`/api/property-listings/${listingId}`)
+
 export default api
 
