@@ -1,6 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { MapLayersPanel, type LayerVisibility } from '../Map/MapLayersPanel'
 import EvacueeProfileForm from '../EvacueeProfileForm'
 import CommunityForm from '../CommunityForm/CommunityForm'
 import RecommendationsPanel from '../Recommendations/RecommendationsPanel'
@@ -8,33 +7,15 @@ import CommunityProfilesPanel from '../CommunityProfiles/CommunityProfilesPanel'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
 
-export type { LayerVisibility }
-
 export interface MapSidebarProps {
   selectedRecommendation: unknown
   onSelectRecommendation: (rec: unknown) => void
-  layerVisibility: LayerVisibility
-  onToggleLayer: (next: LayerVisibility) => void
-  filters: Record<string, unknown>
-  onUpdateFilters: (next: Record<string, unknown>) => void
-  clusterAssignments: unknown[] | null
-  onRunClustering: () => Promise<unknown>
-  selectedArea: number | null
-  onSelectArea: (area: number | null) => void
   className?: string
 }
 
 export function MapSidebar({
   selectedRecommendation,
   onSelectRecommendation,
-  layerVisibility,
-  onToggleLayer,
-  filters,
-  onUpdateFilters,
-  clusterAssignments,
-  onRunClustering,
-  selectedArea,
-  onSelectArea,
   className,
 }: MapSidebarProps) {
   const { user } = useAuth()
@@ -42,21 +23,12 @@ export function MapSidebar({
   const isVisitor = userRole === 'visitor'
   const hasFullAccess = userRole === 'editor' || userRole === 'admin'
 
-  const showLayersTab = true
   const showFamilyTab = isVisitor || hasFullAccess
   const showCommunityTab = hasFullAccess
   const showFamilyRecommendationsTab = isVisitor || hasFullAccess
   const showCommunityRecommendationsTab = hasFullAccess
 
   const tabDefinitions = [
-    {
-      key: 'layers',
-      visible: showLayersTab,
-      value: 'layers',
-      title: 'שכבות מפה',
-      label: 'שכבות',
-      compact: false,
-    },
     {
       key: 'family',
       visible: showFamilyTab,
@@ -96,7 +68,7 @@ export function MapSidebar({
   const hasTwoRows = visibleTabsCount > 3
   const firstRowCount = hasTwoRows ? Math.ceil(visibleTabsCount / 2) : visibleTabsCount
 
-  const defaultTabValue = showFamilyTab ? 'form' : 'layers'
+  const defaultTabValue = showFamilyTab ? 'form' : visibleTabs[0]?.value
 
   return (
     <aside
@@ -155,23 +127,6 @@ export function MapSidebar({
             </ScrollArea>
           </TabsContent>
         ) : null}
-        <TabsContent
-          value="layers"
-          className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
-        >
-          <ScrollArea className="h-full flex-1 px-3 pb-4 pt-3">
-            <MapLayersPanel
-              layerVisibility={layerVisibility}
-              onToggleLayer={onToggleLayer}
-              filters={filters}
-              onUpdateFilters={onUpdateFilters}
-              clusterAssignments={clusterAssignments}
-              onRunClustering={onRunClustering}
-              selectedArea={selectedArea}
-              onSelectArea={onSelectArea}
-            />
-          </ScrollArea>
-        </TabsContent>
         {showFamilyRecommendationsTab ? (
           <TabsContent
             value="recommendations"

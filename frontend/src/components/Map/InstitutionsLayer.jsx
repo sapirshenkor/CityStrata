@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useInstitutions } from '../../hooks/useMapData'
+import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
 
 function InstitutionMarkerBubble({ multi }) {
   return (
@@ -34,7 +35,7 @@ function InstitutionMarkerBubble({ multi }) {
   )
 }
 
-function InstitutionsLayer({ filters }) {
+function InstitutionsLayer({ filters, recommendation }) {
   const { data, loading, error } = useInstitutions(filters)
   const [activeKey, setActiveKey] = useState(null)
 
@@ -44,13 +45,14 @@ function InstitutionsLayer({ filters }) {
     const byCoord = new Map()
     data.features.forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates
+      if (!isPointInsideRecommendationRadii(lat, lon, recommendation)) return
       const key = `${lon},${lat}`
       if (!byCoord.has(key)) byCoord.set(key, { lat, lon, institutions: [] })
       byCoord.get(key).institutions.push(feature.properties)
     })
 
     return [...byCoord.entries()]
-  }, [data])
+  }, [data, recommendation])
 
   if (loading || error) return null
 

@@ -2,15 +2,19 @@ import { useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useHotels } from '../../hooks/useMapData'
 import { formatRating } from '../../utils/formatters'
+import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
 
-function HotelsLayer({ filters }) {
+function HotelsLayer({ filters, recommendation }) {
   const { data, loading, error } = useHotels(filters)
   const [activeUuid, setActiveUuid] = useState(null)
 
   const features = useMemo(() => {
     if (!data?.features) return []
-    return data.features
-  }, [data])
+    return data.features.filter((feature) => {
+      const [lon, lat] = feature.geometry.coordinates
+      return isPointInsideRecommendationRadii(lat, lon, recommendation)
+    })
+  }, [data, recommendation])
 
   if (loading || error) return null
 

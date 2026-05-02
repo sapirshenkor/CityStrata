@@ -1,12 +1,19 @@
 import { useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useMatnasim } from '../../hooks/useMapData'
+import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
 
-function MatnasimLayer({ filters }) {
+function MatnasimLayer({ filters, recommendation }) {
   const { data, loading, error } = useMatnasim(filters)
   const [activeUuid, setActiveUuid] = useState(null)
 
-  const features = useMemo(() => (data?.features ? data.features : []), [data])
+  const features = useMemo(() => {
+    if (!data?.features) return []
+    return data.features.filter((feature) => {
+      const [lon, lat] = feature.geometry.coordinates
+      return isPointInsideRecommendationRadii(lat, lon, recommendation)
+    })
+  }, [data, recommendation])
 
   if (loading || error) return null
 

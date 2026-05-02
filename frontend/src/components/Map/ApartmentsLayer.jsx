@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { usePropertyListings } from '../../hooks/useMapData'
+import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
 
 function formatMoney(value) {
   if (value == null) return '—'
@@ -55,7 +56,7 @@ function ApartmentMarkerBubble({ multi }) {
   )
 }
 
-function ApartmentsLayer() {
+function ApartmentsLayer({ recommendation }) {
   const { data, loading, error } = usePropertyListings()
   const [activeKey, setActiveKey] = useState(null)
 
@@ -65,6 +66,9 @@ function ApartmentsLayer() {
     const byCoord = new Map()
     data
       .filter((listing) => typeof listing?.latitude === 'number' && typeof listing?.longitude === 'number')
+      .filter((listing) =>
+        isPointInsideRecommendationRadii(listing.latitude, listing.longitude, recommendation),
+      )
       .forEach((listing) => {
         const key = `${listing.longitude},${listing.latitude}`
         if (!byCoord.has(key)) {
@@ -74,7 +78,7 @@ function ApartmentsLayer() {
       })
 
     return [...byCoord.entries()]
-  }, [data])
+  }, [data, recommendation])
 
   if (loading || error) return null
 
