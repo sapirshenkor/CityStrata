@@ -6,16 +6,24 @@ import RecommendationsPanel from '../Recommendations/RecommendationsPanel'
 import CommunityProfilesPanel from '../CommunityProfiles/CommunityProfilesPanel'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
+import type { ReactNode } from 'react'
 
 export interface MapSidebarProps {
   selectedRecommendation: unknown
   onSelectRecommendation: (rec: unknown) => void
+  onFamilyMacroClusterFocus?: (clusterIndex: number | null) => void
+  onRecommendationsProcessingChange?: (processing: boolean) => void
+  /** Floating status card (pointer-events-none) anchored to sidebar bottom — map stays usable */
+  agentThinkingOverlay?: ReactNode
   className?: string
 }
 
 export function MapSidebar({
   selectedRecommendation,
   onSelectRecommendation,
+  onFamilyMacroClusterFocus,
+  onRecommendationsProcessingChange,
+  agentThinkingOverlay,
   className,
 }: MapSidebarProps) {
   const { user } = useAuth()
@@ -73,7 +81,7 @@ export function MapSidebar({
   return (
     <aside
       className={cn(
-        'flex h-full w-[min(100%,380px)] shrink-0 flex-col border-r border-border bg-card text-card-foreground shadow-sm shadow-black/20',
+        'relative flex h-full w-[min(100%,380px)] shrink-0 flex-col border-r border-border bg-card text-card-foreground shadow-sm shadow-black/20',
         className,
       )}
     >
@@ -136,6 +144,8 @@ export function MapSidebar({
               <RecommendationsPanel
                 selectedRecommendation={selectedRecommendation}
                 onSelectRecommendation={onSelectRecommendation}
+                onFamilyMacroClusterFocus={onFamilyMacroClusterFocus}
+                onRecommendationsProcessingChange={onRecommendationsProcessingChange}
               />
             </ScrollArea>
           </TabsContent>
@@ -151,6 +161,11 @@ export function MapSidebar({
           </TabsContent>
         ) : null}
       </Tabs>
+      {agentThinkingOverlay ? (
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-50 flex justify-center">
+          {agentThinkingOverlay}
+        </div>
+      ) : null}
     </aside>
   )
 }

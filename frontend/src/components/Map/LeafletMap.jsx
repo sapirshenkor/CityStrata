@@ -18,6 +18,7 @@ import MatnasimLayer from './MatnasimLayer'
 import SynagoguesLayer from './SynagoguesLayer'
 import OSMFacilitiesLayer from './OSMFacilitiesLayer'
 import RecommendationsLayer, { RECOMMENDATIONS_FILL_LAYER_ID } from './RecommendationsLayer'
+import ClusterMacroFit from './ClusterMacroFit'
 // import LayerControls from './LayerControls'
 
 const EILAT_CENTER = [29.55, 34.95]
@@ -91,6 +92,7 @@ export default function LeafletMap({
   showClusters,
   clusterAssignments,
   selectedRecommendation,
+  familyMacroClusterFocus,
 }) {
   const [layersMenuOpen, setLayersMenuOpen] = useState(false)
   const [is3D, setIs3D] = useState(false)
@@ -195,6 +197,12 @@ export default function LeafletMap({
           clusterAssignments={clusterAssignments}
         />
       )}
+
+      <ClusterMacroFit
+        macroClusterIndex={familyMacroClusterFocus}
+        clusterAssignments={clusterAssignments ?? undefined}
+        selectedRecommendation={selectedRecommendation}
+      />
 
       <RecommendationsLayer recommendation={selectedRecommendation} />
 

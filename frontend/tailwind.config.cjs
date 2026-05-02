@@ -44,6 +44,15 @@ module.exports = {
         soft: '0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
         card: '0 1px 2px 0 rgb(0 0 0 / 0.04), 0 4px 12px -2px rgb(0 0 0 / 0.06)',
       },
+      keyframes: {
+        'thinking-icon-pulse': {
+          '0%, 100%': { transform: 'scale(1)', opacity: '1' },
+          '50%': { transform: 'scale(1.1)', opacity: '0.72' },
+        },
+      },
+      animation: {
+        'thinking-icon-pulse': 'thinking-icon-pulse 1.4s ease-in-out infinite',
+      },
     },
   },
   plugins: [require('tailwindcss-animate')],
