@@ -1,5 +1,7 @@
 import type { PathOptions } from 'leaflet'
 
+export const STATISTICAL_AREA_FILL_PALETTE: readonly string[]
+
 export function getAreaColor(stat2022: number): string
 export function getAreaStyle(stat2022: number, isSelected: boolean): PathOptions
 export function getClusterStyle(cluster: number, isSelected: boolean): PathOptions

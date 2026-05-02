@@ -3,16 +3,16 @@
  */
 
 // Statistical Areas — 25 fills: saturated enough to read on OSM tiles; cycled by stat_2022
-export const getAreaColor = (stat2022) => {
-  const colors = [
-    '#E85555', '#2EB8AE', '#2A9FD1', '#E8885C', '#6BC4A8',
-    '#E5C82E', '#9B6FCE', '#5AA8D9', '#E5A21E', '#3DA66A',
-    '#D95A4E', '#3A9FD4', '#3DB87A', '#D9B82E', '#9468B8',
-    '#E07068', '#4A9BDC', '#4AA896', '#E5C82E', '#9B6FCE',
-    '#D95A4E', '#3A9FD4', '#3DB87A', '#D9B82E', '#9468B8',
-  ]
-  return colors[(stat2022 - 1) % colors.length]
-}
+export const STATISTICAL_AREA_FILL_PALETTE = [
+  '#E85555', '#2EB8AE', '#2A9FD1', '#E8885C', '#6BC4A8',
+  '#E5C82E', '#9B6FCE', '#5AA8D9', '#E5A21E', '#3DA66A',
+  '#D95A4E', '#3A9FD4', '#3DB87A', '#D9B82E', '#9468B8',
+  '#E07068', '#4A9BDC', '#4AA896', '#E5C82E', '#9B6FCE',
+  '#D95A4E', '#3A9FD4', '#3DB87A', '#D9B82E', '#9468B8',
+]
+
+export const getAreaColor = (stat2022) =>
+  STATISTICAL_AREA_FILL_PALETTE[(stat2022 - 1) % STATISTICAL_AREA_FILL_PALETTE.length]
 
 // Layer colors
 export const layerColors = {

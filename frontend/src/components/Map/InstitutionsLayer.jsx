@@ -1,32 +1,46 @@
-import { useMemo } from 'react'
-import { Marker, Popup } from 'react-leaflet'
+import { useMemo, useState } from 'react'
+import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useInstitutions } from '../../hooks/useMapData'
-import L from 'leaflet'
 
-const schoolIcon = L.divIcon({
-  className: 'custom-marker institution-marker',
-  html: '<div class="marker-icon">🏫</div>',
-  iconSize: [30, 30],
-  iconAnchor: [15, 30],
-})
-
-// Icon variant that signals multiple institutions share this point.
-const multiSchoolIcon = L.divIcon({
-  className: 'custom-marker institution-marker',
-  html: '<div class="marker-icon" style="position:relative">🏫<span style="position:absolute;top:-4px;right:-6px;background:#2563eb;color:#fff;border-radius:50%;font-size:10px;font-weight:700;width:16px;height:16px;display:flex;align-items:center;justify-content:center;line-height:1">+</span></div>',
-  iconSize: [30, 30],
-  iconAnchor: [15, 30],
-})
+function InstitutionMarkerBubble({ multi }) {
+  return (
+    <div className="custom-marker institution-marker" style={{ position: 'relative', width: 30, height: 30 }}>
+      <div className="marker-icon" style={{ position: 'relative' }}>
+        🏫
+        {multi && (
+          <span
+            style={{
+              position: 'absolute',
+              top: -4,
+              right: -6,
+              background: '#2563eb',
+              color: '#fff',
+              borderRadius: '50%',
+              fontSize: 10,
+              fontWeight: 700,
+              width: 16,
+              height: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1,
+            }}
+          >
+            +
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function InstitutionsLayer({ filters }) {
   const { data, loading, error } = useInstitutions(filters)
+  const [activeKey, setActiveKey] = useState(null)
 
-  const markers = useMemo(() => {
-    if (!data?.features) return []
+  const grouped = useMemo(() => {
+    if (!data?.features?.length) return []
 
-    // Group all institution rows by their exact coordinate string so that
-    // co-located institutions (same building, different programmes) are
-    // surfaced in one popup rather than stacked invisibly behind each other.
     const byCoord = new Map()
     data.features.forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates
@@ -35,41 +49,75 @@ function InstitutionsLayer({ filters }) {
       byCoord.get(key).institutions.push(feature.properties)
     })
 
-    return [...byCoord.entries()].map(([key, { lat, lon, institutions }]) => {
-      const isMulti = institutions.length > 1
-      return (
-        <Marker
-          key={key}
-          position={[lat, lon]}
-          icon={isMulti ? multiSchoolIcon : schoolIcon}
-        >
-          <Popup>
-            {institutions.map((p, idx) => (
-              <div
-                key={p.id}
-                className="popup-content"
-                style={idx > 0 ? { borderTop: '1px solid #e0e0e0', paddingTop: 8, marginTop: 8 } : undefined}
-              >
-                <h3 style={{ margin: '0 0 4px' }}>{p.institution_name}</h3>
-                <p style={{ margin: '2px 0' }}><strong>קוד:</strong> {p.institution_code}</p>
-                {p.address && <p style={{ margin: '2px 0' }}><strong>כתובת:</strong> {p.address}</p>}
-                {p.education_phase && <p style={{ margin: '2px 0' }}><strong>שלב חינוך:</strong> {p.education_phase}</p>}
-                {p.type_of_education && <p style={{ margin: '2px 0' }}><strong>סוג חינוך:</strong> {p.type_of_education}</p>}
-                {p.type_of_supervision && <p style={{ margin: '2px 0' }}><strong>פיקוח:</strong> {p.type_of_supervision}</p>}
-                <p style={{ margin: '2px 0' }}><strong>אזור:</strong> {p.stat_2022}</p>
-              </div>
-            ))}
-          </Popup>
-        </Marker>
-      )
-    })
+    return [...byCoord.entries()]
   }, [data])
 
-  if (loading) return null
-  if (error) return null
+  if (loading || error) return null
 
-  return <>{markers}</>
+  return (
+    <>
+      {grouped.map(([key, { lat, lon, institutions }]) => {
+        const isMulti = institutions.length > 1
+        const isOpen = activeKey === key
+
+        return (
+          <div key={key}>
+            <Marker longitude={lon} latitude={lat} anchor="bottom" onClick={() => setActiveKey(key)}>
+              <InstitutionMarkerBubble multi={isMulti} />
+            </Marker>
+            {isOpen && (
+              <Popup
+                longitude={lon}
+                latitude={lat}
+                anchor="bottom"
+                offset={12}
+                closeButton
+                closeOnClick={false}
+                maxWidth="320px"
+                onClose={() => setActiveKey(null)}
+              >
+                {institutions.map((p, idx) => (
+                  <div
+                    key={p.id}
+                    className="popup-content"
+                    style={idx > 0 ? { borderTop: '1px solid #e0e0e0', paddingTop: 8, marginTop: 8 } : undefined}
+                  >
+                    <h3 style={{ margin: '0 0 4px' }}>{p.institution_name}</h3>
+                    <p style={{ margin: '2px 0' }}>
+                      <strong>קוד:</strong> {p.institution_code}
+                    </p>
+                    {p.address && (
+                      <p style={{ margin: '2px 0' }}>
+                        <strong>כתובת:</strong> {p.address}
+                      </p>
+                    )}
+                    {p.education_phase && (
+                      <p style={{ margin: '2px 0' }}>
+                        <strong>שלב חינוך:</strong> {p.education_phase}
+                      </p>
+                    )}
+                    {p.type_of_education && (
+                      <p style={{ margin: '2px 0' }}>
+                        <strong>סוג חינוך:</strong> {p.type_of_education}
+                      </p>
+                    )}
+                    {p.type_of_supervision && (
+                      <p style={{ margin: '2px 0' }}>
+                        <strong>פיקוח:</strong> {p.type_of_supervision}
+                      </p>
+                    )}
+                    <p style={{ margin: '2px 0' }}>
+                      <strong>אזור:</strong> {p.stat_2022}
+                    </p>
+                  </div>
+                ))}
+              </Popup>
+            )}
+          </div>
+        )
+      })}
+    </>
+  )
 }
 
 export default InstitutionsLayer
-

@@ -1,59 +1,73 @@
-import { useMemo } from 'react'
-import { Marker, Popup } from 'react-leaflet'
+import { useMemo, useState } from 'react'
+import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useSynagogues } from '../../hooks/useMapData'
-import L from 'leaflet'
-
-// Synagogue icon
-const synagogueIcon = L.divIcon({
-  className: 'custom-marker synagogue-marker',
-  html: '<div class="marker-icon">🕍</div>',
-  iconSize: [30, 30],
-  iconAnchor: [15, 30],
-})
 
 function SynagoguesLayer({ filters }) {
   const { data, loading, error } = useSynagogues(filters)
+  const [activeUuid, setActiveUuid] = useState(null)
 
-  const markers = useMemo(() => {
-    if (!data || !data.features) return []
-    
-    return data.features.map((feature) => {
-      const { geometry, properties } = feature
-      const [lon, lat] = geometry.coordinates
-      
-      return (
-        <Marker
-          key={properties.uuid}
-          position={[lat, lon]}
-          icon={synagogueIcon}
-        >
-          <Popup>
-            <div className="popup-content">
-              <h3>{properties.name}</h3>
-              {properties.name_he && (
-                <p><strong>שם:</strong> {properties.name_he}</p>
-              )}
-              {properties.type && (
-                <p><strong>סוג:</strong> {properties.type}</p>
-              )}
-              {properties.type_he && (
-                <p><strong>סוג:</strong> {properties.type_he}</p>
-              )}
-              {properties.address && (
-                <p><strong>כתובת:</strong> {properties.address}</p>
-              )}
-              <p><strong>אזור:</strong> {properties.stat_2022}</p>
-            </div>
-          </Popup>
-        </Marker>
-      )
-    })
-  }, [data])
+  const features = useMemo(() => (data?.features ? data.features : []), [data])
 
-  if (loading) return null
-  if (error) return null
+  if (loading || error) return null
 
-  return <>{markers}</>
+  return (
+    <>
+      {features.map((feature) => {
+        const { geometry, properties } = feature
+        const [lon, lat] = geometry.coordinates
+        const isOpen = activeUuid === properties.uuid
+
+        return (
+          <div key={properties.uuid}>
+            <Marker longitude={lon} latitude={lat} anchor="bottom" onClick={() => setActiveUuid(properties.uuid)}>
+              <div className="custom-marker synagogue-marker">
+                <div className="marker-icon">🕍</div>
+              </div>
+            </Marker>
+            {isOpen && (
+              <Popup
+                longitude={lon}
+                latitude={lat}
+                anchor="bottom"
+                offset={12}
+                closeButton
+                closeOnClick={false}
+                maxWidth="280px"
+                onClose={() => setActiveUuid(null)}
+              >
+                <div className="popup-content">
+                  <h3>{properties.name}</h3>
+                  {properties.name_he && (
+                    <p>
+                      <strong>שם:</strong> {properties.name_he}
+                    </p>
+                  )}
+                  {properties.type && (
+                    <p>
+                      <strong>סוג:</strong> {properties.type}
+                    </p>
+                  )}
+                  {properties.type_he && (
+                    <p>
+                      <strong>סוג:</strong> {properties.type_he}
+                    </p>
+                  )}
+                  {properties.address && (
+                    <p>
+                      <strong>כתובת:</strong> {properties.address}
+                    </p>
+                  )}
+                  <p>
+                    <strong>אזור:</strong> {properties.stat_2022}
+                  </p>
+                </div>
+              </Popup>
+            )}
+          </div>
+        )
+      })}
+    </>
+  )
 }
 
 export default SynagoguesLayer

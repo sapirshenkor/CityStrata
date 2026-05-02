@@ -52,6 +52,36 @@ body {
   font-family: inherit;
 }
 
+/* Shared Mapbox Marker / Popup HTML (parity with legacy LayerControls inject) */
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer;
+}
+.marker-icon {
+  font-size: 24px;
+  text-align: center;
+  line-height: 30px;
+}
+.mapboxgl-popup-content .popup-content {
+  min-width: 200px;
+}
+.mapboxgl-popup-content .popup-content h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+.mapboxgl-popup-content .popup-content p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+.mapboxgl-popup-content .popup-content a {
+  color: #4a90e2;
+  text-decoration: none;
+}
+.mapboxgl-popup-content .popup-content a:hover {
+  text-decoration: underline;
+}
+
 /* Evacuee profile form — match shadcn inputs without rewriting every step */
 @layer components {
   .evpf-input,
