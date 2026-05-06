@@ -38,6 +38,7 @@ function InstitutionMarkerBubble({ multi }) {
 function InstitutionsLayer({ filters, recommendation }) {
   const { data, loading, error } = useInstitutions(filters)
   const [activeKey, setActiveKey] = useState(null)
+  const [activeIndex, setActiveIndex] = useState(0)
 
   const grouped = useMemo(() => {
     if (!data?.features?.length) return []
@@ -62,9 +63,23 @@ function InstitutionsLayer({ filters, recommendation }) {
         const isMulti = institutions.length > 1
         const isOpen = activeKey === key
 
+        const clampedIndex =
+          institutions.length > 0
+            ? Math.min(Math.max(activeIndex, 0), institutions.length - 1)
+            : 0
+        const currentInstitution = institutions[clampedIndex]
+
         return (
           <div key={key}>
-            <Marker longitude={lon} latitude={lat} anchor="bottom" onClick={() => setActiveKey(key)}>
+            <Marker
+              longitude={lon}
+              latitude={lat}
+              anchor="bottom"
+              onClick={() => {
+                setActiveKey(key)
+                setActiveIndex(0)
+              }}
+            >
               <InstitutionMarkerBubble multi={isMulti} />
             </Marker>
             {isOpen && (
@@ -78,41 +93,63 @@ function InstitutionsLayer({ filters, recommendation }) {
                 maxWidth="320px"
                 onClose={() => setActiveKey(null)}
               >
-                {institutions.map((p, idx) => (
-                  <div
-                    key={p.id}
-                    className="popup-content"
-                    style={idx > 0 ? { borderTop: '1px solid #e0e0e0', paddingTop: 8, marginTop: 8 } : undefined}
-                  >
-                    <h3 style={{ margin: '0 0 4px' }}>{p.institution_name}</h3>
+                {currentInstitution ? (
+                  <div className="popup-content">
+                    {institutions.length > 1 ? (
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/30 text-sm text-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() => setActiveIndex((idx) => Math.max(0, idx - 1))}
+                          disabled={clampedIndex === 0}
+                          aria-label="הקודם"
+                        >
+                          ‹
+                        </button>
+                        <div className="text-xs text-muted-foreground" aria-live="polite">
+                          {clampedIndex + 1} / {institutions.length}
+                        </div>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/30 text-sm text-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() => setActiveIndex((idx) => Math.min(institutions.length - 1, idx + 1))}
+                          disabled={clampedIndex === institutions.length - 1}
+                          aria-label="הבא"
+                        >
+                          ›
+                        </button>
+                      </div>
+                    ) : null}
+
+                    <h3 style={{ margin: '0 0 4px' }}>{currentInstitution.institution_name}</h3>
                     <p style={{ margin: '2px 0' }}>
-                      <strong>קוד:</strong> {p.institution_code}
+                      <strong>קוד:</strong> {currentInstitution.institution_code}
                     </p>
-                    {p.address && (
+                    {currentInstitution.address && (
                       <p style={{ margin: '2px 0' }}>
-                        <strong>כתובת:</strong> {p.address}
+                        <strong>כתובת:</strong> {currentInstitution.address}
                       </p>
                     )}
-                    {p.education_phase && (
+                    {currentInstitution.education_phase && (
                       <p style={{ margin: '2px 0' }}>
-                        <strong>שלב חינוך:</strong> {p.education_phase}
+                        <strong>שלב חינוך:</strong> {currentInstitution.education_phase}
                       </p>
                     )}
-                    {p.type_of_education && (
+                    {currentInstitution.type_of_education && (
                       <p style={{ margin: '2px 0' }}>
-                        <strong>סוג חינוך:</strong> {p.type_of_education}
+                        <strong>סוג חינוך:</strong> {currentInstitution.type_of_education}
                       </p>
                     )}
-                    {p.type_of_supervision && (
+                    {currentInstitution.type_of_supervision && (
                       <p style={{ margin: '2px 0' }}>
-                        <strong>פיקוח:</strong> {p.type_of_supervision}
+                        <strong>פיקוח:</strong> {currentInstitution.type_of_supervision}
                       </p>
                     )}
                     <p style={{ margin: '2px 0' }}>
-                      <strong>אזור:</strong> {p.stat_2022}
+                      <strong>אזור:</strong> {currentInstitution.stat_2022}
                     </p>
                   </div>
-                ))}
+                ) : null}
               </Popup>
             )}
           </div>
