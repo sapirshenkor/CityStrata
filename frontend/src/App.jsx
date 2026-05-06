@@ -25,7 +25,7 @@ export default function App() {
       <Route
         path="/municipality"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['editor', 'admin']} redirectTo="/map">
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
@@ -41,7 +41,7 @@ export default function App() {
       <Route
         path="/municipality/hotels"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['editor', 'admin']} redirectTo="/map">
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
@@ -57,7 +57,7 @@ export default function App() {
       <Route
         path="/municipality/poi"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['editor', 'admin']} redirectTo="/map">
             <Suspense
               fallback={
                 <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">

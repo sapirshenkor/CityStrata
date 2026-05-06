@@ -17,6 +17,16 @@ function pid(u) {
   return u != null ? String(u) : ''
 }
 
+/** Macro cluster index for map fit: prefer latest matching result, else overview row field. */
+function resolveMacroCluster(row, matchingData) {
+  const fromMatch = matchingData?.recommended_cluster_number
+  if (fromMatch != null && Number.isFinite(Number(fromMatch))) return Number(fromMatch)
+  if (row?.cluster_number != null && Number.isFinite(Number(row.cluster_number))) {
+    return Number(row.cluster_number)
+  }
+  return null
+}
+
 /**
  * Recommendations tab: all families from overview; tactical report detail + agent actions.
  *
@@ -24,8 +34,14 @@ function pid(u) {
  * -----
  * selectedRecommendation : full TacticalAgentResponse from parent (map + detail)
  * onSelectRecommendation  : (rec | null) => void
+ * onFamilyMacroClusterFocus : optional (cluster index | null) for map zoom to cluster areas
  */
-function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }) {
+function RecommendationsPanel({
+  selectedRecommendation,
+  onSelectRecommendation,
+  onFamilyMacroClusterFocus,
+  onRecommendationsProcessingChange,
+}) {
   const queryClient = useQueryClient()
   const {
     data: overview = [],
@@ -43,6 +59,8 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
   const [communityBusy, setCommunityBusy] = useState(false)
   const [communitySelection, setCommunitySelection] = useState(() => new Set())
   const [matchingDetail, setMatchingDetail] = useState(null)
+  /** Drives map overlay during agent/API runs (matching, tactical, community). */
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const [clusterFilter, setClusterFilter] = useState('')
   const [filterMergedOnly, setFilterMergedOnly] = useState(false)
@@ -108,10 +126,20 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
     }
   }, [clusterFilter, selectedOverview])
 
+  useEffect(() => {
+    onRecommendationsProcessingChange?.(isProcessing)
+    return () => onRecommendationsProcessingChange?.(false)
+  }, [isProcessing, onRecommendationsProcessingChange])
+
+  const emitMacroCluster = (row, matchingData) => {
+    onFamilyMacroClusterFocus?.(resolveMacroCluster(row, matchingData))
+  }
+
   const handleClose = () => {
     setSelectedOverview(null)
     setMatchingDetail(null)
     onSelectRecommendation(null)
+    onFamilyMacroClusterFocus?.(null)
   }
 
   const handleRowClick = async (row) => {
@@ -123,6 +151,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
     setSelectedOverview(row)
     setActionError(null)
     setMatchingDetail(null)
+    emitMacroCluster(row, null)
 
     if (row.has_tactical) {
       setDetailLoading(true)
@@ -135,6 +164,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
           getRecommendationByProfile(row.profile_uuid),
         ])
         setMatchingDetail(matchingData)
+        emitMacroCluster(row, matchingData)
         onSelectRecommendation(recRes.data)
       } catch (err) {
         setActionError(err.response?.data?.detail ?? err.message)
@@ -148,6 +178,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
         try {
           const res = await getMatchingResultForProfile(row.profile_uuid)
           setMatchingDetail(res.data)
+          emitMacroCluster(row, res.data)
         } catch (err) {
           setActionError(err.response?.data?.detail ?? err.message)
         }
@@ -159,6 +190,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
     e.stopPropagation()
     setActionError(null)
     const key = pid(profileUuid)
+    setIsProcessing(true)
     setMatchingBusy(key)
     try {
       await runMatchingForProfile(profileUuid)
@@ -170,6 +202,12 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
       try {
         const res = await getMatchingResultForProfile(profileUuid)
         setMatchingDetail(res.data)
+        setSelectedOverview((prev) => {
+          if (prev && pid(prev.profile_uuid) === key) {
+            emitMacroCluster(prev, res.data)
+          }
+          return prev
+        })
       } catch {
         // ignore secondary fetch; overview still updated
       }
@@ -177,6 +215,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
       setActionError(err.response?.data?.detail ?? err.message)
     } finally {
       setMatchingBusy(null)
+      setIsProcessing(false)
     }
   }
 
@@ -184,6 +223,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
     e.stopPropagation()
     setActionError(null)
     const key = pid(profileUuid)
+    setIsProcessing(true)
     setTacticalBusy(key)
     try {
       const res = await runTacticalForProfile(profileUuid)
@@ -193,10 +233,28 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
         return { ...prev, has_tactical: true, has_matching: true }
       })
       onSelectRecommendation(res.data)
+      try {
+        const m = await getMatchingResultForProfile(profileUuid)
+        setMatchingDetail(m.data)
+        setSelectedOverview((prev) => {
+          if (prev && pid(prev.profile_uuid) === key) {
+            emitMacroCluster(prev, m.data)
+          }
+          return prev
+        })
+      } catch {
+        setSelectedOverview((prev) => {
+          if (prev && pid(prev.profile_uuid) === key) {
+            emitMacroCluster(prev, null)
+          }
+          return prev
+        })
+      }
     } catch (err) {
       setActionError(err.response?.data?.detail ?? err.message)
     } finally {
       setTacticalBusy(null)
+      setIsProcessing(false)
     }
   }
 
@@ -216,6 +274,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
     setActionError(null)
     const ids = Array.from(communitySelection)
     if (ids.length < 2) return
+    setIsProcessing(true)
     setCommunityBusy(true)
     try {
       const res = await runCommunityTactical(ids)
@@ -228,10 +287,12 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
       if (row) {
         setSelectedOverview(row)
         setMatchingDetail(null)
+        emitMacroCluster(row, null)
         if (row.has_matching) {
           try {
             const m = await getMatchingResultForProfile(row.profile_uuid)
             setMatchingDetail(m.data)
+            emitMacroCluster(row, m.data)
           } catch {
             /* optional */
           }
@@ -242,6 +303,7 @@ function RecommendationsPanel({ selectedRecommendation, onSelectRecommendation }
       setActionError(err.response?.data?.detail ?? err.message)
     } finally {
       setCommunityBusy(false)
+      setIsProcessing(false)
     }
   }
 

@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import LeafletMap from './components/Map/LeafletMap'
 import { AppHeader } from './components/layout/AppHeader'
-import { MapSidebar, type LayerVisibility } from './components/Sidebar/MapSidebar'
+import { MapSidebar } from './components/Sidebar/MapSidebar'
+import type { LayerVisibility } from './components/Map/MapLayersPanel'
 import UserBar from './components/UserBar'
 import { useClusterAssignments } from './hooks/useMapData'
+import { ThinkingState } from './components/Map/ThinkingState'
 
 const defaultLayerVisibility: LayerVisibility = {
   statisticalAreas: true,
@@ -34,6 +36,8 @@ const defaultFilters: Record<string, unknown> = {
 export default function MapApp() {
   const [selectedArea, setSelectedArea] = useState<number | null>(null)
   const [selectedRecommendation, setSelectedRecommendation] = useState<unknown>(null)
+  const [familyMacroClusterFocus, setFamilyMacroClusterFocus] = useState<number | null>(null)
+  const [recommendationsAgentProcessing, setRecommendationsAgentProcessing] = useState(false)
   const { data: clusterAssignments, refetch: refetchClusterAssignments } = useClusterAssignments()
   const [layerVisibility, setLayerVisibility] =
     useState<LayerVisibility>(defaultLayerVisibility)
@@ -49,14 +53,11 @@ export default function MapApp() {
         <MapSidebar
           selectedRecommendation={selectedRecommendation}
           onSelectRecommendation={setSelectedRecommendation}
-          layerVisibility={layerVisibility}
-          onToggleLayer={setLayerVisibility}
-          filters={filters}
-          onUpdateFilters={setFilters}
-          clusterAssignments={clusterAssignments ?? null}
-          onRunClustering={() => refetchClusterAssignments()}
-          selectedArea={selectedArea}
-          onSelectArea={setSelectedArea}
+          onFamilyMacroClusterFocus={setFamilyMacroClusterFocus}
+          onRecommendationsProcessingChange={setRecommendationsAgentProcessing}
+          agentThinkingOverlay={
+            recommendationsAgentProcessing ? <ThinkingState variant="sidebar" /> : undefined
+          }
         />
 
         <div className="relative min-h-0 min-w-0 flex-1">
@@ -68,10 +69,14 @@ export default function MapApp() {
                   onSelectArea={setSelectedArea}
                   areaFilter={null}
                   layerVisibility={layerVisibility}
+                  onToggleLayer={setLayerVisibility}
                   filters={filters}
+                  onUpdateFilters={setFilters}
+                  onRunClustering={() => refetchClusterAssignments()}
                   showClusters={layerVisibility.clusters}
                   clusterAssignments={clusterAssignments}
                   selectedRecommendation={selectedRecommendation}
+                  familyMacroClusterFocus={familyMacroClusterFocus}
                 />
               </div>
             </div>

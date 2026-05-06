@@ -1,59 +1,192 @@
-import { MapContainer, TileLayer } from 'react-leaflet'
-import { useEffect } from 'react'
-import StatisticalAreasLayer from './StatisticalAreasLayer'
-import InstitutionsLayer from './InstitutionsLayer'
+/**
+ * Map chrome uses Mapbox GL (react-map-gl). Layer overlays are temporarily disabled pending migration off react-leaflet.
+ */
+import { useRef, useState } from 'react'
+import Map, { NavigationControl, FullscreenControl } from 'react-map-gl/mapbox'
+import 'mapbox-gl/dist/mapbox-gl.css'
+import { MapLayersPanel } from './MapLayersPanel'
+import StatisticalAreasLayer, {
+  STATISTICAL_AREAS_FILL_LAYER_ID,
+} from './StatisticalAreasLayer'
 import AirbnbLayer from './AirbnbLayer'
-import RestaurantsLayer from './RestaurantsLayer'
-import CoffeeShopsLayer from './CoffeeShopsLayer'
 import HotelsLayer from './HotelsLayer'
 import ApartmentsLayer from './ApartmentsLayer'
+import RestaurantsLayer from './RestaurantsLayer'
+import CoffeeShopsLayer from './CoffeeShopsLayer'
+import InstitutionsLayer from './InstitutionsLayer'
 import MatnasimLayer from './MatnasimLayer'
-import OSMFacilitiesLayer from './OSMFacilitiesLayer'
 import SynagoguesLayer from './SynagoguesLayer'
-import RecommendationsLayer from './RecommendationsLayer'
-import LayerControls from './LayerControls'
-import 'leaflet/dist/leaflet.css'
-
-// Fix for default markers in react-leaflet
-import L from 'leaflet'
-import icon from 'leaflet/dist/images/marker-icon.png'
-import iconShadow from 'leaflet/dist/images/marker-shadow.png'
-
-let DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-})
-
-L.Marker.prototype.options.icon = DefaultIcon
+import OSMFacilitiesLayer from './OSMFacilitiesLayer'
+import RecommendationsLayer, { RECOMMENDATIONS_FILL_LAYER_ID } from './RecommendationsLayer'
+import ClusterMacroFit from './ClusterMacroFit'
+// import LayerControls from './LayerControls'
 
 const EILAT_CENTER = [29.55, 34.95]
 const DEFAULT_ZOOM = 13
+const BUILDINGS_3D_LAYER_ID = 'mapbox-3d-buildings'
 
-function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, filters, showClusters, clusterAssignments, selectedRecommendation }) {
-  // Merge areaFilter into filters for all layers
-  const institutionsFilters = { ...filters.institutions, ...(areaFilter && { area: areaFilter }) }
+const mapboxToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN ?? ''
+const mapboxAccountUsername = import.meta.env.VITE_MAPBOX_USERNAME ?? ''
+const rawStyleId = import.meta.env.VITE_MAPBOX_STYLE_ID?.trim() || 'streets-v12'
+
+/** Public Mapbox templates use style owner `mapbox`; Studio styles use your username + style id. */
+const MAPBOX_PUBLIC_STYLE_IDS = new Set([
+  'dark-v11',
+  'light-v11',
+  'streets-v11',
+  'streets-v12',
+  'outdoors-v11',
+  'outdoors-v12',
+  'satellite-v9',
+  'satellite-streets-v12',
+  'navigation-day-v1',
+  'navigation-night-v1',
+])
+
+const rasterStyleUsername =
+  mapboxAccountUsername && rawStyleId && !MAPBOX_PUBLIC_STYLE_IDS.has(rawStyleId)
+    ? mapboxAccountUsername
+    : 'mapbox'
+
+const mapStyle = `mapbox://styles/${rasterStyleUsername}/${rawStyleId}`
+
+function getFirstLabelLayerId(map) {
+  const layers = map.getStyle()?.layers ?? []
+  const labelLayer = layers.find(
+    (layer) => layer.type === 'symbol' && layer.layout && layer.layout['text-field'],
+  )
+  return labelLayer?.id
+}
+
+function ensure3DBuildingsLayer(map) {
+  if (!map.getLayer(BUILDINGS_3D_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: BUILDINGS_3D_LAYER_ID,
+        type: 'fill-extrusion',
+        source: 'composite',
+        'source-layer': 'building',
+        minzoom: 12,
+        paint: {
+          'fill-extrusion-color': '#aaa',
+          // Fallback height ensures visible extrusion even when `height` is missing.
+          'fill-extrusion-height': ['coalesce', ['get', 'height'], 18],
+          'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0],
+          'fill-extrusion-opacity': 0.7,
+        },
+      },
+      getFirstLabelLayerId(map),
+    )
+  }
+}
+
+export default function LeafletMap({
+  selectedArea,
+  onSelectArea,
+  areaFilter,
+  layerVisibility,
+  onToggleLayer,
+  filters,
+  onUpdateFilters,
+  onRunClustering,
+  showClusters,
+  clusterAssignments,
+  selectedRecommendation,
+  familyMacroClusterFocus,
+}) {
+  const [layersMenuOpen, setLayersMenuOpen] = useState(false)
+  const [is3D, setIs3D] = useState(false)
+  const mapRef = useRef(null)
   const airbnbFilters = { ...filters.airbnb, ...(areaFilter && { area: areaFilter }) }
+  const hotelsFilters = { ...filters.hotels, ...(areaFilter && { area: areaFilter }) }
   const restaurantsFilters = { ...filters.restaurants, ...(areaFilter && { area: areaFilter }) }
   const coffeeShopsFilters = { ...filters.coffeeShops, ...(areaFilter && { area: areaFilter }) }
-  const hotelsFilters = { ...filters.hotels, ...(areaFilter && { area: areaFilter }) }
-  const apartmentsFilters = { ...filters.apartments, ...(areaFilter && { area: areaFilter }) }
+  const institutionsFilters = { ...filters.institutions, ...(areaFilter && { area: areaFilter }) }
   const matnasimFilters = { ...filters.matnasim, ...(areaFilter && { area: areaFilter }) }
-  const osmFacilitiesFilters = { ...filters.osmFacilities, ...(areaFilter && { area: areaFilter }) }
   const synagoguesFilters = { ...filters.synagogues, ...(areaFilter && { area: areaFilter }) }
+  const osmFacilitiesFilters = { ...filters.osmFacilities, ...(areaFilter && { area: areaFilter }) }
+
+  const queriedLayerIds = [
+    ...(layerVisibility.statisticalAreas ? [STATISTICAL_AREAS_FILL_LAYER_ID] : []),
+    ...(selectedRecommendation?.radii_data?.length ? [RECOMMENDATIONS_FILL_LAYER_ID] : []),
+  ]
+  const interactiveLayerIds = queriedLayerIds.length ? queriedLayerIds : undefined
+  const onMapLoad = (event) => {
+    const map = event.target
+    mapRef.current = map
+    ensure3DBuildingsLayer(map)
+    map.setLayoutProperty(BUILDINGS_3D_LAYER_ID, 'visibility', 'none')
+  }
+
+  const toggle2D3D = () => {
+    const map = mapRef.current
+    if (!map?.easeTo) return
+
+    if (is3D) {
+      if (map.getLayer(BUILDINGS_3D_LAYER_ID)) {
+        map.setLayoutProperty(BUILDINGS_3D_LAYER_ID, 'visibility', 'none')
+      }
+      map.easeTo({ pitch: 0, bearing: 0, duration: 700 })
+      setIs3D(false)
+      return
+    }
+
+    ensure3DBuildingsLayer(map)
+    map.setLayoutProperty(BUILDINGS_3D_LAYER_ID, 'visibility', 'visible')
+    map.easeTo({ pitch: 60, bearing: 20, duration: 700 })
+    setIs3D(true)
+  }
 
   return (
-    <MapContainer
-      center={EILAT_CENTER}
-      zoom={DEFAULT_ZOOM}
-      style={{ height: '100%', width: '100%' }}
-      scrollWheelZoom={true}
+    <Map
+      ref={mapRef}
+      onLoad={onMapLoad}
+      mapboxAccessToken={mapboxToken}
+      mapStyle={mapStyle}
+      initialViewState={{
+        latitude: EILAT_CENTER[0],
+        longitude: EILAT_CENTER[1],
+        zoom: DEFAULT_ZOOM,
+        pitch: 0,
+        bearing: 0,
+      }}
+      style={{ width: '100%', height: '100%' }}
+      interactiveLayerIds={interactiveLayerIds}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <NavigationControl position="top-right" />
+      <FullscreenControl />
+      <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-h-[calc(100%-24px)] flex-col">
+        <button
+          type="button"
+          className="pointer-events-auto w-fit rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground shadow"
+          onClick={() => setLayersMenuOpen((prev) => !prev)}
+        >
+          שכבות
+        </button>
+        <button
+          type="button"
+          className="pointer-events-auto mt-2 w-fit rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground shadow"
+          onClick={toggle2D3D}
+        >
+          {is3D ? '2D' : '3D'}
+        </button>
+        {layersMenuOpen && (
+          <div className="pointer-events-auto mt-2 w-[360px] max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border border-border bg-card/95 text-card-foreground shadow-xl backdrop-blur">
+            <div className="max-h-[70vh] overflow-y-auto px-3 py-3">
+              <MapLayersPanel
+                layerVisibility={layerVisibility}
+                onToggleLayer={onToggleLayer}
+                filters={filters}
+                onUpdateFilters={onUpdateFilters}
+                clusterAssignments={clusterAssignments ?? null}
+                onRunClustering={onRunClustering}
+                selectedArea={selectedArea}
+                onSelectArea={onSelectArea}
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       {layerVisibility.statisticalAreas && (
         <StatisticalAreasLayer
@@ -65,48 +198,39 @@ function LeafletMap({ selectedArea, onSelectArea, areaFilter, layerVisibility, f
         />
       )}
 
-      {layerVisibility.institutions && (
-        <InstitutionsLayer filters={institutionsFilters} />
-      )}
-
-      {layerVisibility.airbnb && (
-        <AirbnbLayer filters={airbnbFilters} />
-      )}
-
-      {layerVisibility.restaurants && (
-        <RestaurantsLayer filters={restaurantsFilters} />
-      )}
-
-      {layerVisibility.coffeeShops && (
-        <CoffeeShopsLayer filters={coffeeShopsFilters} />
-      )}
-
-      {layerVisibility.hotels && (
-        <HotelsLayer filters={hotelsFilters} />
-      )}
-
-      {layerVisibility.apartments && (
-        <ApartmentsLayer filters={apartmentsFilters} />
-      )}
-
-      {layerVisibility.matnasim && (
-        <MatnasimLayer filters={matnasimFilters} />
-      )}
-
-      {layerVisibility.osmFacilities && (
-        <OSMFacilitiesLayer filters={osmFacilitiesFilters} />
-      )}
-
-      {layerVisibility.synagogues && (
-        <SynagoguesLayer filters={synagoguesFilters} />
-      )}
+      <ClusterMacroFit
+        macroClusterIndex={familyMacroClusterFocus}
+        clusterAssignments={clusterAssignments ?? undefined}
+        selectedRecommendation={selectedRecommendation}
+      />
 
       <RecommendationsLayer recommendation={selectedRecommendation} />
 
-      <LayerControls />
-    </MapContainer>
+      {layerVisibility.airbnb && (
+        <AirbnbLayer filters={airbnbFilters} recommendation={selectedRecommendation} />
+      )}
+      {layerVisibility.hotels && (
+        <HotelsLayer filters={hotelsFilters} recommendation={selectedRecommendation} />
+      )}
+      {layerVisibility.apartments && <ApartmentsLayer recommendation={selectedRecommendation} />}
+      {layerVisibility.restaurants && (
+        <RestaurantsLayer filters={restaurantsFilters} recommendation={selectedRecommendation} />
+      )}
+      {layerVisibility.coffeeShops && (
+        <CoffeeShopsLayer filters={coffeeShopsFilters} recommendation={selectedRecommendation} />
+      )}
+      {layerVisibility.institutions && (
+        <InstitutionsLayer filters={institutionsFilters} recommendation={selectedRecommendation} />
+      )}
+      {layerVisibility.matnasim && (
+        <MatnasimLayer filters={matnasimFilters} recommendation={selectedRecommendation} />
+      )}
+      {layerVisibility.synagogues && (
+        <SynagoguesLayer filters={synagoguesFilters} recommendation={selectedRecommendation} />
+      )}
+      {layerVisibility.osmFacilities && (
+        <OSMFacilitiesLayer filters={osmFacilitiesFilters} recommendation={selectedRecommendation} />
+      )}
+    </Map>
   )
 }
-
-export default LeafletMap
-
