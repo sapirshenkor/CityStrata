@@ -18,8 +18,15 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { useAuth } from '@/context/AuthContext'
+import { getAuthToken } from '@/services/api'
 
 export default function LandingPage() {
+  const { user, loading } = useAuth()
+  const hasToken = Boolean(getAuthToken())
+  const isEditorOrAdmin = user?.role === 'editor' || user?.role === 'admin'
+  const showMunicipalityButton = isEditorOrAdmin || (!hasToken && !user && !loading)
+
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <AppHeader variant="landing">
@@ -226,9 +233,11 @@ export default function LandingPage() {
                 <Button asChild variant="outline">
                   <Link to="/family">לוח בקרה משפחתי</Link>
                 </Button>
-                <Button asChild variant="outline">
-                  <Link to="/municipality">לוח בקרה לרשות המקומית</Link>
-                </Button>
+                {showMunicipalityButton ? (
+                  <Button asChild variant="outline">
+                    <Link to="/municipality">לוח בקרה לרשות המקומית</Link>
+                  </Button>
+                ) : null}
                 <Button asChild variant="secondary">
                   <Link to="/login">התחברות</Link>
                 </Button>
