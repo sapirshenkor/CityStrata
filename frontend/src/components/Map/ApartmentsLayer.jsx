@@ -59,6 +59,7 @@ function ApartmentMarkerBubble({ multi }) {
 function ApartmentsLayer({ recommendation }) {
   const { data, loading, error } = usePropertyListings()
   const [activeKey, setActiveKey] = useState(null)
+  const [activeIndex, setActiveIndex] = useState(0)
 
   const grouped = useMemo(() => {
     if (!Array.isArray(data)) return []
@@ -88,9 +89,23 @@ function ApartmentsLayer({ recommendation }) {
         const isMulti = group.listings.length > 1
         const isOpen = activeKey === key
 
+        const clampedIndex =
+          group.listings.length > 0
+            ? Math.min(Math.max(activeIndex, 0), group.listings.length - 1)
+            : 0
+        const currentListing = group.listings[clampedIndex] ?? null
+
         return (
           <div key={key}>
-            <Marker longitude={group.lon} latitude={group.lat} anchor="bottom" onClick={() => setActiveKey(key)}>
+            <Marker
+              longitude={group.lon}
+              latitude={group.lat}
+              anchor="bottom"
+              onClick={() => {
+                setActiveKey(key)
+                setActiveIndex(0)
+              }}
+            >
               <ApartmentMarkerBubble multi={isMulti} />
             </Marker>
             {isOpen && (
@@ -104,42 +119,73 @@ function ApartmentsLayer({ recommendation }) {
                 maxWidth="300px"
                 onClose={() => setActiveKey(null)}
               >
-                {group.listings.map((listing, idx) => {
-                  const units = Array.isArray(listing.units) ? listing.units : []
-                  const firstPriced = units.find((u) => u?.monthly_price != null)
-                  const typeLabel =
-                    listing.property_type === 'other' && listing.property_type_other
-                      ? listing.property_type_other
-                      : listing.property_type
-                  const address = [listing.city, listing.street, listing.house_number, listing.neighborhood]
-                    .filter(Boolean)
-                    .join(', ')
+                {currentListing ? (
+                  <div className="popup-content">
+                    {group.listings.length > 1 ? (
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/30 text-sm text-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() => setActiveIndex((idx) => Math.max(0, idx - 1))}
+                          disabled={clampedIndex === 0}
+                          aria-label="הקודם"
+                        >
+                          ‹
+                        </button>
+                        <div className="text-xs text-muted-foreground" aria-live="polite">
+                          {clampedIndex + 1} / {group.listings.length}
+                        </div>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/30 text-sm text-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() => setActiveIndex((idx) => Math.min(group.listings.length - 1, idx + 1))}
+                          disabled={clampedIndex === group.listings.length - 1}
+                          aria-label="הבא"
+                        >
+                          ›
+                        </button>
+                      </div>
+                    ) : null}
 
-                  return (
-                    <div
-                      key={listing.id}
-                      className="popup-content"
-                      style={idx > 0 ? { borderTop: '1px solid #e0e0e0', paddingTop: 8, marginTop: 8 } : undefined}
-                    >
-                      <h3>{listing.publisher_name || 'דירה'}</h3>
-                      <p>
-                        <strong>סוג נכס:</strong> {typeLabel || '—'}
-                      </p>
-                      <p>
-                        <strong>כתובת:</strong> {address || '—'}
-                      </p>
-                      <p>
-                        <strong>יחידות:</strong> {units.length}
-                      </p>
-                      <p>
-                        <strong>מחיר חודשי:</strong> {formatMoney(firstPriced?.monthly_price)}
-                      </p>
-                      <p>
-                        <strong>טלפון:</strong> {listing.phone_number || '—'}
-                      </p>
-                    </div>
-                  )
-                })}
+                    {(() => {
+                      const units = Array.isArray(currentListing.units) ? currentListing.units : []
+                      const firstPriced = units.find((u) => u?.monthly_price != null)
+                      const typeLabel =
+                        currentListing.property_type === 'other' && currentListing.property_type_other
+                          ? currentListing.property_type_other
+                          : currentListing.property_type
+                      const address = [
+                        currentListing.city,
+                        currentListing.street,
+                        currentListing.house_number,
+                        currentListing.neighborhood,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')
+
+                      return (
+                        <>
+                          <h3>{currentListing.publisher_name || 'דירה'}</h3>
+                          <p>
+                            <strong>סוג נכס:</strong> {typeLabel || '—'}
+                          </p>
+                          <p>
+                            <strong>כתובת:</strong> {address || '—'}
+                          </p>
+                          <p>
+                            <strong>יחידות:</strong> {units.length}
+                          </p>
+                          <p>
+                            <strong>מחיר חודשי:</strong> {formatMoney(firstPriced?.monthly_price)}
+                          </p>
+                          <p>
+                            <strong>טלפון:</strong> {currentListing.phone_number || '—'}
+                          </p>
+                        </>
+                      )
+                    })()}
+                  </div>
+                ) : null}
               </Popup>
             )}
           </div>
