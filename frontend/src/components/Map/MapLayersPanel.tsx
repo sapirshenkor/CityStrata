@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Switch } from '@/components/ui/switch'
+import { LayersPanelSwitch } from './LayersPanelSwitch'
 
 const LAYER_DEFS: {
   key: keyof LayerVisibility
@@ -132,7 +132,7 @@ export function MapLayersPanel({
   }
 
   return (
-    <div className="space-y-5 pr-1">
+    <div dir="rtl" lang="he" className="space-y-5 px-1 text-start">
       <div className="space-y-1">
         <h2 className="text-base font-semibold text-foreground">שכבות מפה</h2>
         <p className="text-xs text-muted-foreground">
@@ -148,7 +148,7 @@ export function MapLayersPanel({
               <Label htmlFor={`sidebar-layer-${key}`} className="cursor-pointer text-foreground">
                 {label}
               </Label>
-              <Switch
+              <LayersPanelSwitch
                 id={`sidebar-layer-${key}`}
                 checked={layerVisibility[key]}
                 onCheckedChange={(c) => setLayer(key, c)}
@@ -160,7 +160,7 @@ export function MapLayersPanel({
             <Label htmlFor="sidebar-layer-clusters" className="cursor-pointer text-foreground">
               הצגת אשכולות במפה
             </Label>
-            <Switch
+            <LayersPanelSwitch
               id="sidebar-layer-clusters"
               checked={layerVisibility.clusters}
               onCheckedChange={(c) => setLayer('clusters', c)}
@@ -179,8 +179,8 @@ export function MapLayersPanel({
         >
           {clusteringRunning ? (
             <>
-              <Loader2 className="me-2 h-4 w-4 animate-spin" />
               מריץ...
+              <Loader2 className="ms-2 h-4 w-4 shrink-0 animate-spin" aria-hidden />
             </>
           ) : (
             'הרצת אשכול'
@@ -219,17 +219,17 @@ export function MapLayersPanel({
               {filteredFacilityTypes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">אין סוגים תואמים.</p>
               ) : (
-                <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                <div className="max-h-48 space-y-2 overflow-y-auto px-1">
                   {filteredFacilityTypes.map((type: string) => {
                     const selected = (
                       filters.osmFacilities as { facility_types?: string[] } | undefined
                     )?.facility_types?.includes(type)
                     return (
                       <div key={type} className="flex items-center justify-between gap-2">
-                        <Label className="max-w-[200px] cursor-pointer truncate text-xs font-normal">
+                        <Label className="max-w-[200px] cursor-pointer truncate text-start text-xs font-normal">
                           {type}
                         </Label>
-                        <Switch
+                        <LayersPanelSwitch
                           checked={!!selected}
                           onCheckedChange={() => toggleFacilityType(type)}
                         />
