@@ -1,266 +1,272 @@
+import { lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ArrowRight,
+  ArrowLeft,
   Bot,
+  Building2,
+  ChevronLeft,
   Layers,
   Map,
+  Radar,
   Sparkles,
   Users,
 } from 'lucide-react'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { SystemIntelligenceSection } from '@/components/landing/SystemIntelligenceSection'
+import { LandingHeroMapSkeleton } from '@/components/Map/LandingHeroMapSkeleton'
 import UserBar from '@/components/UserBar'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
-import { useAuth } from '@/context/AuthContext'
-import { getAuthToken } from '@/services/api'
+import { Card, CardContent } from '@/components/ui/card'
+
+const LandingHeroMap = lazy(() => import('@/components/Map/LandingHeroMap'))
+
+const capabilities = [
+  {
+    icon: Layers,
+    title: 'שכבות GIS חיות',
+    description: 'איחוד אזורים סטטיסטיים, תשתיות, שירותים ונקודות עניין לתמונת מצב מרחבית אחת.',
+  },
+  {
+    icon: Users,
+    title: 'פרופילי משפחות וקהילות',
+    description: 'איסוף צרכים, מגבלות והעדפות של משקי בית כדי לשמר רציפות קהילתית בזמן פינוי.',
+  },
+  {
+    icon: Sparkles,
+    title: 'המלצות מבוססות התאמה',
+    description: 'דירוג חלופות לפי נתונים מרחביים, מאפייני המשפחה והקשר תפעולי בזמן אמת.',
+  },
+  {
+    icon: Bot,
+    title: 'סוכנים חכמים',
+    description: 'תהליכי ניתוח אוטומטיים שמסייעים לצוותים להבין, לתעדף ולפעול מהר יותר.',
+  },
+]
+
+const processSteps = [
+  {
+    label: '01',
+    title: 'אוספים נתונים',
+    description: 'שכבות עירוניות, שירותים, מתקנים, מאפייני אזורים ופרופילי משפחות מוזנים למערכת.',
+  },
+  {
+    label: '02',
+    title: 'בונים הקשר מרחבי',
+    description: 'המערכת מחברת בין מיקום, נגישות, זמינות שירותים ומאפייני קהילה כדי לייצר תמונת מצב.',
+  },
+  {
+    label: '03',
+    title: 'מקבלים המלצות',
+    description: 'הרשות והמשפחה מקבלות חלופות פעולה ברורות, מדורגות ומוסברות לפי הצרכים בפועל.',
+  },
+]
+
+const audiences = [
+  {
+    icon: Building2,
+    title: 'לרשות המקומית',
+    description: 'קבלת החלטות מבוססת מפה, ניתוח עומסים, ניהול מתקנים ותעדוף אזורים בזמן אירוע.',
+    to: '/municipality',
+    cta: 'לוח הרשות',
+  },
+  {
+    icon: Users,
+    title: 'למשפחות וקהילות',
+    description: 'תהליך מובנה להזנת צרכים וקבלת התאמות שמכבדות מגבלות, קרבה ושייכות קהילתית.',
+    to: '/family',
+    cta: 'לוח משפחתי',
+  },
+]
 
 export default function LandingPage() {
-  const { user, loading } = useAuth()
-  const hasToken = Boolean(getAuthToken())
-  const isEditorOrAdmin = user?.role === 'editor' || user?.role === 'admin'
-  const showMunicipalityButton = isEditorOrAdmin || (!hasToken && !user && !loading)
-
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
+    <div dir="rtl" className="flex min-h-screen flex-col bg-background text-foreground">
       <AppHeader variant="landing">
         <UserBar />
       </AppHeader>
 
-      <main id="main-content" className="flex-1">
-        <section className="border-b border-border bg-card/80 px-4 py-12 sm:py-16">
-          <div className="mx-auto max-w-3xl text-center">
-            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              CityStrata
-            </h1>
-            <p className="mt-3 text-base text-muted-foreground sm:text-lg">
-            מערכת גיאו-מרחבית לניהול פינוי באילת: תמונת מצב מבוססת מפה, פרופילי משפחות
-            והמלצות חכמות בממשק אחד.
-            </p>
-            <div
-              className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center"
-              role="group"
-              aria-label="פעולות ראשיות"
-            >
-              <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                <Link to="/map">כניסה למפת המערכת</Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link to="/family">לוח בקרה משפחתי</Link>
-              </Button>
-              <Button asChild variant="secondary" size="lg">
-                <Link to="/login">התחברות</Link>
-              </Button>
+      <main id="main-content" className="flex-1 overflow-hidden">
+        <section className="relative border-b border-border/60 px-4 py-20 sm:py-24 lg:py-32">
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.18),transparent_34%),radial-gradient(circle_at_bottom_right,hsl(var(--primary)/0.12),transparent_32%)]" />
+          <div className="absolute inset-0 -z-10 opacity-[0.18] [background-image:linear-gradient(90deg,hsl(var(--border))_1px,transparent_1px),linear-gradient(hsl(var(--border))_1px,transparent_1px)] [background-size:72px_72px]" />
+
+          <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="max-w-3xl">
+              <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-4 py-2 text-sm text-muted-foreground shadow-sm backdrop-blur-sm">
+                <Radar className="h-4 w-4 text-primary" aria-hidden />
+                מערכת GIS חכמה לניהול פינוי עירוני
+              </div>
+
+              <h1 className="text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
+                החלטות פינוי
+                <span className="block text-primary">מבוססות מקום.</span>
+                
+              </h1>
+
+              <p className="mt-7 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl">
+                CityStrata מחברת בין שכבות GIS, פרופילי משפחות, מאפייני קהילה וסוכנים חכמים - כדי לסייע לרשות ולתושבים לקבל החלטות מהירות, שקופות ומדויקות בזמן אירוע פינוי.
+              </p>
+
+              <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap" role="group" aria-label="פעולות ראשיות">
+                <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Link to="/map" className="gap-2">
+                    כניסה למפת המערכת
+                    <ArrowLeft className="h-4 w-4" aria-hidden />
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg">
+                  <Link to="/family">התחלה כמשפחה</Link>
+                </Button>
+                <Button asChild variant="secondary" size="lg">
+                  <Link to="/login">התחברות</Link>
+                </Button>
+              </div>
+            </div>
+
+            <Suspense fallback={<LandingHeroMapSkeleton />}>
+              <LandingHeroMap />
+            </Suspense>
+          </div>
+        </section>
+
+        <section className="px-4 py-20 sm:py-24" aria-labelledby="why-heading">
+          <div className="mx-auto max-w-7xl">
+            <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
+              <div>
+                <p className="mb-3 text-sm font-medium text-primary">למה CityStrata</p>
+                <h2 id="why-heading" className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                  בזמן חירום, מפה לבד לא מספיקה.
+                </h2>
+              </div>
+              <p className="max-w-3xl text-base leading-8 text-muted-foreground sm:text-lg">
+                פינוי רחב היקף דורש להבין לא רק איפה נמצאים מתקנים פנויים, אלא גם אילו שירותים זמינים סביבם, אילו משפחות מתאימות לכל חלופה, ואיך שומרים על רציפות קהילתית. המערכת מתרגמת נתונים מפוזרים לתמונה תפעולית אחת.
+              </p>
+            </div>
+
+            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {capabilities.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Card key={item.title} className="group border-border/70 bg-card/70 shadow-card transition duration-300 hover:-translate-y-1 hover:bg-card">
+                    <CardContent className="p-6">
+                      <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/12 text-primary transition duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
+                        <Icon className="h-6 w-6" aria-hidden />
+                      </div>
+                      <h3 className="text-lg font-semibold">{item.title}</h3>
+                      <p className="mt-3 text-sm leading-7 text-muted-foreground">{item.description}</p>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           </div>
         </section>
 
-        <div className="mx-auto max-w-5xl space-y-14 px-4 py-12 sm:py-16">
-          <section aria-labelledby="problem-heading">
-            <h2 id="problem-heading" className="text-xl font-semibold">
-            למה דווקא CityStrata
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            באירועי פינוי רחבי היקף, קבלת ההחלטות תלויה בגיאוגרפיה, בתשתיות
-            ובצרכים של משקי הבית. CityStrata מסייעת לרשויות ולמשפחות לשלב בין נתונים
-            מרחביים לפרופילים מובנים, לצורך תגובה מתואמת, יעילה ושקופה לכל הצדדים.
-            </p>
-          </section>
-
-          <Separator className="bg-border" />
-
-          <section aria-labelledby="capabilities-heading" className="space-y-6">
-            <div>
-              <h2 id="capabilities-heading" className="text-xl font-semibold">
-                יכולות
+        <section className="border-y border-border/60 bg-card/35 px-4 py-20 sm:py-24" aria-labelledby="process-heading">
+          <div className="mx-auto max-w-7xl">
+            <div className="max-w-3xl">
+              <p className="mb-3 text-sm font-medium text-primary">תהליך העבודה</p>
+              <h2 id="process-heading" className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                מנתונים עירוניים להחלטות פעולה.
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-              היכולות המרכזיות הזמינות במערכת.
-              </p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Card className="border-border shadow-card">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                      <Layers className="h-5 w-5" aria-hidden />
-                    </span>
-                    <CardTitle className="text-base">GIS ושכבות</CardTitle>
-                  </div>
-                  <CardDescription>
-                    אזורים סטטיסטיים, מתקנים ושכבות מפה לניתוח ממוקד באילת.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-              <Card className="border-border shadow-card">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                      <Users className="h-5 w-5" aria-hidden />
-                    </span>
-                    <CardTitle className="text-base">פרופילי משפחות</CardTitle>
-                  </div>
-                  <CardDescription>
-                  ניהול מובנה של משפחות מפונות וקהילות, המשקף צרכים ואילוצים אמיתיים של משקי בית.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-              <Card className="border-border shadow-card">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                      <Sparkles className="h-5 w-5" aria-hidden />
-                    </span>
-                    <CardTitle className="text-base">התאמה והמלצות</CardTitle>
-                  </div>
-                  <CardDescription>
-                  המלצות מדורגות והכוונה טקטית המבוססות על פרופיל המשפחה וההקשר המרחבי.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-              <Card className="border-border shadow-card">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                      <Bot className="h-5 w-5" aria-hidden />
-                    </span>
-                    <CardTitle className="text-base">סוכנים חכמים</CardTitle>
-                  </div>
-                  <CardDescription>
-                    תהליכים אוטומטיים המסייעים בניתוח, מעקב וקבלת החלטות.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
-          </section>
 
-          <Separator className="bg-border" />
-
-          <section aria-labelledby="how-heading" className="space-y-6">
-            <h2 id="how-heading" className="text-xl font-semibold">
-              איך זה עובד
-            </h2>
-            <ol className="grid gap-4 md:grid-cols-3">
-              <li>
-                <Card className="h-full border-border shadow-card">
-                  <CardHeader>
-                    <CardTitle className="text-sm font-semibold">1 · קלט</CardTitle>
-                    <CardDescription>
-                      מזינים אזורי מיקוד גיאוגרפיים ונתוני פרופיל משפחה או קהילה.
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              </li>
-              <li>
-                <Card className="h-full border-border shadow-card">
-                  <CardHeader>
-                    <CardTitle className="text-sm font-semibold">2 · ניתוח</CardTitle>
-                    <CardDescription>
-                      משלבים שכבות GIS, כללים ותובנות מערכת ליצירת הקשר תפעולי.
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              </li>
-              <li>
-                <Card className="h-full border-border shadow-card">
-                  <CardHeader>
-                    <CardTitle className="text-sm font-semibold">3 · המלצה</CardTitle>
-                    <CardDescription>
-                      מציגים התאמות מעשיות וצעדים הבאים לצוותים ולמשפחות.
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              </li>
+            <ol className="mt-12 grid gap-5 lg:grid-cols-3">
+              {processSteps.map((step) => (
+                <li key={step.label} className="relative rounded-[1.75rem] border border-border/70 bg-background/65 p-7 shadow-sm backdrop-blur-sm">
+                  <div className="mb-10 flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{step.label}</span>
+                    <ChevronLeft className="h-5 w-5 text-primary" aria-hidden />
+                  </div>
+                  <h3 className="text-xl font-semibold">{step.title}</h3>
+                  <p className="mt-4 text-sm leading-7 text-muted-foreground">{step.description}</p>
+                </li>
+              ))}
             </ol>
-          </section>
+          </div>
+        </section>
 
-          <Separator className="bg-border" />
+        <SystemIntelligenceSection />
 
-          <section aria-labelledby="preview-heading" className="space-y-4">
-            <div>
-              <h2 id="preview-heading" className="text-xl font-semibold">
-                תצוגה מקדימה
+        <section className="border-y border-border/60 bg-card/35 px-4 py-20 sm:py-24" aria-labelledby="audience-heading">
+          <div className="mx-auto max-w-7xl">
+            <div className="max-w-3xl">
+              <p className="mb-3 text-sm font-medium text-primary">שערי כניסה</p>
+              <h2 id="audience-heading" className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                אותה מערכת, שתי נקודות מבט.
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                המחשה בלבד - פתחו את המפה הראשית לשכבות וכלים בזמן אמת.
-              </p>
             </div>
-            <Card className="overflow-hidden border-border shadow-card">
-              <CardContent className="p-5 pt-5">
-                <div
-                  className="relative aspect-[16/10] w-full overflow-hidden rounded-lg border border-border bg-muted/80 shadow-sm"
-                  aria-hidden
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-muted via-background to-primary/10" />
-                  <div className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(90deg,hsl(var(--border))_1px,transparent_1px),linear-gradient(hsl(var(--border))_1px,transparent_1px)] [background-size:40px_40px]" />
-                  <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2">
-                    <div className="rounded-full border-2 border-primary/50 bg-card p-3 shadow-md">
-                      <Map className="h-10 w-10 text-primary" />
-                    </div>
-                    <span className="rounded-md border border-border bg-card/95 px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm">
-                      תצוגה סטטית
-                    </span>
-                  </div>
-                  <div className="absolute bottom-3 left-3 right-3 rounded-md border border-border/80 bg-card/95 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
-                    המפה האינטראקטיבית, האשכולות והפאנלים הצדדיים זמינים לאחר פתיחת
-                    המפה הראשית.
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
 
-          <Separator className="bg-border" />
+            <div className="mt-12 grid gap-5 md:grid-cols-2">
+              {audiences.map((audience) => {
+                const Icon = audience.icon
+                return (
+                  <Card key={audience.title} className="border-border/70 bg-background/65 shadow-card transition duration-300 hover:-translate-y-1 hover:bg-background">
+                    <CardContent className="p-7">
+                      <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+                        <Icon className="h-7 w-7" aria-hidden />
+                      </div>
+                      <h3 className="text-2xl font-semibold">{audience.title}</h3>
+                      <p className="mt-4 max-w-xl text-sm leading-7 text-muted-foreground">{audience.description}</p>
+                      <Button asChild variant="outline" className="mt-7">
+                        <Link to={audience.to} className="gap-2">
+                          {audience.cta}
+                          <ArrowLeft className="h-4 w-4" aria-hidden />
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        </section>
 
-          <section aria-labelledby="nav-heading" className="space-y-4">
-            <h2 id="nav-heading" className="text-xl font-semibold">
-              לאן ממשיכים
-            </h2>
-            <Card className="border-border shadow-card">
-              <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                <Button asChild variant="default" className="bg-primary text-primary-foreground hover:bg-primary/90">
+        <section className="px-4 py-20 sm:py-24" aria-labelledby="cta-heading">
+          <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-border/70 bg-card p-8 shadow-card sm:p-12 lg:p-16">
+            <div className="grid gap-10 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div>
+                <p className="mb-3 text-sm font-medium text-primary">CityStrata</p>
+                <h2 id="cta-heading" className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                  התחילו מהמפה, והמשיכו להחלטה.
+                </h2>
+                <p className="mt-5 max-w-3xl text-base leading-8 text-muted-foreground">
+                  פתחו את המפה הראשית כדי לראות את השכבות, האזורים והכלים בזמן אמת. גישה ללוחות הבקרה תתבצע לפי הרשאות המשתמש.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+                <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
                   <Link to="/map" className="gap-2">
                     פתיחת מפה
-                    <ArrowRight className="h-4 w-4" aria-hidden />
+                    <Map className="h-4 w-4" aria-hidden />
                   </Link>
                 </Button>
-                <Button asChild variant="outline">
-                  <Link to="/family">לוח בקרה משפחתי</Link>
+                <Button asChild variant="outline" size="lg">
+                  <Link to="/municipality">לוח רשות</Link>
                 </Button>
-                {showMunicipalityButton ? (
-                  <Button asChild variant="outline">
-                    <Link to="/municipality">לוח בקרה לרשות המקומית</Link>
-                  </Button>
-                ) : null}
-                <Button asChild variant="secondary">
+                <Button asChild variant="secondary" size="lg">
                   <Link to="/login">התחברות</Link>
                 </Button>
-              </CardContent>
-            </Card>
-            <p className="text-xs text-muted-foreground">
-            הגישה ללוחות הבקרה דורשת התחברות; במידת הצורך תועברו למסך ההתחברות.
-            </p>
-          </section>
-        </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
-        <footer className="border-t border-border bg-card/60 px-4 py-10">
-          <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <footer className="border-t border-border/60 bg-card/60 px-4 py-10">
+          <div className="mx-auto flex max-w-7xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold">CityStrata</p>
-              <p className="mt-1 text-xs text-muted-foreground">אילת · מערכת לניהול פינוי</p>
+              <p className="mt-1 text-xs text-muted-foreground">אילת · מערכת גיאו־מרחבית לניהול פינוי</p>
             </div>
-            <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm" aria-label="קישורי תחתית">
+            <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="קישורי תחתית">
               <Link to="/map" className="text-primary hover:underline">
                 מפה
               </Link>
               <Link to="/family" className="text-primary hover:underline">
                 משפחה
+              </Link>
+              <Link to="/municipality" className="text-primary hover:underline">
+                רשות מקומית
               </Link>
               <Link to="/login" className="text-primary hover:underline">
                 התחברות
