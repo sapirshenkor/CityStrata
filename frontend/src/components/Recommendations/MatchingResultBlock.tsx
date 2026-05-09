@@ -32,14 +32,18 @@ export interface MatchingData {
 export function MatchingResultBlock({ data }: { data?: MatchingData | null }) {
   if (!data) return null
   const created = data.created_at
-    ? new Date(data.created_at).toLocaleString(undefined, {
+    ? new Date(data.created_at).toLocaleString('he-IL', {
         dateStyle: 'short',
         timeStyle: 'short',
       })
     : null
 
   return (
-    <section className="rec-matching-section" aria-labelledby="rec-matching-heading">
+    <section
+      className="rec-matching-section"
+      aria-labelledby="rec-matching-heading"
+      lang="he"
+    >
       <h4 id="rec-matching-heading" className="rec-matching-title">
         התאמת מאקרו (אשכול)
       </h4>
@@ -56,13 +60,21 @@ export function MatchingResultBlock({ data }: { data?: MatchingData | null }) {
       )}
       <div className="rec-matching-row">
         <span className="rec-matching-label">מומלץ</span>
-        <strong className="rec-matching-value">{data.recommended_cluster}</strong>
+        <strong className="rec-matching-value">
+          <span dir="ltr" lang="en" className="rec-matching-value-embed">
+            {data.recommended_cluster}
+          </span>
+        </strong>
         <ConfidenceBadge value={data.confidence} />
       </div>
       <p className="rec-matching-reasoning">{data.reasoning}</p>
       <div className="rec-matching-row">
         <span className="rec-matching-label">חלופה</span>
-        <span className="rec-matching-value">{data.alternative_cluster}</span>
+        <span className="rec-matching-value">
+          <span dir="ltr" lang="en" className="rec-matching-value-embed">
+            {data.alternative_cluster}
+          </span>
+        </span>
       </div>
       <p className="rec-matching-reasoning rec-matching-reasoning--alt">{data.alternative_reasoning}</p>
       {data.flags && data.flags.length > 0 && (

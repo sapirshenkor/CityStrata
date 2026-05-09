@@ -115,6 +115,23 @@ _OVERVIEW_SQL_BY_USER = """
     LEFT JOIN matching_results mr
         ON mr.id = efp.selected_matching_result_id
     WHERE efp.user_id = $1
+
+    UNION ALL
+
+    SELECT
+        mfp.uuid AS profile_uuid,
+        mfp.family_name,
+        (mfp.selected_matching_result_id IS NOT NULL) AS has_matching,
+        (mftr.id IS NOT NULL) AS has_tactical,
+        mftr.created_at AS tactical_created_at,
+        mr.recommended_cluster_number AS cluster_number,
+        TRUE AS is_merged_profile
+    FROM multi_family_profiles mfp
+    LEFT JOIN multi_family_tactical_responses mftr
+        ON mftr.multi_family_uuid = mfp.uuid
+    LEFT JOIN matching_results mr
+        ON mr.id = mfp.selected_matching_result_id
+    WHERE mfp.user_id = $1
 """
 
 _ALL_RESPONSES_SQL = """
@@ -200,7 +217,8 @@ async def list_families_recommendation_overview(
         async with pool.acquire() as conn:
             if current.role == "visitor":
                 rows = await conn.fetch(
-                    _OVERVIEW_SQL_BY_USER + " ORDER BY family_name",
+                    "SELECT * FROM (" + _OVERVIEW_SQL_BY_USER + ") overview "
+                    "ORDER BY is_merged_profile, family_name",
                     current.id,
                 )
             else:

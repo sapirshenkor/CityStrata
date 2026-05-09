@@ -81,7 +81,7 @@ function CommunityMatchingBlock({ data }: { data: CommunityMatchingDetail | null
     ? new Date(data.created_at).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })
     : null
   return (
-    <section className="rec-matching-section" aria-labelledby="cp-matching-heading">
+    <section className="rec-matching-section" aria-labelledby="cp-matching-heading" lang="he">
       <h4 id="cp-matching-heading" className="rec-matching-title">
         התאמת אשכול (מאקרו)
       </h4>
@@ -95,13 +95,21 @@ function CommunityMatchingBlock({ data }: { data: CommunityMatchingDetail | null
       )}
       <div className="rec-matching-row">
         <span className="rec-matching-label">מומלץ</span>
-        <strong className="rec-matching-value">{data.recommended_cluster}</strong>
+        <strong className="rec-matching-value">
+          <span dir="ltr" lang="en" className="rec-matching-value-embed">
+            {data.recommended_cluster}
+          </span>
+        </strong>
         <ConfidenceBadge value={data.confidence} />
       </div>
       <p className="rec-matching-reasoning">{data.reasoning}</p>
       <div className="rec-matching-row">
         <span className="rec-matching-label">חלופה</span>
-        <span className="rec-matching-value">{data.alternative_cluster}</span>
+        <span className="rec-matching-value">
+          <span dir="ltr" lang="en" className="rec-matching-value-embed">
+            {data.alternative_cluster}
+          </span>
+        </span>
       </div>
       <p className="rec-matching-reasoning rec-matching-reasoning--alt">{data.alternative_reasoning}</p>
       {data.flags && data.flags.length > 0 && (
@@ -379,7 +387,7 @@ export default function CommunityProfilesPanel() {
 
           <div className="rec-layout-detail">
             {!selected && (
-              <div className="rec-detail">
+              <div className="rec-detail" dir="rtl" lang="he">
                 <div className="rec-detail-placeholder">
                   <strong>בחרו קהילה</strong>
                   <p style={{ margin: '8px 0 0', fontSize: 13 }}>
@@ -390,7 +398,7 @@ export default function CommunityProfilesPanel() {
             )}
 
             {selected && (
-              <div className="rec-detail">
+              <div className="rec-detail" dir="rtl" lang="he">
                 <div className="rec-detail-header">
                   <div className="rec-detail-header-main">
                     <h3 className="rec-detail-name">{selected.community_name}</h3>
