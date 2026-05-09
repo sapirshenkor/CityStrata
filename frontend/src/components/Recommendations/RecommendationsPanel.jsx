@@ -575,7 +575,7 @@ function RecommendationsPanel({
 
         <div className="rec-layout-detail">
           {!selectedOverview && (
-            <div className="rec-detail">
+            <div className="rec-detail" dir="rtl" lang="he">
               <div className="rec-detail-placeholder">
                 <strong>בחרו משפחה</strong>
                 <p style={{ margin: '8px 0 0', fontSize: 13 }}>
@@ -586,7 +586,7 @@ function RecommendationsPanel({
           )}
 
           {selectedOverview && (
-            <div className="rec-detail">
+            <div className="rec-detail" dir="rtl" lang="he">
               <div className="rec-detail-header">
                 <div className="rec-detail-header-main">
                   <h3 className="rec-detail-name">{selectedOverview.family_name}</h3>

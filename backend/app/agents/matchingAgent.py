@@ -86,7 +86,9 @@ def _format_family_profile_text(family: EvacueeFamilyProfileBase) -> str:
     """
     parts = [f"The family has {family.total_people} members."]
 
-    has_children = family.infants or family.preschool or family.elementary or family.youth
+    has_children = (
+        family.infants or family.preschool or family.elementary or family.youth
+    )
     if has_children:
         segs = []
         if family.infants:
@@ -110,7 +112,9 @@ def _format_family_profile_text(family: EvacueeFamilyProfileBase) -> str:
         parts.append(" Including " + ", ".join(segs) + ".")
 
     if family.seniors > 0:
-        parts.append(f" {family.seniors} senior(s)." if family.seniors > 1 else " 1 senior.")
+        parts.append(
+            f" {family.seniors} senior(s)." if family.seniors > 1 else " 1 senior."
+        )
 
     aff = family.religious_affiliation
     parts.append(f" They are {aff}.")
@@ -124,9 +128,7 @@ def _format_family_profile_text(family: EvacueeFamilyProfileBase) -> str:
     parts.append(
         f" Education proximity importance: {family.education_proximity_importance}/5."
     )
-    parts.append(
-        f" Social venues importance: {family.social_venues_importance}/5."
-    )
+    parts.append(f" Social venues importance: {family.social_venues_importance}/5.")
     parts.append(
         f" Daily services accessibility importance: {family.services_importance}/5."
     )
@@ -241,7 +243,9 @@ Apply these matching rules:
 - social_venues_importance 4–5 → Prioritize high "food" dimension.
 - "Peripheral - Sparse" → Recommend only as absolute last resort; always flag it explicitly.
 
-Return exactly one JSON object with these keys (no markdown, no backticks, no preamble): recommended_cluster (string, one of the cluster names), confidence (string: "high" | "medium" | "low"), reasoning (string), alternative_cluster (string), alternative_reasoning (string), flags (array of strings; critical constraints for the placement officer)."""
+Output language: Write reasoning, alternative_reasoning, and every entry in flags in Modern Hebrew (clear, concise placement-officer style). Do not translate recommended_cluster or alternative_cluster — use the exact cluster names as listed. confidence must remain exactly "high", "medium", or "low".
+
+Return exactly one JSON object with these keys (no markdown, no backticks, no preamble): recommended_cluster (string, one of the cluster names), confidence (string: "high" | "medium" | "low"), reasoning (string in Hebrew), alternative_cluster (string), alternative_reasoning (string in Hebrew), flags (array of strings in Hebrew; critical constraints for the placement officer)."""
 
 
 COMMUNITY_MATCHING_SYSTEM_PROMPT = """You are a placement officer assistant for neighborhood matching in Eilat, Israel. Your task is to recommend the best neighborhood cluster for a displaced **community group** (multiple families relocating together — e.g. a neighborhood block, kibbutz, or religious community) based on their collective profile and the available cluster profiles.
@@ -256,7 +260,9 @@ Apply these matching rules (in addition to the family rules where relevant):
 - **Kibbutz/moshav type** → Consider clusters that support communal living patterns.
 - "Peripheral - Sparse" → Recommend only as absolute last resort; flag explicitly.
 
-Return exactly one JSON object with these keys (no markdown, no backticks, no preamble): recommended_cluster (string, one of the cluster names), confidence (string: "high" | "medium" | "low"), reasoning (string), alternative_cluster (string), alternative_reasoning (string), flags (array of strings; critical constraints for the placement officer)."""
+Output language: Write reasoning, alternative_reasoning, and every entry in flags in Modern Hebrew (clear, concise placement-officer style). Do not translate recommended_cluster or alternative_cluster — use the exact cluster names as listed. confidence must remain exactly "high", "medium", or "low".
+
+Return exactly one JSON object with these keys (no markdown, no backticks, no preamble): recommended_cluster (string, one of the cluster names), confidence (string: "high" | "medium" | "low"), reasoning (string in Hebrew), alternative_cluster (string), alternative_reasoning (string in Hebrew), flags (array of strings in Hebrew; critical constraints for the placement officer)."""
 
 
 async def match_family_to_cluster(
@@ -275,7 +281,9 @@ async def match_family_to_cluster(
         f"{family_text}\n\n"
         "Available clusters:\n"
         f"{clusters_text}\n\n"
-        "Return ONLY a valid JSON object with keys: recommended_cluster, confidence, reasoning, alternative_cluster, alternative_reasoning, flags. No markdown, no backticks, no extra text."
+        "Return ONLY a valid JSON object with keys: recommended_cluster, confidence, reasoning, alternative_cluster, alternative_reasoning, flags. "
+        "reasoning, alternative_reasoning, and flags must be in Hebrew; confidence must be high, medium, or low; cluster names unchanged. "
+        "No markdown, no backticks, no extra text."
     )
 
     try:
@@ -296,7 +304,9 @@ async def match_family_to_cluster(
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Agent returned invalid JSON: {e}. Raw response: {raw!r}") from e
+        raise ValueError(
+            f"Agent returned invalid JSON: {e}. Raw response: {raw!r}"
+        ) from e
 
     return Agent1Response(
         recommended_cluster=data["recommended_cluster"],
@@ -323,7 +333,9 @@ async def match_community_to_cluster(
         f"{community_text}\n\n"
         "Available clusters:\n"
         f"{clusters_text}\n\n"
-        "Return ONLY a valid JSON object with keys: recommended_cluster, confidence, reasoning, alternative_cluster, alternative_reasoning, flags. No markdown, no backticks, no extra text."
+        "Return ONLY a valid JSON object with keys: recommended_cluster, confidence, reasoning, alternative_cluster, alternative_reasoning, flags. "
+        "reasoning, alternative_reasoning, and flags must be in Hebrew; confidence must be high, medium, or low; cluster names unchanged. "
+        "No markdown, no backticks, no extra text."
     )
 
     try:
@@ -344,7 +356,9 @@ async def match_community_to_cluster(
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Agent returned invalid JSON: {e}. Raw response: {raw!r}") from e
+        raise ValueError(
+            f"Agent returned invalid JSON: {e}. Raw response: {raw!r}"
+        ) from e
 
     return Agent1Response(
         recommended_cluster=data["recommended_cluster"],
