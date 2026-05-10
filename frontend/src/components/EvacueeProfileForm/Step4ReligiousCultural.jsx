@@ -1,4 +1,5 @@
 import React from 'react'
+import FieldHelpIcon from './FieldHelpIcon'
 
 function FieldError({ errors, name }) {
   if (!errors?.[name]) return null
@@ -26,9 +27,17 @@ export default function Step4ReligiousCultural({ data, onChange, errors }) {
       </div>
 
       <div className="evpf-field">
-        <label>תדירות פעילות תרבותית</label>
-        {/* option value stays as the English key the backend expects */}
+        <div className="mb-1.5 flex flex-wrap items-center gap-1">
+          <label htmlFor="evpf-s4-culture" className="!mb-0 text-sm font-semibold text-muted-foreground">
+            תדירות פעילות תרבותית
+          </label>
+          <FieldHelpIcon
+            text="באיזו תדירות המשפחה נוהגת לצרוך אירועי תרבות, פנאי או הצגות?"
+            ariaLabel="הסבר על תדירות פעילות תרבותית"
+          />
+        </div>
         <select
+          id="evpf-s4-culture"
           className="evpf-select"
           value={data.culture_frequency}
           onChange={(e) => onChange({ culture_frequency: e.target.value })}

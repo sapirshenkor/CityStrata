@@ -26,6 +26,8 @@ export default function Step7Extra({ data, onChange, errors }) {
         value={data.services_importance}
         onChange={(v) => onChange({ services_importance: v })}
         error={errors?.services_importance}
+        fieldTooltip="דירוג המידה שבה קריטי למשפחה להיות במרחק הליכה ממוסדות ציבור ושירותים ממשלתיים."
+        fieldTooltipAriaLabel="הסבר על חשיבות גישה לשירותים ומוסדות עירוניים"
       />
 
       <div className="evpf-field">

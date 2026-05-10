@@ -1,5 +1,6 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Source, Layer, Popup, useMap } from 'react-map-gl/mapbox'
+import { orderRadiiByLlmNarrative } from '../../utils/recommendationZones'
 
 /** Source / layers on the canonical map instance — attach hover / click on `RECOMMENDATIONS_FILL_LAYER_ID` from parent if needed */
 export const RECOMMENDATIONS_SOURCE_ID = 'recommendations-zones'
@@ -89,21 +90,33 @@ function mergeBounds(boundsList) {
   return out
 }
 
-/** Avoid Mapbox throwing while the map is tearing down (e.g. React route change). */
-function safeFitBounds(mapRef, bounds, options) {
-  if (!mapRef?.fitBounds || !bounds) return
+function profileKeyFromRecommendation(recommendation) {
+  if (recommendation?.profile_uuid != null && recommendation.profile_uuid !== '') {
+    return String(recommendation.profile_uuid)
+  }
+  return recommendation
+}
+
+/**
+ * Same animation as manual radius switching; returns whether fitBounds actually ran.
+ * When the style is not ready yet (common right after first tactical load), returns false
+ * so the caller can retry on `idle`.
+ */
+function trySafeFitBounds(mapRef, bounds, options) {
+  if (!mapRef?.fitBounds || !bounds) return false
   let mb = null
   try {
     mb = typeof mapRef.getMap === 'function' ? mapRef.getMap() : null
   } catch {
-    return
+    return false
   }
-  if (!mb) return
-  if (typeof mb.isStyleLoaded === 'function' && !mb.isStyleLoaded()) return
+  if (!mb) return false
+  if (typeof mb.isStyleLoaded === 'function' && !mb.isStyleLoaded()) return false
   try {
     mapRef.fitBounds(bounds, options)
+    return true
   } catch {
-    /* map destroyed or style unavailable */
+    return false
   }
 }
 
@@ -115,13 +128,18 @@ function safeFitBounds(mapRef, bounds, options) {
  */
 function RecommendationsLayer({ recommendation }) {
   const mapRef = useMap()?.current
+  const prevProfileKeyRef = useRef(null)
   const [hover, setHover] = useState(null)
   const [focusedPriorityIndex, setFocusedPriorityIndex] = useState(0)
 
   const geojson = useMemo(() => {
     if (!recommendation?.radii_data?.length) return null
 
-    const features = recommendation.radii_data
+    const zonesOrdered = orderRadiiByLlmNarrative(
+      recommendation.agent_output,
+      recommendation.radii_data,
+    )
+    const features = zonesOrdered
       .map((zone, i) => {
         const lat = Number(zone.center_lat)
         const lng = Number(zone.center_lng)
@@ -159,17 +177,28 @@ function RecommendationsLayer({ recommendation }) {
   const zoneCount = geojson?.features?.length ?? 0
 
   useEffect(() => {
+    if (recommendation == null) {
+      prevProfileKeyRef.current = null
+    }
+  }, [recommendation])
+
+  useEffect(() => {
     if (zoneCount > 0) setFocusedPriorityIndex(0)
   }, [recommendation, zoneCount])
 
   useEffect(() => {
-    if (!mapRef?.fitBounds || !geojson?.features?.length) return
+    if (!mapRef?.fitBounds || !geojson?.features?.length || !recommendation) return
+
+    const profileKey = profileKeyFromRecommendation(recommendation)
+    const isNewSelection = prevProfileKeyRef.current !== profileKey
+    prevProfileKeyRef.current = profileKey
 
     const n = geojson.features.length
-    const idx =
-      focusedPriorityIndex === -1
-        ? -1
-        : Math.min(Math.max(0, focusedPriorityIndex), n - 1)
+    const idx = (() => {
+      if (isNewSelection) return 0
+      if (focusedPriorityIndex === -1) return -1
+      return Math.min(Math.max(0, focusedPriorityIndex), n - 1)
+    })()
 
     const currentBounds =
       idx === -1
@@ -178,12 +207,60 @@ function RecommendationsLayer({ recommendation }) {
 
     if (!currentBounds) return
 
-    safeFitBounds(mapRef, currentBounds, {
+    const fitOptions = {
       padding: { top: 70, right: 70, bottom: 70, left: 70 },
       maxZoom: idx === -1 ? 14 : 15,
       duration: 700,
-    })
-  }, [mapRef, geojson, focusedPriorityIndex])
+    }
+
+    let cancelled = false
+    let fitApplied = false
+    let mb = null
+    try {
+      mb = typeof mapRef.getMap === 'function' ? mapRef.getMap() : null
+    } catch {
+      mb = null
+    }
+
+    const applyFit = () => {
+      if (cancelled || fitApplied) return
+      if (trySafeFitBounds(mapRef, currentBounds, fitOptions)) {
+        fitApplied = true
+      }
+    }
+
+    if (trySafeFitBounds(mapRef, currentBounds, fitOptions)) {
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const onIdle = () => {
+      window.clearTimeout(fallbackTimer)
+      applyFit()
+    }
+
+    let fallbackTimer = window.setTimeout(applyFit, 300)
+
+    if (mb?.once) {
+      mb.once('idle', onIdle)
+      return () => {
+        cancelled = true
+        window.clearTimeout(fallbackTimer)
+        try {
+          mb.off?.('idle', onIdle)
+        } catch {
+          /* map destroyed */
+        }
+      }
+    }
+
+    const t = fallbackTimer
+    return () => {
+      cancelled = true
+      window.clearTimeout(t)
+    }
+  }, [mapRef, geojson, recommendation, focusedPriorityIndex])
 
   useEffect(() => {
     let mb = null
@@ -242,7 +319,6 @@ function RecommendationsLayer({ recommendation }) {
 
   if (!geojson) return null
 
-  const score = hover?.props ? parseNum(hover.props.semantic_score) : null
   const amenities = hover?.props ? parseNum(hover.props.total_amenities) : null
 
   return (
@@ -348,11 +424,6 @@ function RecommendationsLayer({ recommendation }) {
             <div>
               רדיוס: <b>{hover.props.radius_m} מ&apos;</b>
             </div>
-            {score != null && (
-              <div>
-                ציון: <b>{(score * 100).toFixed(1)}%</b>
-              </div>
-            )}
             {amenities != null && (
               <div>
                 שירותים זמינים: <b>{amenities}</b>

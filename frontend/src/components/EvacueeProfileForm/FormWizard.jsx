@@ -11,6 +11,7 @@ import Step7Extra from './Step7Extra'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import './EvacueeProfileForm.css'
 import {
   evacueeFamilyProfileCreateSchema,
@@ -153,6 +154,7 @@ export default function FormWizard() {
   const isLast = stepIdx === steps.length - 1
 
   return (
+    <TooltipProvider delayDuration={280} skipDelayDuration={0}>
     <Card className="max-w-[720px] border-border bg-card shadow-md" dir="rtl">
       <CardHeader className="space-y-4 pb-4">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -219,5 +221,6 @@ export default function FormWizard() {
         )}
       </CardFooter>
     </Card>
+    </TooltipProvider>
   )
 }

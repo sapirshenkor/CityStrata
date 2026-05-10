@@ -22,6 +22,7 @@ import { useFamilyDashboard } from './hooks/useFamilyQueries'
 import { familyKeys } from './queryKeys'
 import '../user_dashboard/dashboard.css'
 import UserBar from '@/components/UserBar'
+import { orderRadiiByLlmNarrative } from '@/utils/recommendationZones'
 
 function pid(u: string | null | undefined) {
   return u != null ? String(u) : ''
@@ -32,6 +33,7 @@ interface TacticalRecData {
   profile_uuid?: string
   confidence?: string | null
   radii_data?: Array<{ hub_label?: string; radius_m?: number }>
+  /** Full tactical markdown; used to order zones by LLM narrative */
   agent_output?: string
 }
 
@@ -419,7 +421,10 @@ export default function FamilyDashboard() {
                                 </div>
                                 {(tacticalRec.radii_data?.length ?? 0) > 0 && (
                                   <div className="rec-zones-summary">
-                                    {(tacticalRec.radii_data ?? []).map((z, i) => (
+                                    {orderRadiiByLlmNarrative(
+                                      tacticalRec.agent_output,
+                                      tacticalRec.radii_data ?? [],
+                                    ).map((z, i) => (
                                       <span
                                         key={z.hub_label ?? i}
                                         className={`rec-zone-badge rec-zone-badge--${i % 3}`}

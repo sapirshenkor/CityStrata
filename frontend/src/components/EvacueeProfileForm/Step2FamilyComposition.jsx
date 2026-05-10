@@ -1,4 +1,5 @@
 import React from 'react'
+import FieldHelpIcon from './FieldHelpIcon'
 
 function FieldError({ errors, name }) {
   if (!errors?.[name]) return null
@@ -49,11 +50,20 @@ export default function Step2FamilyComposition({ data, onChange, errors }) {
       <div className="evpf-field evpf-span2" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="evpf-checkbox">
           <input
+            id="evpf-s2-mobility"
             type="checkbox"
             checked={data.has_mobility_disability}
             onChange={(e) => onChange({ has_mobility_disability: e.target.checked })}
           />
-          <span>יש לבן/בת המשפחה מוגבלות ניידות</span>
+          <span className="flex flex-wrap items-center gap-1">
+            <label htmlFor="evpf-s2-mobility" className="cursor-pointer font-inherit">
+              יש לבן/בת המשפחה מוגבלות ניידות
+            </label>
+            <FieldHelpIcon
+              text="האם יש צורך בנגישות פיזית (כיסא גלגלים, מעלית, הימנעות ממדרגות)?"
+              ariaLabel="הסבר על מוגבלות ניידות"
+            />
+          </span>
         </div>
         <FieldError errors={errors} name="has_mobility_disability" />
 

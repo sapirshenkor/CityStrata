@@ -1,4 +1,5 @@
 import React from 'react'
+import FieldHelpIcon from './FieldHelpIcon'
 import ImportanceSlider from './ImportanceSlider'
 
 function FieldError({ errors, name }) {
@@ -13,11 +14,20 @@ export default function Step5Community({ data, onChange, errors }) {
         <div className="evpf-field">
           <div className="evpf-checkbox">
             <input
+              id="evpf-s5-matnas"
               type="checkbox"
               checked={data.matnas_participation}
               onChange={(e) => onChange({ matnas_participation: e.target.checked })}
             />
-            <span>השתתפות בפעילויות מתנ״ס</span>
+            <span className="flex flex-wrap items-center gap-1">
+              <label htmlFor="evpf-s5-matnas" className="cursor-pointer font-inherit">
+                השתתפות בפעילויות קהילתיות
+              </label>
+              <FieldHelpIcon
+                text="השתתפות קבועה בחוגים, סדנאות או פעילויות קהילתיות במרכז הקהילתי."
+                ariaLabel="הסבר על השתתפות בפעילויות מתנ״ס"
+              />
+            </span>
           </div>
           <FieldError errors={errors} name="matnas_participation" />
         </div>

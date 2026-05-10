@@ -1,13 +1,19 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
+import { EDUCATION_SERVICE_KEY_TUPLE, educationServiceLabelHe } from './educationServiceOptions'
 
 export default function EducationListInput({ items, onChange, error }) {
-  const [draft, setDraft] = useState('')
+  const [selected, setSelected] = useState('')
+
+  const available = useMemo(() => {
+    const chosen = new Set(items ?? [])
+    return EDUCATION_SERVICE_KEY_TUPLE.filter((k) => !chosen.has(k))
+  }, [items])
 
   const add = () => {
-    const t = draft.trim()
-    if (!t) return
-    onChange([...(items ?? []), t])
-    setDraft('')
+    const key = selected
+    if (!key || (items ?? []).includes(key)) return
+    onChange([...(items ?? []), key])
+    setSelected('')
   }
 
   const removeAt = (idx) => {
@@ -21,19 +27,19 @@ export default function EducationListInput({ items, onChange, error }) {
       <div className="text-sm font-extrabold text-foreground">דרישות חינוך חיוניות</div>
 
       <div className="flex flex-col gap-2.5 min-[400px]:flex-row min-[400px]:items-center">
-        <input
-          className="evpf-input min-w-0 flex-1"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="הקלד/י ולחץ/י Enter"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              add()
-            }
-          }}
-        />
-        <button type="button" onClick={add} className="evpf-btn primary shrink-0 text-sm">
+        <select
+          className="evpf-select min-w-0 flex-1"
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+        >
+          <option value="">בחרו סוג מוסד…</option>
+          {available.map((key) => (
+            <option key={key} value={key}>
+              {educationServiceLabelHe(key)}
+            </option>
+          ))}
+        </select>
+        <button type="button" onClick={add} className="evpf-btn primary shrink-0 text-sm" disabled={!selected}>
           הוסף
         </button>
       </div>
@@ -41,9 +47,9 @@ export default function EducationListInput({ items, onChange, error }) {
       {error ? <div className="evpf-error">{error}</div> : null}
 
       <div className="evpf-chips">
-        {(items ?? []).map((it, idx) => (
-          <span key={`${it}-${idx}`} className="evpf-chip">
-            {it}
+        {(items ?? []).map((key, idx) => (
+          <span key={`${key}-${idx}`} className="evpf-chip">
+            {educationServiceLabelHe(key)}
             <button type="button" onClick={() => removeAt(idx)} aria-label="הסרת פריט">
               ×
             </button>

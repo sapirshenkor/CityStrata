@@ -1,6 +1,9 @@
 import { z } from 'zod'
+import { EDUCATION_SERVICE_KEY_TUPLE } from './educationServiceOptions'
 
 const nonEmptyString = z.string().trim().min(1, 'שדה חובה')
+
+const educationServiceKeySchema = z.enum(EDUCATION_SERVICE_KEY_TUPLE)
 
 const optionalNullableInt = z.preprocess((v) => {
   if (v === undefined || v === null) return null
@@ -48,8 +51,8 @@ export const evacueeFamilyProfileCreateSchema = z.object({
   has_mobility_disability: z.boolean(),
   has_car: z.boolean(),
 
-  // Education
-  essential_education: z.array(nonEmptyString).optional().default([]),
+  // Education (canonical keys; Hebrew labels in UI only)
+  essential_education: z.array(educationServiceKeySchema).optional().default([]),
   education_proximity_importance: importance1to5,
 
   // Religious/Cultural

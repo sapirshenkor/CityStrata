@@ -9,6 +9,7 @@ import {
   runCommunityTactical,
 } from '../../services/api'
 import { recommendationsKeys, useRecommendationsOverviewQuery } from '../../hooks/useRecommendationsData'
+import { orderRadiiByLlmNarrative } from '../../utils/recommendationZones'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfidenceBadge, MatchingResultBlock } from './MatchingResultBlock'
 import './RecommendationsPanel.css'
@@ -626,7 +627,10 @@ function RecommendationsPanel({
                     <h4 className="rec-tactical-title">דוח טקטי (אזורים ונרטיב)</h4>
                     {selectedRecommendation.radii_data?.length > 0 && (
                       <div className="rec-zones-summary">
-                        {selectedRecommendation.radii_data.map((z, i) => (
+                        {orderRadiiByLlmNarrative(
+                          selectedRecommendation.agent_output,
+                          selectedRecommendation.radii_data,
+                        ).map((z, i) => (
                           <span
                             key={z.hub_label ?? i}
                             className={`rec-zone-badge rec-zone-badge--${i % 3}`}

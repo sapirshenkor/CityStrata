@@ -6,6 +6,7 @@ import type { z } from 'zod'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import Step1ContactInfo from '../components/EvacueeProfileForm/Step1ContactInfo'
 import Step2FamilyComposition from '../components/EvacueeProfileForm/Step2FamilyComposition'
 import Step3Education from '../components/EvacueeProfileForm/Step3Education'
@@ -20,6 +21,7 @@ import {
   evacueeFamilyProfileCreateSchema,
   toPayload,
 } from '../components/EvacueeProfileForm/evacueeFamilyProfileSchemas'
+import { isEducationServiceKey } from '../components/EvacueeProfileForm/educationServiceOptions'
 import {
   useCreateFamilyProfile,
   useFamilyProfile,
@@ -124,8 +126,9 @@ function mapApiToForm(p: Record<string, unknown>): FormValues {
     seniors: num(p.seniors, 0),
     has_mobility_disability: Boolean(p.has_mobility_disability),
     has_car: p.has_car !== false,
+    // ערכים שאינם מפתחות קנוניים נזרקים בטעינה; שמירה שומרת רק רשימה תקפה לפי הסכימה.
     essential_education: Array.isArray(p.essential_education)
-      ? (p.essential_education as string[])
+      ? (p.essential_education as string[]).filter(isEducationServiceKey)
       : [],
     education_proximity_importance: num(p.education_proximity_importance, 3),
     religious_affiliation: (p.religious_affiliation as FormValues['religious_affiliation']) ?? 'secular',
@@ -276,6 +279,7 @@ export default function FamilyEvacueeWizard() {
       </header>
 
       <div className="mx-auto max-w-[720px] min-w-0 p-4 pb-10">
+        <TooltipProvider delayDuration={280} skipDelayDuration={0}>
         <Card className="border-border bg-card shadow-md">
           <CardHeader className="space-y-4 pb-4">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -341,6 +345,7 @@ export default function FamilyEvacueeWizard() {
             </CardFooter>
           </form>
         </Card>
+        </TooltipProvider>
       </div>
     </div>
   )

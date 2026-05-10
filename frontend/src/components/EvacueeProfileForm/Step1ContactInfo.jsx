@@ -1,4 +1,5 @@
 import React from 'react'
+import FieldHelpIcon from './FieldHelpIcon'
 
 function FieldError({ errors, name }) {
   if (!errors?.[name]) return null
@@ -50,8 +51,17 @@ export default function Step1ContactInfo({ data, onChange, errors }) {
       </div>
 
       <div className="evpf-field">
-        <label>קוד סטטיסטי (אופציונלי)</label>
+        <div className="mb-1.5 flex flex-wrap items-center gap-1">
+          <label htmlFor="evpf-s1-home_stat" className="!mb-0 text-sm font-semibold text-muted-foreground">
+            קוד סטטיסטי (אופציונלי)
+          </label>
+          <FieldHelpIcon
+            text="מזהה ייחודי של האזור הסטטיסטי לצורכי ניתוח גאוגרפי מדויק."
+            ariaLabel="הסבר על קוד סטטיסטי"
+          />
+        </div>
         <input
+          id="evpf-s1-home_stat"
           className="evpf-input"
           type="number"
           value={data.home_stat_2022 ?? ''}
