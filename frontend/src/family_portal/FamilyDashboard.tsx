@@ -388,7 +388,11 @@ export default function FamilyDashboard() {
                         </div>
 
                         {showIntel && (
-                          <div className="rec-detail mt-4 border-t border-border pt-4 text-start">
+                          <div
+                            className="rec-detail mt-4 border-t border-border pt-4 text-start"
+                            dir="rtl"
+                            lang="he"
+                          >
                             {detailLoading && (
                               <div className="rec-detail-loading text-sm text-muted-foreground">
                                 <span className="rec-spinner me-2 inline-block" aria-hidden />

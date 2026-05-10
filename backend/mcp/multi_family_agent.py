@@ -129,6 +129,8 @@ async def ensure_multi_family_profile(member_uuids: list[str]) -> str:
                services_importance, culture_frequency (by rank)
         - Union: essential_education
         - Single / "other": religious_affiliation
+        - Inherited owner: user_id is taken from the source families when they
+          all share the same owner; NULL when sources span multiple users.
 
     Returns:
         The multi-family profile UUID (str) — existing or newly created.
@@ -219,6 +221,11 @@ async def ensure_multi_family_profile(member_uuids: list[str]) -> str:
         cr = max(culture_rank(r["culture_frequency"]) for r in ordered)
         merged_culture_frequency = culture_from_rank(cr)
 
+        # Inherit user_id from source families when they all share the same
+        # owner; otherwise leave NULL (mixed-owner or legacy/unscoped rows).
+        owner_ids = {r["user_id"] for r in ordered if r.get("user_id") is not None}
+        merged_user_id = next(iter(owner_ids)) if len(owner_ids) == 1 else None
+
         notes_parts = [
             f"[{r['family_name']}] {r['notes']}"
             for r in ordered
@@ -248,11 +255,11 @@ async def ensure_multi_family_profile(member_uuids: list[str]) -> str:
                 matnas_participation, social_venues_importance, needs_community_proximity,
                 accommodation_preference, estimated_stay_duration,
                 needs_medical_proximity, services_importance, notes,
-                selected_matching_result_id
+                selected_matching_result_id, user_id
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
                 $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
-                $27, $28, $29, $30, $31
+                $27, $28, $29, $30, $31, $32
             )
             RETURNING uuid::text AS uuid
             """,
@@ -291,6 +298,7 @@ async def ensure_multi_family_profile(member_uuids: list[str]) -> str:
             services_imp,                                           # $29
             merged_notes,                                           # $30
             matching_id,                                            # $31
+            merged_user_id,                                         # $32
         )
 
         mf_uuid = new_row["uuid"]
