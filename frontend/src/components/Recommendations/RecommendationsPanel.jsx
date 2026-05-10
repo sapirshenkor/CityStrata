@@ -418,7 +418,7 @@ function RecommendationsPanel({
 
       <div className="rec-layout">
         <div className="rec-layout-list">
-          <div className="rec-list-section">
+          <div className="rec-list-section" dir="rtl" lang="he">
             <div className="rec-list-heading">
               <h2 id="rec-families-heading">משפחות</h2>
               <span className="rec-list-hint" id="rec-families-hint">

@@ -319,7 +319,7 @@ export default function CommunityProfilesPanel() {
       ) : (
         <div className="rec-layout">
           <div className="rec-layout-list">
-            <div className="rec-list-section">
+            <div className="rec-list-section" dir="rtl" lang="he">
               <div className="rec-list-heading">
                 <h2 id="cp-list-heading">קהילות</h2>
                 <span className="rec-list-hint" id="cp-list-hint">
