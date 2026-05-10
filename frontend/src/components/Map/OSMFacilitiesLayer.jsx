@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useOSMFacilities } from '../../hooks/useMapData'
 import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
@@ -103,4 +103,4 @@ function OSMFacilitiesLayer({ filters, recommendation }) {
   )
 }
 
-export default OSMFacilitiesLayer
+export default memo(OSMFacilitiesLayer)

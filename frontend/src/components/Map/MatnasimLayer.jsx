@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useMatnasim } from '../../hooks/useMapData'
 import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
@@ -92,4 +92,4 @@ function MatnasimLayer({ filters, recommendation }) {
   )
 }
 
-export default MatnasimLayer
+export default memo(MatnasimLayer)

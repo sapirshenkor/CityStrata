@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import LeafletMap from './components/Map/LeafletMap'
 import { AppHeader } from './components/layout/AppHeader'
 import { MapSidebar } from './components/Sidebar/MapSidebar'
@@ -43,6 +43,10 @@ export default function MapApp() {
     useState<LayerVisibility>(defaultLayerVisibility)
   const [filters, setFilters] = useState<Record<string, unknown>>(defaultFilters)
 
+  const onRunClustering = useCallback(() => {
+    void refetchClusterAssignments()
+  }, [refetchClusterAssignments])
+
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
       <AppHeader variant="map">
@@ -72,7 +76,7 @@ export default function MapApp() {
                   onToggleLayer={setLayerVisibility}
                   filters={filters}
                   onUpdateFilters={setFilters}
-                  onRunClustering={() => refetchClusterAssignments()}
+                  onRunClustering={onRunClustering}
                   showClusters={layerVisibility.clusters}
                   clusterAssignments={clusterAssignments}
                   selectedRecommendation={selectedRecommendation}

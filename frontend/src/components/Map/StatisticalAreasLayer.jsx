@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react'
+import { memo, useMemo, useEffect } from 'react'
 import { Source, Layer, useMap } from 'react-map-gl/mapbox'
 import { useStatisticalAreas } from '../../hooks/useMapData'
 import { CLUSTER_COLORS, layerColors, STATISTICAL_AREA_FILL_PALETTE } from '../../utils/colors'
@@ -86,13 +86,8 @@ function buildFillColorExpression(selectedArea, useClusterRamp) {
 
 function buildFillOpacityExpression(selectedArea, useClusterRamp) {
   if (!useClusterRamp) {
-    if (selectedArea === null || selectedArea === undefined) return 0.46
-    return [
-      'case',
-      ['==', ['to-number', ['get', 'stat_2022']], selectedArea],
-      0.58,
-      0.46,
-    ]
+    // Invisible fill keeps polygon interiors clickable (Mapbox hit-tests the fill geometry).
+    return 0
   }
 
   if (selectedArea === null || selectedArea === undefined) {
@@ -114,9 +109,11 @@ function buildFillOpacityExpression(selectedArea, useClusterRamp) {
   ]
 }
 
-function buildLineWidthExpression(selectedArea) {
-  if (selectedArea === null || selectedArea === undefined) return 2.5
-  return ['case', ['==', ['to-number', ['get', 'stat_2022']], selectedArea], 4, 2.5]
+function buildLineWidthExpression(selectedArea, useClusterRamp) {
+  const base = useClusterRamp ? 2.5 : 3
+  const selectedW = useClusterRamp ? 4 : 5
+  if (selectedArea === null || selectedArea === undefined) return base
+  return ['case', ['==', ['to-number', ['get', 'stat_2022']], selectedArea], selectedW, base]
 }
 
 function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClusters, clusterAssignments }) {
@@ -182,10 +179,10 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClu
   const linePaint = useMemo(
     () => ({
       'line-color': layerColors.statisticalAreas.stroke,
-      'line-width': buildLineWidthExpression(selectedArea),
+      'line-width': buildLineWidthExpression(selectedArea, useClusterRamp),
       'line-opacity': 1,
     }),
-    [selectedArea],
+    [selectedArea, useClusterRamp],
   )
 
   /** Fit viewport when filtering to a single area — Mapbox expects SW/NE lng/lat, not Leaflet LatLngBounds */
@@ -259,4 +256,4 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClu
   )
 }
 
-export default StatisticalAreasLayer
+export default memo(StatisticalAreasLayer)

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useSynagogues } from '../../hooks/useMapData'
 import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
@@ -77,4 +77,4 @@ function SynagoguesLayer({ filters, recommendation }) {
   )
 }
 
-export default SynagoguesLayer
+export default memo(SynagoguesLayer)
