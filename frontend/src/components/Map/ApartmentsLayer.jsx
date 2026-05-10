@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { usePropertyListings } from '../../hooks/useMapData'
 import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
@@ -195,4 +195,4 @@ function ApartmentsLayer({ recommendation }) {
   )
 }
 
-export default ApartmentsLayer
+export default memo(ApartmentsLayer)

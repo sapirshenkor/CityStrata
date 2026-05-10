@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useAirbnbListings } from '../../hooks/useMapData'
 import { formatCurrency, formatRating } from '../../utils/formatters'
@@ -80,4 +80,4 @@ function AirbnbLayer({ filters, recommendation }) {
   )
 }
 
-export default AirbnbLayer
+export default memo(AirbnbLayer)

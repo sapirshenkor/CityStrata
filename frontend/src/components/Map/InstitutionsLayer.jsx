@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useInstitutions } from '../../hooks/useMapData'
 import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
@@ -159,4 +159,4 @@ function InstitutionsLayer({ filters, recommendation }) {
   )
 }
 
-export default InstitutionsLayer
+export default memo(InstitutionsLayer)

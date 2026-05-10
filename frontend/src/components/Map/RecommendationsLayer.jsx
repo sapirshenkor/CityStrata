@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { Source, Layer, Popup, useMap } from 'react-map-gl/mapbox'
 
 /** Source / layers on the canonical map instance — attach hover / click on `RECOMMENDATIONS_FILL_LAYER_ID` from parent if needed */
@@ -89,13 +89,31 @@ function mergeBounds(boundsList) {
   return out
 }
 
+/** Avoid Mapbox throwing while the map is tearing down (e.g. React route change). */
+function safeFitBounds(mapRef, bounds, options) {
+  if (!mapRef?.fitBounds || !bounds) return
+  let mb = null
+  try {
+    mb = typeof mapRef.getMap === 'function' ? mapRef.getMap() : null
+  } catch {
+    return
+  }
+  if (!mb) return
+  if (typeof mb.isStyleLoaded === 'function' && !mb.isStyleLoaded()) return
+  try {
+    mapRef.fitBounds(bounds, options)
+  } catch {
+    /* map destroyed or style unavailable */
+  }
+}
+
 /**
  * Recommendation relocation radii as Mapbox GeoJSON polygons (fill + stroke), with hover Popup
  * analogous to Leaflet Circle + Tooltip.
  *
  * recommendation : object with radii_data[] — center_lat, center_lng, radius_m; optional hub_label, semantic_score, total_amenities.
  */
-export default function RecommendationsLayer({ recommendation }) {
+function RecommendationsLayer({ recommendation }) {
   const mapRef = useMap()?.current
   const [hover, setHover] = useState(null)
   const [focusedPriorityIndex, setFocusedPriorityIndex] = useState(0)
@@ -103,24 +121,38 @@ export default function RecommendationsLayer({ recommendation }) {
   const geojson = useMemo(() => {
     if (!recommendation?.radii_data?.length) return null
 
-    const features = recommendation.radii_data.map((zone, i) => {
-      const hue = ZONE_COLORS[i % ZONE_COLORS.length]
-      return {
-        type: 'Feature',
-        id: String(zone.hub_label ?? `zone_${i}`),
-        properties: {
-          hub_label: zone.hub_label ?? '',
-          label_title: formatZoneLabel(zone.hub_label),
-          radius_m: zone.radius_m,
-          semantic_score: zone.semantic_score ?? '',
-          total_amenities: zone.total_amenities ?? '',
-          fillHex: hue,
-          lineHex: hue,
-        },
-        geometry: geodesicCirclePolygon(zone.center_lat, zone.center_lng, zone.radius_m),
-      }
-    })
+    const features = recommendation.radii_data
+      .map((zone, i) => {
+        const lat = Number(zone.center_lat)
+        const lng = Number(zone.center_lng)
+        const radiusM = Number(zone.radius_m)
+        if (
+          !Number.isFinite(lat) ||
+          !Number.isFinite(lng) ||
+          !Number.isFinite(radiusM) ||
+          radiusM <= 0
+        ) {
+          return null
+        }
+        const hue = ZONE_COLORS[i % ZONE_COLORS.length]
+        return {
+          type: 'Feature',
+          id: String(zone.hub_label ?? `zone_${i}`),
+          properties: {
+            hub_label: zone.hub_label ?? '',
+            label_title: formatZoneLabel(zone.hub_label),
+            radius_m: zone.radius_m,
+            semantic_score: zone.semantic_score ?? '',
+            total_amenities: zone.total_amenities ?? '',
+            fillHex: hue,
+            lineHex: hue,
+          },
+          geometry: geodesicCirclePolygon(lat, lng, radiusM),
+        }
+      })
+      .filter(Boolean)
 
+    if (!features.length) return null
     return { type: 'FeatureCollection', features }
   }, [recommendation])
 
@@ -131,25 +163,35 @@ export default function RecommendationsLayer({ recommendation }) {
   }, [recommendation, zoneCount])
 
   useEffect(() => {
-    const fitBounds = mapRef?.fitBounds
-    if (!fitBounds || !geojson?.features?.length) return
+    if (!mapRef?.fitBounds || !geojson?.features?.length) return
+
+    const n = geojson.features.length
+    const idx =
+      focusedPriorityIndex === -1
+        ? -1
+        : Math.min(Math.max(0, focusedPriorityIndex), n - 1)
 
     const currentBounds =
-      focusedPriorityIndex === -1
+      idx === -1
         ? mergeBounds(geojson.features.map(featureBounds).filter(Boolean))
-        : featureBounds(geojson.features[focusedPriorityIndex])
+        : featureBounds(geojson.features[idx])
 
     if (!currentBounds) return
 
-    fitBounds(currentBounds, {
+    safeFitBounds(mapRef, currentBounds, {
       padding: { top: 70, right: 70, bottom: 70, left: 70 },
-      maxZoom: focusedPriorityIndex === -1 ? 14 : 15,
+      maxZoom: idx === -1 ? 14 : 15,
       duration: 700,
     })
   }, [mapRef, geojson, focusedPriorityIndex])
 
   useEffect(() => {
-    const mb = typeof mapRef?.getMap === 'function' ? mapRef.getMap() : null
+    let mb = null
+    try {
+      mb = typeof mapRef?.getMap === 'function' ? mapRef.getMap() : null
+    } catch {
+      return undefined
+    }
     if (!mb?.on || !geojson?.features?.length) {
       setHover(null)
       return undefined
@@ -160,22 +202,41 @@ export default function RecommendationsLayer({ recommendation }) {
       const p = f?.properties
       if (!p) return
       const ll = e.lngLat ?? mb.unproject?.(e.point)
-      setHover(ll ? { lng: ll.lng, lat: ll.lat, props: { ...p } } : null)
-      mb.getCanvas().style.cursor = 'pointer'
+      if (
+        !ll ||
+        !Number.isFinite(ll.lng) ||
+        !Number.isFinite(ll.lat)
+      ) {
+        return
+      }
+      setHover({ lng: ll.lng, lat: ll.lat, props: { ...p } })
+      try {
+        mb.getCanvas().style.cursor = 'pointer'
+      } catch {
+        /* map destroyed */
+      }
     }
 
     const onLeave = () => {
       setHover(null)
-      mb.getCanvas().style.cursor = ''
+      try {
+        mb.getCanvas().style.cursor = ''
+      } catch {
+        /* map destroyed */
+      }
     }
 
     mb.on('mouseenter', RECOMMENDATIONS_FILL_LAYER_ID, onEnter)
     mb.on('mouseleave', RECOMMENDATIONS_FILL_LAYER_ID, onLeave)
 
     return () => {
-      mb.off('mouseenter', RECOMMENDATIONS_FILL_LAYER_ID, onEnter)
-      mb.off('mouseleave', RECOMMENDATIONS_FILL_LAYER_ID, onLeave)
-      mb.getCanvas().style.cursor = ''
+      try {
+        mb.off('mouseenter', RECOMMENDATIONS_FILL_LAYER_ID, onEnter)
+        mb.off('mouseleave', RECOMMENDATIONS_FILL_LAYER_ID, onLeave)
+        mb.getCanvas().style.cursor = ''
+      } catch {
+        /* map may already be destroyed during navigation */
+      }
     }
   }, [mapRef, geojson])
 
@@ -270,7 +331,7 @@ export default function RecommendationsLayer({ recommendation }) {
         </div>
       )}
 
-      {hover && (
+      {hover && Number.isFinite(hover.lng) && Number.isFinite(hover.lat) && (
         <Popup
           longitude={hover.lng}
           latitude={hover.lat}
@@ -303,3 +364,5 @@ export default function RecommendationsLayer({ recommendation }) {
     </>
   )
 }
+
+export default memo(RecommendationsLayer)

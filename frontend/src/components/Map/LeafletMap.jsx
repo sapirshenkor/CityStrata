@@ -1,7 +1,7 @@
 /**
  * Map chrome uses Mapbox GL (react-map-gl). Layer overlays are temporarily disabled pending migration off react-leaflet.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Map, { NavigationControl, FullscreenControl } from 'react-map-gl/mapbox'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { MapLayersPanel } from './MapLayersPanel'
@@ -133,49 +133,78 @@ export default function LeafletMap({
     }
   }, [isPreview])
 
-  const airbnbFilters = { ...filters.airbnb, ...(areaFilter && { area: areaFilter }) }
-  const hotelsFilters = { ...filters.hotels, ...(areaFilter && { area: areaFilter }) }
-  const restaurantsFilters = { ...filters.restaurants, ...(areaFilter && { area: areaFilter }) }
-  const coffeeShopsFilters = { ...filters.coffeeShops, ...(areaFilter && { area: areaFilter }) }
-  const institutionsFilters = { ...filters.institutions, ...(areaFilter && { area: areaFilter }) }
-  const matnasimFilters = { ...filters.matnasim, ...(areaFilter && { area: areaFilter }) }
-  const synagoguesFilters = { ...filters.synagogues, ...(areaFilter && { area: areaFilter }) }
-  const osmFacilitiesFilters = { ...filters.osmFacilities, ...(areaFilter && { area: areaFilter }) }
+  /** Stable object identities avoid pointless POI layer reconciles when only unrelated map UI state changes. */
+  const airbnbFilters = useMemo(
+    () => ({ ...filters.airbnb, ...(areaFilter && { area: areaFilter }) }),
+    [filters.airbnb, areaFilter],
+  )
+  const hotelsFilters = useMemo(
+    () => ({ ...filters.hotels, ...(areaFilter && { area: areaFilter }) }),
+    [filters.hotels, areaFilter],
+  )
+  const restaurantsFilters = useMemo(
+    () => ({ ...filters.restaurants, ...(areaFilter && { area: areaFilter }) }),
+    [filters.restaurants, areaFilter],
+  )
+  const coffeeShopsFilters = useMemo(
+    () => ({ ...filters.coffeeShops, ...(areaFilter && { area: areaFilter }) }),
+    [filters.coffeeShops, areaFilter],
+  )
+  const institutionsFilters = useMemo(
+    () => ({ ...filters.institutions, ...(areaFilter && { area: areaFilter }) }),
+    [filters.institutions, areaFilter],
+  )
+  const matnasimFilters = useMemo(
+    () => ({ ...filters.matnasim, ...(areaFilter && { area: areaFilter }) }),
+    [filters.matnasim, areaFilter],
+  )
+  const synagoguesFilters = useMemo(
+    () => ({ ...filters.synagogues, ...(areaFilter && { area: areaFilter }) }),
+    [filters.synagogues, areaFilter],
+  )
+  const osmFacilitiesFilters = useMemo(
+    () => ({ ...filters.osmFacilities, ...(areaFilter && { area: areaFilter }) }),
+    [filters.osmFacilities, areaFilter],
+  )
 
-  const queriedLayerIds = isPreview
-    ? []
-    : [
-        ...(layerVisibility.statisticalAreas ? [STATISTICAL_AREAS_FILL_LAYER_ID] : []),
-        ...(selectedRecommendation?.radii_data?.length ? [RECOMMENDATIONS_FILL_LAYER_ID] : []),
-      ]
-  const interactiveLayerIds = isPreview ? [] : queriedLayerIds.length ? queriedLayerIds : undefined
-  const onMapLoad = (event) => {
-    const map = event.target
-    mapRef.current = map
-    ensure3DBuildingsLayer(map)
-    map.setLayoutProperty(BUILDINGS_3D_LAYER_ID, 'visibility', 'none')
+  const interactiveLayerIds = useMemo(() => {
+    if (isPreview) return []
+    const ids = []
+    if (layerVisibility.statisticalAreas) ids.push(STATISTICAL_AREAS_FILL_LAYER_ID)
+    if (selectedRecommendation?.radii_data?.length) ids.push(RECOMMENDATIONS_FILL_LAYER_ID)
+    return ids.length ? ids : undefined
+  }, [isPreview, layerVisibility.statisticalAreas, selectedRecommendation])
 
-    const bumpResize = () => {
-      try {
-        map.resize()
-      } catch {
-        /* ignore */
+  const onMapLoad = useCallback(
+    (event) => {
+      const map = event.target
+      mapRef.current = map
+      ensure3DBuildingsLayer(map)
+      map.setLayoutProperty(BUILDINGS_3D_LAYER_ID, 'visibility', 'none')
+
+      const bumpResize = () => {
+        try {
+          map.resize()
+        } catch {
+          /* ignore */
+        }
       }
-    }
-    bumpResize()
-    requestAnimationFrame(bumpResize)
-    requestAnimationFrame(() => requestAnimationFrame(bumpResize))
+      bumpResize()
+      requestAnimationFrame(bumpResize)
+      requestAnimationFrame(() => requestAnimationFrame(bumpResize))
 
-    if (isPreview && typeof ResizeObserver !== 'undefined') {
-      previewResizeObserverRef.current?.disconnect()
-      const container = map.getContainer?.()
-      if (container) {
-        const ro = new ResizeObserver(() => bumpResize())
-        ro.observe(container)
-        previewResizeObserverRef.current = ro
+      if (isPreview && typeof ResizeObserver !== 'undefined') {
+        previewResizeObserverRef.current?.disconnect()
+        const container = map.getContainer?.()
+        if (container) {
+          const ro = new ResizeObserver(() => bumpResize())
+          ro.observe(container)
+          previewResizeObserverRef.current = ro
+        }
       }
-    }
-  }
+    },
+    [isPreview],
+  )
 
   const toggle2D3D = () => {
     const map = mapRef.current

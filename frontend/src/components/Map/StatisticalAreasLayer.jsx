@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react'
+import { memo, useMemo, useEffect } from 'react'
 import { Source, Layer, useMap } from 'react-map-gl/mapbox'
 import { useStatisticalAreas } from '../../hooks/useMapData'
 import { CLUSTER_COLORS, layerColors, STATISTICAL_AREA_FILL_PALETTE } from '../../utils/colors'
@@ -256,4 +256,4 @@ function StatisticalAreasLayer({ selectedArea, onSelectArea, areaFilter, showClu
   )
 }
 
-export default StatisticalAreasLayer
+export default memo(StatisticalAreasLayer)

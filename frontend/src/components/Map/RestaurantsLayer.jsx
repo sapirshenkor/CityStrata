@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useRestaurants } from '../../hooks/useMapData'
 import { formatRating } from '../../utils/formatters'
@@ -75,4 +75,4 @@ function RestaurantsLayer({ filters, recommendation }) {
   )
 }
 
-export default RestaurantsLayer
+export default memo(RestaurantsLayer)

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { memo, useEffect } from 'react'
 import { useMap } from 'react-map-gl/mapbox'
 import { useStatisticalAreas } from '../../hooks/useMapData'
 import { geojsonBBoxLngLat, mergeLngLatBounds } from '../../utils/geoBounds'
@@ -8,7 +8,7 @@ import { geojsonBBoxLngLat, mergeLngLatBounds } from '../../utils/geoBounds'
  * fit the map to the union of statistical areas assigned to that cluster.
  * Tactical recommendation radii (when present) take precedence — RecommendationsLayer handles those.
  */
-export default function ClusterMacroFit({ macroClusterIndex, clusterAssignments, selectedRecommendation }) {
+function ClusterMacroFit({ macroClusterIndex, clusterAssignments, selectedRecommendation }) {
   const mapRef = useMap()?.current
   const { data: statGeo, loading, error } = useStatisticalAreas()
 
@@ -72,3 +72,5 @@ export default function ClusterMacroFit({ macroClusterIndex, clusterAssignments,
 
   return null
 }
+
+export default memo(ClusterMacroFit)
