@@ -1,12 +1,16 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useHotels } from '../../hooks/useMapData'
 import { formatRating } from '../../utils/formatters'
 import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
 
-function HotelsLayer({ filters, recommendation }) {
+function HotelsLayer({ filters, recommendation, focusedUuid }) {
   const { data, loading, error } = useHotels(filters)
   const [activeUuid, setActiveUuid] = useState(null)
+
+  useEffect(() => {
+    if (focusedUuid) setActiveUuid(focusedUuid)
+  }, [focusedUuid])
 
   const features = useMemo(() => {
     if (!data?.features) return []
@@ -16,11 +20,17 @@ function HotelsLayer({ filters, recommendation }) {
     })
   }, [data, recommendation])
 
+  const visibleFeatures = useMemo(() => {
+    if (!focusedUuid) return features
+    const focused = features.find((f) => f?.properties?.uuid === focusedUuid)
+    return focused ? [focused] : []
+  }, [features, focusedUuid])
+
   if (loading || error) return null
 
   return (
     <>
-      {features.map((feature) => {
+      {visibleFeatures.map((feature) => {
         const { geometry, properties } = feature
         const [lon, lat] = geometry.coordinates
         const isOpen = activeUuid === properties.uuid

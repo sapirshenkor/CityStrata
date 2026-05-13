@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { usePropertyListings } from '../../hooks/useMapData'
 import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
@@ -56,7 +56,7 @@ function ApartmentMarkerBubble({ multi }) {
   )
 }
 
-function ApartmentsLayer({ recommendation }) {
+function ApartmentsLayer({ recommendation, focusedApartment }) {
   const { data, loading, error } = usePropertyListings()
   const [activeKey, setActiveKey] = useState(null)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -81,11 +81,42 @@ function ApartmentsLayer({ recommendation }) {
     return [...byCoord.entries()]
   }, [data, recommendation])
 
+  useEffect(() => {
+    if (!focusedApartment) return
+    const { latitude, longitude, id } = focusedApartment
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') return
+
+    const key = `${longitude},${latitude}`
+    const group = grouped.find(([k]) => k === key)?.[1]
+    if (!group) return
+
+    setActiveKey(key)
+
+    if (id) {
+      const idx = group.listings.findIndex((l) => {
+        const lId = l?.id ?? l?.uuid ?? l?.listing_id ?? l?.created_at
+        return String(lId ?? '') === String(id)
+      })
+      setActiveIndex(idx >= 0 ? idx : 0)
+    } else {
+      setActiveIndex(0)
+    }
+  }, [focusedApartment, grouped])
+
   if (loading || error) return null
+
+  const visibleGroups = useMemo(() => {
+    if (!focusedApartment) return grouped
+    const { latitude, longitude } = focusedApartment
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') return grouped
+    const key = `${longitude},${latitude}`
+    const match = grouped.find(([k]) => k === key)
+    return match ? [match] : []
+  }, [focusedApartment, grouped])
 
   return (
     <>
-      {grouped.map(([key, group]) => {
+      {visibleGroups.map(([key, group]) => {
         const isMulti = group.listings.length > 1
         const isOpen = activeKey === key
 

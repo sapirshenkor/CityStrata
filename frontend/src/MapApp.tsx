@@ -6,6 +6,7 @@ import type { LayerVisibility } from './components/Map/MapLayersPanel'
 import UserBar from './components/UserBar'
 import { useClusterAssignments } from './hooks/useMapData'
 import { ThinkingState } from './components/Map/ThinkingState'
+import type { FocusedListing } from './components/Sidebar/PublicListingsPanel'
 
 const defaultLayerVisibility: LayerVisibility = {
   statisticalAreas: true,
@@ -38,6 +39,10 @@ export default function MapApp() {
   const [selectedRecommendation, setSelectedRecommendation] = useState<unknown>(null)
   const [familyMacroClusterFocus, setFamilyMacroClusterFocus] = useState<number | null>(null)
   const [recommendationsAgentProcessing, setRecommendationsAgentProcessing] = useState(false)
+  const [focusLocation, setFocusLocation] = useState<{ latitude: number; longitude: number; zoom?: number } | null>(
+    null,
+  )
+  const [focusedListing, setFocusedListing] = useState<FocusedListing | null>(null)
   const { data: clusterAssignments, refetch: refetchClusterAssignments } = useClusterAssignments()
   const [layerVisibility, setLayerVisibility] =
     useState<LayerVisibility>(defaultLayerVisibility)
@@ -46,6 +51,22 @@ export default function MapApp() {
   const onRunClustering = useCallback(() => {
     void refetchClusterAssignments()
   }, [refetchClusterAssignments])
+
+  const handleFocusLocation = useCallback((focused: FocusedListing) => {
+    setFocusLocation({ latitude: focused.latitude, longitude: focused.longitude, zoom: 16 })
+    setFocusedListing(focused)
+
+    const layerKey =
+      focused.kind === 'apartments' ? 'apartments' : focused.kind === 'hotels' ? 'hotels' : 'airbnb'
+
+    setLayerVisibility((prev) => ({
+      ...prev,
+      airbnb: layerKey === 'airbnb',
+      hotels: layerKey === 'hotels',
+      apartments: layerKey === 'apartments',
+      [layerKey]: true,
+    }))
+  }, [])
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
@@ -59,6 +80,7 @@ export default function MapApp() {
           onSelectRecommendation={setSelectedRecommendation}
           onFamilyMacroClusterFocus={setFamilyMacroClusterFocus}
           onRecommendationsProcessingChange={setRecommendationsAgentProcessing}
+          onFocusLocation={handleFocusLocation}
           agentThinkingOverlay={
             recommendationsAgentProcessing ? <ThinkingState variant="sidebar" /> : undefined
           }
@@ -81,6 +103,8 @@ export default function MapApp() {
                   clusterAssignments={clusterAssignments}
                   selectedRecommendation={selectedRecommendation}
                   familyMacroClusterFocus={familyMacroClusterFocus}
+                  focusLocation={focusLocation}
+                  focusedListing={focusedListing}
                 />
               </div>
             </div>

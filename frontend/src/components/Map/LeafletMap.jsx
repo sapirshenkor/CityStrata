@@ -97,6 +97,8 @@ export default function LeafletMap({
   clusterAssignments,
   selectedRecommendation,
   familyMacroClusterFocus,
+  focusLocation,
+  focusedListing,
   /** @type {MapVariant | undefined} */
   variant = 'full',
 }) {
@@ -107,6 +109,22 @@ export default function LeafletMap({
   const [previewDragPan, setPreviewDragPan] = useState(true)
   const mapRef = useRef(null)
   const previewResizeObserverRef = useRef(null)
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map?.easeTo) return
+    if (!focusLocation) return
+
+    const { latitude, longitude, zoom } = focusLocation
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') return
+
+    map.easeTo({
+      center: [longitude, latitude],
+      zoom: typeof zoom === 'number' ? zoom : Math.max(map.getZoom?.() ?? DEFAULT_ZOOM, 15),
+      duration: 850,
+      essential: true,
+    })
+  }, [focusLocation])
 
   useEffect(() => {
     return () => {
@@ -307,12 +325,33 @@ export default function LeafletMap({
       <RecommendationsLayer recommendation={selectedRecommendation} />
 
       {layerVisibility.airbnb && (
-        <AirbnbLayer filters={airbnbFilters} recommendation={selectedRecommendation} />
+        <AirbnbLayer
+          filters={airbnbFilters}
+          recommendation={selectedRecommendation}
+          focusedUuid={focusedListing?.kind === 'airbnb' ? focusedListing.uuid : null}
+        />
       )}
       {layerVisibility.hotels && (
-        <HotelsLayer filters={hotelsFilters} recommendation={selectedRecommendation} />
+        <HotelsLayer
+          filters={hotelsFilters}
+          recommendation={selectedRecommendation}
+          focusedUuid={focusedListing?.kind === 'hotels' ? focusedListing.uuid : null}
+        />
       )}
-      {layerVisibility.apartments && <ApartmentsLayer recommendation={selectedRecommendation} />}
+      {layerVisibility.apartments && (
+        <ApartmentsLayer
+          recommendation={selectedRecommendation}
+          focusedApartment={
+            focusedListing?.kind === 'apartments'
+              ? {
+                  latitude: focusedListing.latitude,
+                  longitude: focusedListing.longitude,
+                  id: focusedListing.id ?? null,
+                }
+              : null
+          }
+        />
+      )}
       {layerVisibility.restaurants && (
         <RestaurantsLayer filters={restaurantsFilters} recommendation={selectedRecommendation} />
       )}

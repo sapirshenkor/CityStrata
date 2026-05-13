@@ -1,12 +1,16 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { Marker, Popup } from 'react-map-gl/mapbox'
 import { useAirbnbListings } from '../../hooks/useMapData'
 import { formatCurrency, formatRating } from '../../utils/formatters'
 import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
 
-function AirbnbLayer({ filters, recommendation }) {
+function AirbnbLayer({ filters, recommendation, focusedUuid }) {
   const { data, loading, error } = useAirbnbListings(filters)
   const [activeUuid, setActiveUuid] = useState(null)
+
+  useEffect(() => {
+    if (focusedUuid) setActiveUuid(focusedUuid)
+  }, [focusedUuid])
 
   const features = useMemo(() => {
     if (!data?.features) return []
@@ -16,11 +20,17 @@ function AirbnbLayer({ filters, recommendation }) {
     })
   }, [data, recommendation])
 
+  const visibleFeatures = useMemo(() => {
+    if (!focusedUuid) return features
+    const focused = features.find((f) => f?.properties?.uuid === focusedUuid)
+    return focused ? [focused] : []
+  }, [features, focusedUuid])
+
   if (loading || error) return null
 
   return (
     <>
-      {features.map((feature) => {
+      {visibleFeatures.map((feature) => {
         const { geometry, properties } = feature
         const [lon, lat] = geometry.coordinates
         const isOpen = activeUuid === properties.uuid
