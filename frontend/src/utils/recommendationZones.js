@@ -76,17 +76,110 @@ function distanceMeters(lat1, lon1, lat2, lon2) {
   return 2 * EARTH_RADIUS_METERS * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+export function isPointInsideZone(lat, lon, zone) {
+  const centerLat = Number(zone?.center_lat)
+  const centerLng = Number(zone?.center_lng)
+  const radiusM = Number(zone?.radius_m)
+  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng) || !Number.isFinite(radiusM)) {
+    return false
+  }
+  return distanceMeters(lat, lon, centerLat, centerLng) <= radiusM
+}
+
 export function isPointInsideRecommendationRadii(lat, lon, recommendation) {
   const zones = recommendation?.radii_data
   if (!Array.isArray(zones) || zones.length === 0) return true
 
   return zones.some((zone) => {
-    const centerLat = Number(zone.center_lat)
-    const centerLng = Number(zone.center_lng)
-    const radiusM = Number(zone.radius_m)
-    if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng) || !Number.isFinite(radiusM)) {
-      return false
-    }
-    return distanceMeters(lat, lon, centerLat, centerLng) <= radiusM
+    return isPointInsideZone(lat, lon, zone)
   })
+}
+
+/**
+ * Map mini-bar scope: all lodging types in the active radius filter, or a single layer.
+ * Matches filtering in `PublicListingsPanel` (priority index or -1 for all radii).
+ */
+export function collectLodgingLngLatsForFit(
+  scope,
+  recommendation,
+  focusedRadiusPriorityIndex,
+  apartments,
+  hotelFeatures,
+  airbnbFeatures,
+) {
+  const points = []
+
+  const inFilteredZones = (lat, lon) => {
+    if (!recommendation?.radii_data?.length) return true
+    const rec = recommendation
+    const radiiRaw = Array.isArray(rec.radii_data) ? rec.radii_data : []
+    const ordered = orderRadiiByLlmNarrative(String(rec.agent_output ?? ''), radiiRaw)
+    const idx = typeof focusedRadiusPriorityIndex === 'number' ? focusedRadiusPriorityIndex : -1
+    if (idx === -1) return isPointInsideRecommendationRadii(lat, lon, recommendation)
+    const zone = ordered[idx]
+    return zone ? isPointInsideZone(lat, lon, zone) : false
+  }
+
+  const wantApartments = scope === 'radius' || scope === 'apartments'
+  const wantHotels = scope === 'radius' || scope === 'hotels'
+  const wantAirbnb = scope === 'radius' || scope === 'airbnb'
+
+  if (wantApartments && Array.isArray(apartments)) {
+    for (const listing of apartments) {
+      const lat = Number(listing?.latitude)
+      const lon = Number(listing?.longitude)
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+      if (!inFilteredZones(lat, lon)) continue
+      points.push([lon, lat])
+    }
+  }
+
+  if (wantHotels && Array.isArray(hotelFeatures)) {
+    for (const feature of hotelFeatures) {
+      const coords = feature?.geometry?.coordinates
+      if (!Array.isArray(coords) || coords.length < 2) continue
+      const lon = Number(coords[0])
+      const lat = Number(coords[1])
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+      if (!inFilteredZones(lat, lon)) continue
+      points.push([lon, lat])
+    }
+  }
+
+  if (wantAirbnb && Array.isArray(airbnbFeatures)) {
+    for (const feature of airbnbFeatures) {
+      const coords = feature?.geometry?.coordinates
+      if (!Array.isArray(coords) || coords.length < 2) continue
+      const lon = Number(coords[0])
+      const lat = Number(coords[1])
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+      if (!inFilteredZones(lat, lon)) continue
+      points.push([lon, lat])
+    }
+  }
+
+  return points
+}
+
+/** Mapbox LngLatBoundsLike: [[west, south], [east, north]] */
+export function lngLatPointsToBounds(points) {
+  if (!Array.isArray(points) || points.length === 0) return null
+  let minLng = Infinity
+  let minLat = Infinity
+  let maxLng = -Infinity
+  let maxLat = -Infinity
+  for (const pair of points) {
+    const lng = Number(pair?.[0])
+    const lat = Number(pair?.[1])
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
+    minLng = Math.min(minLng, lng)
+    minLat = Math.min(minLat, lat)
+    maxLng = Math.max(maxLng, lng)
+    maxLat = Math.max(maxLat, lat)
+  }
+  if (!Number.isFinite(minLng)) return null
+  return [
+    [minLng, minLat],
+    [maxLng, maxLat],
+  ]
 }

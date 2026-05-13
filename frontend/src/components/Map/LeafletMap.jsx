@@ -19,6 +19,7 @@ import SynagoguesLayer from './SynagoguesLayer'
 import OSMFacilitiesLayer from './OSMFacilitiesLayer'
 import RecommendationsLayer, { RECOMMENDATIONS_FILL_LAYER_ID } from './RecommendationsLayer'
 import ClusterMacroFit from './ClusterMacroFit'
+import LodgingsBoundsFitter from './LodgingsBoundsFitter'
 // import LayerControls from './LayerControls'
 
 const EILAT_CENTER = [29.55, 34.95]
@@ -97,6 +98,13 @@ export default function LeafletMap({
   clusterAssignments,
   selectedRecommendation,
   familyMacroClusterFocus,
+  focusLocation,
+  focusedListing,
+  lodgingsMapScope = 'radius',
+  onLodgingsMapScope,
+  focusedRadiusPriorityIndex,
+  onFocusedRadiusPriorityIndexChange,
+  onLodgingMarkerFocus,
   /** @type {MapVariant | undefined} */
   variant = 'full',
 }) {
@@ -107,6 +115,22 @@ export default function LeafletMap({
   const [previewDragPan, setPreviewDragPan] = useState(true)
   const mapRef = useRef(null)
   const previewResizeObserverRef = useRef(null)
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map?.easeTo) return
+    if (!focusLocation) return
+
+    const { latitude, longitude, zoom } = focusLocation
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') return
+
+    map.easeTo({
+      center: [longitude, latitude],
+      zoom: typeof zoom === 'number' ? zoom : Math.max(map.getZoom?.() ?? DEFAULT_ZOOM, 15),
+      duration: 850,
+      essential: true,
+    })
+  }, [focusLocation])
 
   useEffect(() => {
     return () => {
@@ -304,15 +328,56 @@ export default function LeafletMap({
         selectedRecommendation={selectedRecommendation}
       />
 
-      <RecommendationsLayer recommendation={selectedRecommendation} />
+      <RecommendationsLayer
+        recommendation={selectedRecommendation}
+        focusedPriorityIndex={focusedRadiusPriorityIndex}
+        onFocusedPriorityIndexChange={onFocusedRadiusPriorityIndexChange}
+        lodgingsMapScope={lodgingsMapScope}
+        onLodgingsMapScopeChange={onLodgingsMapScope}
+      />
+
+      {!isPreview && selectedRecommendation?.radii_data?.length ? (
+        <LodgingsBoundsFitter
+          recommendation={selectedRecommendation}
+          focusedRadiusPriorityIndex={focusedRadiusPriorityIndex}
+          lodgingsMapScope={lodgingsMapScope}
+          focusedListing={focusedListing}
+          hotelsFilters={hotelsFilters}
+          airbnbFilters={airbnbFilters}
+        />
+      ) : null}
 
       {layerVisibility.airbnb && (
-        <AirbnbLayer filters={airbnbFilters} recommendation={selectedRecommendation} />
+        <AirbnbLayer
+          filters={airbnbFilters}
+          recommendation={selectedRecommendation}
+          focusedUuid={focusedListing?.kind === 'airbnb' ? focusedListing.uuid : null}
+          onListingSelect={onLodgingMarkerFocus}
+        />
       )}
       {layerVisibility.hotels && (
-        <HotelsLayer filters={hotelsFilters} recommendation={selectedRecommendation} />
+        <HotelsLayer
+          filters={hotelsFilters}
+          recommendation={selectedRecommendation}
+          focusedUuid={focusedListing?.kind === 'hotels' ? focusedListing.uuid : null}
+          onListingSelect={onLodgingMarkerFocus}
+        />
       )}
-      {layerVisibility.apartments && <ApartmentsLayer recommendation={selectedRecommendation} />}
+      {layerVisibility.apartments && (
+        <ApartmentsLayer
+          recommendation={selectedRecommendation}
+          focusedApartment={
+            focusedListing?.kind === 'apartments'
+              ? {
+                  latitude: focusedListing.latitude,
+                  longitude: focusedListing.longitude,
+                  id: focusedListing.id ?? null,
+                }
+              : null
+          }
+          onListingSelect={onLodgingMarkerFocus}
+        />
+      )}
       {layerVisibility.restaurants && (
         <RestaurantsLayer filters={restaurantsFilters} recommendation={selectedRecommendation} />
       )}

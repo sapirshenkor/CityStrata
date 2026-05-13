@@ -4,6 +4,7 @@ import EvacueeProfileForm from '../EvacueeProfileForm'
 import CommunityForm from '../CommunityForm/CommunityForm'
 import RecommendationsPanel from '../Recommendations/RecommendationsPanel'
 import CommunityProfilesPanel from '../CommunityProfiles/CommunityProfilesPanel'
+import { PublicListingsPanel, type FocusedListing } from './PublicListingsPanel'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
 import type { ReactNode } from 'react'
@@ -13,6 +14,7 @@ export interface MapSidebarProps {
   onSelectRecommendation: (rec: unknown) => void
   onFamilyMacroClusterFocus?: (clusterIndex: number | null) => void
   onRecommendationsProcessingChange?: (processing: boolean) => void
+  onFocusLocation?: (focused: FocusedListing) => void
   /** Floating status card (pointer-events-none) anchored to sidebar bottom — map stays usable */
   agentThinkingOverlay?: ReactNode
   className?: string
@@ -23,6 +25,7 @@ export function MapSidebar({
   onSelectRecommendation,
   onFamilyMacroClusterFocus,
   onRecommendationsProcessingChange,
+  onFocusLocation,
   agentThinkingOverlay,
   className,
 }: MapSidebarProps) {
@@ -31,10 +34,31 @@ export function MapSidebar({
   const isVisitor = userRole === 'visitor'
   const hasFullAccess = userRole === 'editor' || userRole === 'admin'
 
+  if (!user) {
+    return (
+      <aside
+        className={cn(
+          'relative flex h-full w-[min(100%,380px)] shrink-0 flex-col border-r border-border bg-card text-card-foreground shadow-sm shadow-black/20',
+          className,
+        )}
+      >
+        <ScrollArea className="h-full min-h-0 flex-1">
+          <PublicListingsPanel onFocusLocation={onFocusLocation} />
+        </ScrollArea>
+        {agentThinkingOverlay ? (
+          <div className="pointer-events-none absolute inset-x-3 bottom-3 z-50 flex justify-center">
+            {agentThinkingOverlay}
+          </div>
+        ) : null}
+      </aside>
+    )
+  }
+
   const showFamilyTab = isVisitor || hasFullAccess
   const showCommunityTab = hasFullAccess
   const showFamilyRecommendationsTab = isVisitor || hasFullAccess
   const showCommunityRecommendationsTab = hasFullAccess
+  const showLodgingsTab = hasFullAccess
 
   const tabDefinitions = [
     {
@@ -44,6 +68,14 @@ export function MapSidebar({
       title: 'טופס פרופיל משפחה',
       label: 'משפחה',
       compact: false,
+    },
+    {
+      key: 'lodgings',
+      visible: showLodgingsTab,
+      value: 'lodgings',
+      title: 'דירות, מלונות ו-Airbnb',
+      label: 'מקומות לינה',
+      compact: true,
     },
     {
       key: 'community',
@@ -123,6 +155,16 @@ export function MapSidebar({
             <ScrollArea className="h-full flex-1 px-3 pb-4 pt-3">
               <EvacueeProfileForm />
             </ScrollArea>
+          </TabsContent>
+        ) : null}
+        {showLodgingsTab ? (
+          <TabsContent
+            value="lodgings"
+            className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+          >
+            <div className="flex min-h-0 flex-1 flex-col">
+              <PublicListingsPanel onFocusLocation={onFocusLocation} />
+            </div>
           </TabsContent>
         ) : null}
         {showCommunityTab ? (

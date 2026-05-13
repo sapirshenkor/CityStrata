@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Source, Layer, Popup, useMap } from 'react-map-gl/mapbox'
+import { cn } from '@/lib/utils'
 import { orderRadiiByLlmNarrative } from '../../utils/recommendationZones'
 
 /** Source / layers on the canonical map instance — attach hover / click on `RECOMMENDATIONS_FILL_LAYER_ID` from parent if needed */
@@ -126,11 +127,27 @@ function trySafeFitBounds(mapRef, bounds, options) {
  *
  * recommendation : object with radii_data[] — center_lat, center_lng, radius_m; optional hub_label, semantic_score, total_amenities.
  */
-function RecommendationsLayer({ recommendation }) {
+function RecommendationsLayer({
+  recommendation,
+  focusedPriorityIndex: controlledFocusedPriorityIndex,
+  onFocusedPriorityIndexChange,
+  lodgingsMapScope = 'radius',
+  onLodgingsMapScopeChange,
+}) {
   const mapRef = useMap()?.current
   const prevProfileKeyRef = useRef(null)
   const [hover, setHover] = useState(null)
-  const [focusedPriorityIndex, setFocusedPriorityIndex] = useState(0)
+  const [uncontrolledFocusedPriorityIndex, setUncontrolledFocusedPriorityIndex] = useState(0)
+
+  const isControlled = typeof controlledFocusedPriorityIndex === 'number'
+  const focusedPriorityIndex = isControlled
+    ? controlledFocusedPriorityIndex
+    : uncontrolledFocusedPriorityIndex
+
+  const setFocusedPriorityIndex = (next) => {
+    if (onFocusedPriorityIndexChange) onFocusedPriorityIndexChange(next)
+    if (!isControlled) setUncontrolledFocusedPriorityIndex(next)
+  }
 
   const geojson = useMemo(() => {
     if (!recommendation?.radii_data?.length) return null
@@ -184,6 +201,7 @@ function RecommendationsLayer({ recommendation }) {
 
   useEffect(() => {
     if (zoneCount > 0) setFocusedPriorityIndex(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recommendation, zoneCount])
 
   useEffect(() => {
@@ -351,59 +369,96 @@ function RecommendationsLayer({ recommendation }) {
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 10,
-            background: 'rgba(15,23,42,0.9)',
-            color: '#fff',
-            border: '1px solid rgba(255,255,255,0.14)',
-            borderRadius: 10,
-            padding: 8,
             display: 'flex',
-            gap: 6,
+            flexDirection: 'column',
             alignItems: 'center',
+            gap: 8,
           }}
         >
-          <button
-            type="button"
-            onClick={() =>
-              setFocusedPriorityIndex((prev) => {
-                if (prev === -1) return 0
-                return (prev - 1 + zoneCount) % zoneCount
-              })
-            }
-            style={{ border: 0, borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}
-          >
-            ◀
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              setFocusedPriorityIndex((prev) => {
-                if (prev === -1) return 0
-                return (prev + 1) % zoneCount
-              })
-            }
-            style={{ border: 0, borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}
-          >
-            ▶
-          </button>
-          <button
-            type="button"
-            onClick={() => setFocusedPriorityIndex(-1)}
+          <div
             style={{
-              border: 0,
-              borderRadius: 6,
-              padding: '4px 8px',
-              cursor: 'pointer',
-              background: focusedPriorityIndex === -1 ? '#2563eb' : '#f3f4f6',
-              color: focusedPriorityIndex === -1 ? '#fff' : '#111827',
+              background: 'rgba(15,23,42,0.9)',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: 10,
+              padding: 8,
+              display: 'flex',
+              gap: 6,
+              alignItems: 'center',
             }}
           >
-            All
-          </button>
-          <span style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-            {focusedPriorityIndex === -1
-              ? `All (${zoneCount})`
-              : `Priority ${focusedPriorityIndex + 1}/${zoneCount}`}
-          </span>
+            <button
+              type="button"
+              onClick={() =>
+                setFocusedPriorityIndex((prev) => {
+                  if (prev === -1) return 0
+                  return (prev - 1 + zoneCount) % zoneCount
+                })
+              }
+              style={{ border: 0, borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}
+            >
+              ◀
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setFocusedPriorityIndex((prev) => {
+                  if (prev === -1) return 0
+                  return (prev + 1) % zoneCount
+                })
+              }
+              style={{ border: 0, borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}
+            >
+              ▶
+            </button>
+            <button
+              type="button"
+              onClick={() => setFocusedPriorityIndex(-1)}
+              style={{
+                border: 0,
+                borderRadius: 6,
+                padding: '4px 8px',
+                cursor: 'pointer',
+                background: focusedPriorityIndex === -1 ? '#2563eb' : '#f3f4f6',
+                color: focusedPriorityIndex === -1 ? '#fff' : '#111827',
+              }}
+            >
+              All
+            </button>
+            <span style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+              {focusedPriorityIndex === -1
+                ? `All (${zoneCount})`
+                : `Priority ${focusedPriorityIndex + 1}/${zoneCount}`}
+            </span>
+          </div>
+
+          {typeof onLodgingsMapScopeChange === 'function' ? (
+            <div
+              className="flex max-w-[min(100vw-32px,420px)] flex-wrap justify-center gap-1.5 rounded-xl border border-white/10 bg-slate-950/95 px-2 py-2 shadow-lg backdrop-blur-sm"
+              dir="rtl"
+            >
+              {[
+                { key: 'radius', label: 'ברדיוס' },
+                { key: 'apartments', label: 'דירות' },
+                { key: 'hotels', label: 'מלונות' },
+                { key: 'airbnb', label: 'Airbnb' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onLodgingsMapScopeChange(key)}
+                  className={cn(
+                    'rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950',
+                    lodgingsMapScope === key
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-100 hover:bg-slate-700',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       )}
 
