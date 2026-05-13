@@ -19,6 +19,7 @@ import SynagoguesLayer from './SynagoguesLayer'
 import OSMFacilitiesLayer from './OSMFacilitiesLayer'
 import RecommendationsLayer, { RECOMMENDATIONS_FILL_LAYER_ID } from './RecommendationsLayer'
 import ClusterMacroFit from './ClusterMacroFit'
+import LodgingsBoundsFitter from './LodgingsBoundsFitter'
 // import LayerControls from './LayerControls'
 
 const EILAT_CENTER = [29.55, 34.95]
@@ -99,8 +100,11 @@ export default function LeafletMap({
   familyMacroClusterFocus,
   focusLocation,
   focusedListing,
+  lodgingsMapScope = 'radius',
+  onLodgingsMapScope,
   focusedRadiusPriorityIndex,
   onFocusedRadiusPriorityIndexChange,
+  onLodgingMarkerFocus,
   /** @type {MapVariant | undefined} */
   variant = 'full',
 }) {
@@ -328,13 +332,27 @@ export default function LeafletMap({
         recommendation={selectedRecommendation}
         focusedPriorityIndex={focusedRadiusPriorityIndex}
         onFocusedPriorityIndexChange={onFocusedRadiusPriorityIndexChange}
+        lodgingsMapScope={lodgingsMapScope}
+        onLodgingsMapScopeChange={onLodgingsMapScope}
       />
+
+      {!isPreview && selectedRecommendation?.radii_data?.length ? (
+        <LodgingsBoundsFitter
+          recommendation={selectedRecommendation}
+          focusedRadiusPriorityIndex={focusedRadiusPriorityIndex}
+          lodgingsMapScope={lodgingsMapScope}
+          focusedListing={focusedListing}
+          hotelsFilters={hotelsFilters}
+          airbnbFilters={airbnbFilters}
+        />
+      ) : null}
 
       {layerVisibility.airbnb && (
         <AirbnbLayer
           filters={airbnbFilters}
           recommendation={selectedRecommendation}
           focusedUuid={focusedListing?.kind === 'airbnb' ? focusedListing.uuid : null}
+          onListingSelect={onLodgingMarkerFocus}
         />
       )}
       {layerVisibility.hotels && (
@@ -342,6 +360,7 @@ export default function LeafletMap({
           filters={hotelsFilters}
           recommendation={selectedRecommendation}
           focusedUuid={focusedListing?.kind === 'hotels' ? focusedListing.uuid : null}
+          onListingSelect={onLodgingMarkerFocus}
         />
       )}
       {layerVisibility.apartments && (
@@ -356,6 +375,7 @@ export default function LeafletMap({
                 }
               : null
           }
+          onListingSelect={onLodgingMarkerFocus}
         />
       )}
       {layerVisibility.restaurants && (

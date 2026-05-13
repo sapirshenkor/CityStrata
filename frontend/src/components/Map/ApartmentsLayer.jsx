@@ -56,7 +56,7 @@ function ApartmentMarkerBubble({ multi }) {
   )
 }
 
-function ApartmentsLayer({ recommendation, focusedApartment }) {
+function ApartmentsLayer({ recommendation, focusedApartment, onListingSelect }) {
   const { data, loading, error } = usePropertyListings()
   const [activeKey, setActiveKey] = useState(null)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -132,9 +132,20 @@ function ApartmentsLayer({ recommendation, focusedApartment }) {
               longitude={group.lon}
               latitude={group.lat}
               anchor="bottom"
-              onClick={() => {
+              onClick={(e) => {
+                e?.originalEvent?.stopPropagation?.()
                 setActiveKey(key)
                 setActiveIndex(0)
+                const first = group.listings[0]
+                if (onListingSelect && first) {
+                  const idRaw = first?.id ?? first?.uuid ?? first?.listing_id ?? first?.created_at
+                  onListingSelect({
+                    kind: 'apartments',
+                    latitude: group.lat,
+                    longitude: group.lon,
+                    id: idRaw != null && idRaw !== '' ? String(idRaw) : null,
+                  })
+                }
               }}
             >
               <ApartmentMarkerBubble multi={isMulti} />

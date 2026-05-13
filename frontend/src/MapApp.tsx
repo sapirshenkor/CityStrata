@@ -6,7 +6,7 @@ import type { LayerVisibility } from './components/Map/MapLayersPanel'
 import UserBar from './components/UserBar'
 import { useClusterAssignments } from './hooks/useMapData'
 import { ThinkingState } from './components/Map/ThinkingState'
-import type { FocusedListing } from './components/Sidebar/PublicListingsPanel'
+import type { FocusedListing, LodgingsMapScope } from './components/Sidebar/PublicListingsPanel'
 import { RadiusLodgingsSidebar } from './components/Sidebar/RadiusLodgingsSidebar'
 
 const defaultLayerVisibility: LayerVisibility = {
@@ -50,6 +50,7 @@ export default function MapApp() {
   const [filters, setFilters] = useState<Record<string, unknown>>(defaultFilters)
   const [radiusLodgingsOpen, setRadiusLodgingsOpen] = useState(false)
   const [focusedRadiusPriorityIndex, setFocusedRadiusPriorityIndex] = useState<number>(0)
+  const [lodgingsMapScope, setLodgingsMapScope] = useState<LodgingsMapScope>('radius')
 
   const onRunClustering = useCallback(() => {
     void refetchClusterAssignments()
@@ -62,6 +63,8 @@ export default function MapApp() {
     const layerKey =
       focused.kind === 'apartments' ? 'apartments' : focused.kind === 'hotels' ? 'hotels' : 'airbnb'
 
+    setLodgingsMapScope(layerKey)
+
     setLayerVisibility((prev) => ({
       ...prev,
       airbnb: layerKey === 'airbnb',
@@ -71,10 +74,64 @@ export default function MapApp() {
     }))
   }, [])
 
+  const handleLodgingsMapScope = useCallback((scope: LodgingsMapScope) => {
+    setFocusedListing(null)
+    setFocusLocation(null)
+    setLodgingsMapScope(scope)
+
+    if (scope === 'radius') {
+      setLayerVisibility((prev) => ({
+        ...prev,
+        airbnb: true,
+        hotels: true,
+        apartments: true,
+      }))
+      return
+    }
+
+    setLayerVisibility((prev) => ({
+      ...prev,
+      airbnb: scope === 'airbnb',
+      hotels: scope === 'hotels',
+      apartments: scope === 'apartments',
+    }))
+  }, [])
+
+  const handleToggleLayer = useCallback((next: LayerVisibility) => {
+    setLayerVisibility((prev) => {
+      const lodgingChanged =
+        next.airbnb !== prev.airbnb || next.hotels !== prev.hotels || next.apartments !== prev.apartments
+
+      if (lodgingChanged) {
+        setFocusedListing(null)
+        setFocusLocation(null)
+        const lodgingOnCount = Number(next.airbnb) + Number(next.hotels) + Number(next.apartments)
+        if (lodgingOnCount >= 2) {
+          setLodgingsMapScope('radius')
+        } else if (next.apartments) {
+          setLodgingsMapScope('apartments')
+        } else if (next.hotels) {
+          setLodgingsMapScope('hotels')
+        } else if (next.airbnb) {
+          setLodgingsMapScope('airbnb')
+        } else {
+          setLodgingsMapScope('radius')
+        }
+      }
+
+      return next
+    })
+  }, [])
+
   useEffect(() => {
     const hasRadii = (selectedRecommendation as { radii_data?: unknown[] } | null)?.radii_data?.length
     setRadiusLodgingsOpen(Boolean(hasRadii))
-    if (hasRadii) setFocusedRadiusPriorityIndex(0)
+    if (hasRadii) {
+      setFocusedRadiusPriorityIndex(0)
+      setLodgingsMapScope('radius')
+      setFocusedListing(null)
+      setFocusLocation(null)
+    }
   }, [selectedRecommendation])
 
   return (
@@ -104,7 +161,7 @@ export default function MapApp() {
                   onSelectArea={setSelectedArea}
                   areaFilter={null}
                   layerVisibility={layerVisibility}
-                  onToggleLayer={setLayerVisibility}
+                  onToggleLayer={handleToggleLayer}
                   filters={filters}
                   onUpdateFilters={setFilters}
                   onRunClustering={onRunClustering}
@@ -114,8 +171,11 @@ export default function MapApp() {
                   familyMacroClusterFocus={familyMacroClusterFocus}
                   focusLocation={focusLocation}
                   focusedListing={focusedListing}
+                  lodgingsMapScope={lodgingsMapScope}
+                  onLodgingsMapScope={handleLodgingsMapScope}
                   focusedRadiusPriorityIndex={focusedRadiusPriorityIndex}
                   onFocusedRadiusPriorityIndexChange={setFocusedRadiusPriorityIndex}
+                  onLodgingMarkerFocus={handleFocusLocation}
                 />
               </div>
             </div>

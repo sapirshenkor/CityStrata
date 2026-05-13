@@ -4,7 +4,7 @@ import { useAirbnbListings } from '../../hooks/useMapData'
 import { formatCurrency, formatRating } from '../../utils/formatters'
 import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
 
-function AirbnbLayer({ filters, recommendation, focusedUuid }) {
+function AirbnbLayer({ filters, recommendation, focusedUuid, onListingSelect }) {
   const { data, loading, error } = useAirbnbListings(filters)
   const [activeUuid, setActiveUuid] = useState(null)
 
@@ -37,7 +37,23 @@ function AirbnbLayer({ filters, recommendation, focusedUuid }) {
 
         return (
           <div key={properties.uuid}>
-            <Marker longitude={lon} latitude={lat} anchor="bottom" onClick={() => setActiveUuid(properties.uuid)}>
+            <Marker
+              longitude={lon}
+              latitude={lat}
+              anchor="bottom"
+              onClick={(e) => {
+                e?.originalEvent?.stopPropagation?.()
+                setActiveUuid(properties.uuid)
+                if (onListingSelect && lat != null && lon != null) {
+                  onListingSelect({
+                    kind: 'airbnb',
+                    latitude: lat,
+                    longitude: lon,
+                    uuid: properties.uuid ?? null,
+                  })
+                }
+              }}
+            >
               <div className="custom-marker airbnb-marker">
                 <div className="marker-icon">🏠</div>
               </div>

@@ -4,7 +4,7 @@ import { useHotels } from '../../hooks/useMapData'
 import { formatRating } from '../../utils/formatters'
 import { isPointInsideRecommendationRadii } from '../../utils/recommendationZones'
 
-function HotelsLayer({ filters, recommendation, focusedUuid }) {
+function HotelsLayer({ filters, recommendation, focusedUuid, onListingSelect }) {
   const { data, loading, error } = useHotels(filters)
   const [activeUuid, setActiveUuid] = useState(null)
 
@@ -37,7 +37,23 @@ function HotelsLayer({ filters, recommendation, focusedUuid }) {
 
         return (
           <div key={properties.uuid}>
-            <Marker longitude={lon} latitude={lat} anchor="bottom" onClick={() => setActiveUuid(properties.uuid)}>
+            <Marker
+              longitude={lon}
+              latitude={lat}
+              anchor="bottom"
+              onClick={(e) => {
+                e?.originalEvent?.stopPropagation?.()
+                setActiveUuid(properties.uuid)
+                if (onListingSelect && lat != null && lon != null) {
+                  onListingSelect({
+                    kind: 'hotels',
+                    latitude: lat,
+                    longitude: lon,
+                    uuid: properties.uuid ?? null,
+                  })
+                }
+              }}
+            >
               <div className="custom-marker hotel-marker">
                 <div className="marker-icon">🏨</div>
               </div>

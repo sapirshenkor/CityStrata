@@ -21,6 +21,8 @@ export type FocusedListing =
   | { kind: 'hotels'; latitude: number; longitude: number; uuid?: string | null }
   | { kind: 'airbnb'; latitude: number; longitude: number; uuid?: string | null }
 
+export type LodgingsMapScope = 'radius' | 'apartments' | 'hotels' | 'airbnb'
+
 type NumberRange = { min: number | null; max: number | null }
 
 function formatMoney(value: unknown) {
