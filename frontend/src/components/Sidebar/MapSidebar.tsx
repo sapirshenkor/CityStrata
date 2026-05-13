@@ -162,9 +162,9 @@ export function MapSidebar({
             value="lodgings"
             className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
           >
-            <ScrollArea className="h-full flex-1 px-0 pb-4 pt-0">
+            <div className="flex min-h-0 flex-1 flex-col">
               <PublicListingsPanel onFocusLocation={onFocusLocation} />
-            </ScrollArea>
+            </div>
           </TabsContent>
         ) : null}
         {showCommunityTab ? (

@@ -99,6 +99,8 @@ export default function LeafletMap({
   familyMacroClusterFocus,
   focusLocation,
   focusedListing,
+  focusedRadiusPriorityIndex,
+  onFocusedRadiusPriorityIndexChange,
   /** @type {MapVariant | undefined} */
   variant = 'full',
 }) {
@@ -322,7 +324,11 @@ export default function LeafletMap({
         selectedRecommendation={selectedRecommendation}
       />
 
-      <RecommendationsLayer recommendation={selectedRecommendation} />
+      <RecommendationsLayer
+        recommendation={selectedRecommendation}
+        focusedPriorityIndex={focusedRadiusPriorityIndex}
+        onFocusedPriorityIndexChange={onFocusedRadiusPriorityIndexChange}
+      />
 
       {layerVisibility.airbnb && (
         <AirbnbLayer

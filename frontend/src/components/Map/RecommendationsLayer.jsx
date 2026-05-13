@@ -126,11 +126,25 @@ function trySafeFitBounds(mapRef, bounds, options) {
  *
  * recommendation : object with radii_data[] — center_lat, center_lng, radius_m; optional hub_label, semantic_score, total_amenities.
  */
-function RecommendationsLayer({ recommendation }) {
+function RecommendationsLayer({
+  recommendation,
+  focusedPriorityIndex: controlledFocusedPriorityIndex,
+  onFocusedPriorityIndexChange,
+}) {
   const mapRef = useMap()?.current
   const prevProfileKeyRef = useRef(null)
   const [hover, setHover] = useState(null)
-  const [focusedPriorityIndex, setFocusedPriorityIndex] = useState(0)
+  const [uncontrolledFocusedPriorityIndex, setUncontrolledFocusedPriorityIndex] = useState(0)
+
+  const isControlled = typeof controlledFocusedPriorityIndex === 'number'
+  const focusedPriorityIndex = isControlled
+    ? controlledFocusedPriorityIndex
+    : uncontrolledFocusedPriorityIndex
+
+  const setFocusedPriorityIndex = (next) => {
+    if (onFocusedPriorityIndexChange) onFocusedPriorityIndexChange(next)
+    if (!isControlled) setUncontrolledFocusedPriorityIndex(next)
+  }
 
   const geojson = useMemo(() => {
     if (!recommendation?.radii_data?.length) return null
@@ -184,6 +198,7 @@ function RecommendationsLayer({ recommendation }) {
 
   useEffect(() => {
     if (zoneCount > 0) setFocusedPriorityIndex(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recommendation, zoneCount])
 
   useEffect(() => {

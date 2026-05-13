@@ -76,17 +76,21 @@ function distanceMeters(lat1, lon1, lat2, lon2) {
   return 2 * EARTH_RADIUS_METERS * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+export function isPointInsideZone(lat, lon, zone) {
+  const centerLat = Number(zone?.center_lat)
+  const centerLng = Number(zone?.center_lng)
+  const radiusM = Number(zone?.radius_m)
+  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng) || !Number.isFinite(radiusM)) {
+    return false
+  }
+  return distanceMeters(lat, lon, centerLat, centerLng) <= radiusM
+}
+
 export function isPointInsideRecommendationRadii(lat, lon, recommendation) {
   const zones = recommendation?.radii_data
   if (!Array.isArray(zones) || zones.length === 0) return true
 
   return zones.some((zone) => {
-    const centerLat = Number(zone.center_lat)
-    const centerLng = Number(zone.center_lng)
-    const radiusM = Number(zone.radius_m)
-    if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng) || !Number.isFinite(radiusM)) {
-      return false
-    }
-    return distanceMeters(lat, lon, centerLat, centerLng) <= radiusM
+    return isPointInsideZone(lat, lon, zone)
   })
 }

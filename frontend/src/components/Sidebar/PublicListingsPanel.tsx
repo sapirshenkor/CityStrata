@@ -4,6 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAirbnbListings, useHotels, usePropertyListings } from '@/hooks/useMapData'
 import { Input } from '@/components/ui/input'
+import {
+  isPointInsideRecommendationRadii,
+  isPointInsideZone,
+  orderRadiiByLlmNarrative,
+} from '@/utils/recommendationZones'
 
 export type MapFocusLocation = {
   latitude: number
@@ -141,8 +146,21 @@ function ClickableCard({
 
 export function PublicListingsPanel({
   onFocusLocation,
+  recommendation,
+  headerTitle,
+  headerSubtitle,
+  visibleTabs,
+  defaultTab,
+  focusedRadiusPriorityIndex,
 }: {
   onFocusLocation?: (focused: FocusedListing) => void
+  recommendation?: unknown
+  headerTitle?: string
+  headerSubtitle?: string
+  visibleTabs?: Array<'apartments' | 'hotels' | 'airbnb'>
+  defaultTab?: 'apartments' | 'hotels' | 'airbnb'
+  /** When set, filters points to priority index (0-based) or -1 for All. Applies only when `recommendation` is set. */
+  focusedRadiusPriorityIndex?: number
 }) {
   const apartmentsQuery = usePropertyListings()
   const hotelsQuery = useHotels()
@@ -165,20 +183,70 @@ export function PublicListingsPanel({
 
   const apartments = useMemo(() => {
     if (!Array.isArray(apartmentsQuery.data)) return []
-    return apartmentsQuery.data as Array<Record<string, unknown>>
-  }, [apartmentsQuery.data])
+    const all = apartmentsQuery.data as Array<Record<string, unknown>>
+    if (!recommendation) return all
+
+    const rec = recommendation as { radii_data?: unknown[]; agent_output?: unknown }
+    const radiiRaw = Array.isArray(rec.radii_data) ? rec.radii_data : []
+    const ordered = orderRadiiByLlmNarrative(String(rec.agent_output ?? ''), radiiRaw)
+    const idx = typeof focusedRadiusPriorityIndex === 'number' ? focusedRadiusPriorityIndex : -1
+    const zones = idx === -1 ? ordered : ordered[idx] ? [ordered[idx]] : []
+
+    return all.filter((listing) => {
+      const lat = tryParseNumber(listing.latitude)
+      const lon = tryParseNumber(listing.longitude)
+      if (lat == null || lon == null) return false
+      if (zones.length === 0) return false
+      if (idx === -1) return isPointInsideRecommendationRadii(lat, lon, recommendation)
+      return isPointInsideZone(lat, lon, zones[0])
+    })
+  }, [apartmentsQuery.data, focusedRadiusPriorityIndex, recommendation])
 
   const hotels = useMemo(() => {
     const fc = hotelsQuery.data as { features?: unknown[] } | null
     if (!fc?.features || !Array.isArray(fc.features)) return []
-    return fc.features as Array<{ geometry?: { coordinates?: unknown[] }; properties?: Record<string, unknown> }>
-  }, [hotelsQuery.data])
+    const all = fc.features as Array<{ geometry?: { coordinates?: unknown[] }; properties?: Record<string, unknown> }>
+    if (!recommendation) return all
+
+    const rec = recommendation as { radii_data?: unknown[]; agent_output?: unknown }
+    const radiiRaw = Array.isArray(rec.radii_data) ? rec.radii_data : []
+    const ordered = orderRadiiByLlmNarrative(String(rec.agent_output ?? ''), radiiRaw)
+    const idx = typeof focusedRadiusPriorityIndex === 'number' ? focusedRadiusPriorityIndex : -1
+    const zones = idx === -1 ? ordered : ordered[idx] ? [ordered[idx]] : []
+
+    return all.filter((feature) => {
+      const coords = Array.isArray(feature.geometry?.coordinates) ? feature.geometry?.coordinates : null
+      const lon = coords ? tryParseNumber(coords[0]) : null
+      const lat = coords ? tryParseNumber(coords[1]) : null
+      if (lat == null || lon == null) return false
+      if (zones.length === 0) return false
+      if (idx === -1) return isPointInsideRecommendationRadii(lat, lon, recommendation)
+      return isPointInsideZone(lat, lon, zones[0])
+    })
+  }, [focusedRadiusPriorityIndex, hotelsQuery.data, recommendation])
 
   const airbnb = useMemo(() => {
     const fc = airbnbQuery.data as { features?: unknown[] } | null
     if (!fc?.features || !Array.isArray(fc.features)) return []
-    return fc.features as Array<{ geometry?: { coordinates?: unknown[] }; properties?: Record<string, unknown> }>
-  }, [airbnbQuery.data])
+    const all = fc.features as Array<{ geometry?: { coordinates?: unknown[] }; properties?: Record<string, unknown> }>
+    if (!recommendation) return all
+
+    const rec = recommendation as { radii_data?: unknown[]; agent_output?: unknown }
+    const radiiRaw = Array.isArray(rec.radii_data) ? rec.radii_data : []
+    const ordered = orderRadiiByLlmNarrative(String(rec.agent_output ?? ''), radiiRaw)
+    const idx = typeof focusedRadiusPriorityIndex === 'number' ? focusedRadiusPriorityIndex : -1
+    const zones = idx === -1 ? ordered : ordered[idx] ? [ordered[idx]] : []
+
+    return all.filter((feature) => {
+      const coords = Array.isArray(feature.geometry?.coordinates) ? feature.geometry?.coordinates : null
+      const lon = coords ? tryParseNumber(coords[0]) : null
+      const lat = coords ? tryParseNumber(coords[1]) : null
+      if (lat == null || lon == null) return false
+      if (zones.length === 0) return false
+      if (idx === -1) return isPointInsideRecommendationRadii(lat, lon, recommendation)
+      return isPointInsideZone(lat, lon, zones[0])
+    })
+  }, [airbnbQuery.data, focusedRadiusPriorityIndex, recommendation])
 
   const apartmentTypeOptions = useMemo(() => {
     const set = new Set<string>()
@@ -295,38 +363,50 @@ export function PublicListingsPanel({
     })
   }, [airbnb, airbnbCapacityMin, airbnbNightPrice, airbnbRatingMin, searchQuery])
 
+  const tabs = visibleTabs ?? ['apartments', 'hotels', 'airbnb']
+  const defaultValue = defaultTab ?? tabs[0] ?? 'apartments'
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col" dir="rtl" lang="he">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden" dir="rtl" lang="he">
       <header className="px-3 pb-2 pt-3">
-        <h2 className="text-sm font-semibold text-card-foreground">מאגר מקומות לינה</h2>
+        <h2 className="text-sm font-semibold text-card-foreground">{headerTitle ?? 'מאגר מקומות לינה'}</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          אין משתמש מחובר — מציגים את כל הדירות, המלונות ונכסי ה-Airbnb.
+          {headerSubtitle ?? 'אין משתמש מחובר — מציגים את כל הדירות, המלונות ונכסי ה-Airbnb.'}
         </p>
       </header>
 
-      <Tabs defaultValue="apartments" className="flex min-h-0 flex-1 flex-col">
-        <TabsList className="mx-3 grid h-auto w-[calc(100%-1.5rem)] grid-cols-3 rounded-xl bg-muted/60 p-1">
-          <TabsTrigger
-            value="apartments"
-            className="text-xs text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm"
-          >
-            דירות
-          </TabsTrigger>
-          <TabsTrigger
-            value="hotels"
-            className="text-xs text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm"
-          >
-            מלונות
-          </TabsTrigger>
-          <TabsTrigger
-            value="airbnb"
-            className="text-xs text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm"
-          >
-            Airbnb
-          </TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue={defaultValue} className="flex min-h-0 flex-1 flex-col">
+        {tabs.length > 1 ? (
+          <TabsList className="mx-3 grid h-auto w-[calc(100%-1.5rem)] grid-cols-3 rounded-xl bg-muted/60 p-1">
+            {tabs.includes('apartments') ? (
+              <TabsTrigger
+                value="apartments"
+                className="text-xs text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm"
+              >
+                דירות
+              </TabsTrigger>
+            ) : null}
+            {tabs.includes('hotels') ? (
+              <TabsTrigger
+                value="hotels"
+                className="text-xs text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm"
+              >
+                מלונות
+              </TabsTrigger>
+            ) : null}
+            {tabs.includes('airbnb') ? (
+              <TabsTrigger
+                value="airbnb"
+                className="text-xs text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm"
+              >
+                Airbnb
+              </TabsTrigger>
+            ) : null}
+          </TabsList>
+        ) : null}
 
-        <TabsContent value="apartments" className="mt-0 min-h-0 flex-1 px-3 pb-4 pt-3 data-[state=inactive]:hidden">
+        {tabs.includes('apartments') ? (
+        <TabsContent value="apartments" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-3 pe-1 data-[state=inactive]:hidden">
           <div className="mb-3 space-y-2">
             <Input
               value={searchQuery}
@@ -452,8 +532,10 @@ export function PublicListingsPanel({
             </div>
           )}
         </TabsContent>
+        ) : null}
 
-        <TabsContent value="hotels" className="mt-0 min-h-0 flex-1 px-3 pb-4 pt-3 data-[state=inactive]:hidden">
+        {tabs.includes('hotels') ? (
+        <TabsContent value="hotels" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-3 pe-1 data-[state=inactive]:hidden">
           <div className="mb-3 space-y-2">
             <Input
               value={searchQuery}
@@ -550,8 +632,10 @@ export function PublicListingsPanel({
             </div>
           )}
         </TabsContent>
+        ) : null}
 
-        <TabsContent value="airbnb" className="mt-0 min-h-0 flex-1 px-3 pb-4 pt-3 data-[state=inactive]:hidden">
+        {tabs.includes('airbnb') ? (
+        <TabsContent value="airbnb" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-3 pe-1 data-[state=inactive]:hidden">
           <div className="mb-3 space-y-2">
             <Input
               value={searchQuery}
@@ -667,6 +751,7 @@ export function PublicListingsPanel({
             </div>
           )}
         </TabsContent>
+        ) : null}
       </Tabs>
     </div>
   )

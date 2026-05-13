@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import LeafletMap from './components/Map/LeafletMap'
 import { AppHeader } from './components/layout/AppHeader'
 import { MapSidebar } from './components/Sidebar/MapSidebar'
@@ -7,6 +7,7 @@ import UserBar from './components/UserBar'
 import { useClusterAssignments } from './hooks/useMapData'
 import { ThinkingState } from './components/Map/ThinkingState'
 import type { FocusedListing } from './components/Sidebar/PublicListingsPanel'
+import { RadiusLodgingsSidebar } from './components/Sidebar/RadiusLodgingsSidebar'
 
 const defaultLayerVisibility: LayerVisibility = {
   statisticalAreas: true,
@@ -47,6 +48,8 @@ export default function MapApp() {
   const [layerVisibility, setLayerVisibility] =
     useState<LayerVisibility>(defaultLayerVisibility)
   const [filters, setFilters] = useState<Record<string, unknown>>(defaultFilters)
+  const [radiusLodgingsOpen, setRadiusLodgingsOpen] = useState(false)
+  const [focusedRadiusPriorityIndex, setFocusedRadiusPriorityIndex] = useState<number>(0)
 
   const onRunClustering = useCallback(() => {
     void refetchClusterAssignments()
@@ -67,6 +70,12 @@ export default function MapApp() {
       [layerKey]: true,
     }))
   }, [])
+
+  useEffect(() => {
+    const hasRadii = (selectedRecommendation as { radii_data?: unknown[] } | null)?.radii_data?.length
+    setRadiusLodgingsOpen(Boolean(hasRadii))
+    if (hasRadii) setFocusedRadiusPriorityIndex(0)
+  }, [selectedRecommendation])
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
@@ -105,10 +114,26 @@ export default function MapApp() {
                   familyMacroClusterFocus={familyMacroClusterFocus}
                   focusLocation={focusLocation}
                   focusedListing={focusedListing}
+                  focusedRadiusPriorityIndex={focusedRadiusPriorityIndex}
+                  onFocusedRadiusPriorityIndexChange={setFocusedRadiusPriorityIndex}
                 />
               </div>
             </div>
           </div>
+
+          {(selectedRecommendation as { radii_data?: unknown[] } | null)?.radii_data?.length &&
+          radiusLodgingsOpen ? (
+            <div className="pointer-events-none absolute inset-y-6 right-6 z-40 flex w-[min(360px,40vw)]">
+              <div className="pointer-events-auto h-full w-full overflow-hidden">
+                <RadiusLodgingsSidebar
+                  recommendation={selectedRecommendation}
+                  onClose={() => setRadiusLodgingsOpen(false)}
+                  onFocusLocation={handleFocusLocation}
+                  focusedRadiusPriorityIndex={focusedRadiusPriorityIndex}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
