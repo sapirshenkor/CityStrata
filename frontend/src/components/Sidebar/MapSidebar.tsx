@@ -58,6 +58,7 @@ export function MapSidebar({
   const showCommunityTab = hasFullAccess
   const showFamilyRecommendationsTab = isVisitor || hasFullAccess
   const showCommunityRecommendationsTab = hasFullAccess
+  const showLodgingsTab = hasFullAccess
 
   const tabDefinitions = [
     {
@@ -67,6 +68,14 @@ export function MapSidebar({
       title: 'טופס פרופיל משפחה',
       label: 'משפחה',
       compact: false,
+    },
+    {
+      key: 'lodgings',
+      visible: showLodgingsTab,
+      value: 'lodgings',
+      title: 'דירות, מלונות ו-Airbnb',
+      label: 'מקומות לינה',
+      compact: true,
     },
     {
       key: 'community',
@@ -145,6 +154,16 @@ export function MapSidebar({
           <TabsContent value="form" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
             <ScrollArea className="h-full flex-1 px-3 pb-4 pt-3">
               <EvacueeProfileForm />
+            </ScrollArea>
+          </TabsContent>
+        ) : null}
+        {showLodgingsTab ? (
+          <TabsContent
+            value="lodgings"
+            className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+          >
+            <ScrollArea className="h-full flex-1 px-0 pb-4 pt-0">
+              <PublicListingsPanel onFocusLocation={onFocusLocation} />
             </ScrollArea>
           </TabsContent>
         ) : null}

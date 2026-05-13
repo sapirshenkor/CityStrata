@@ -1,8 +1,9 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAirbnbListings, useHotels, usePropertyListings } from '@/hooks/useMapData'
+import { Input } from '@/components/ui/input'
 
 export type MapFocusLocation = {
   latitude: number
@@ -14,6 +15,8 @@ export type FocusedListing =
   | { kind: 'apartments'; latitude: number; longitude: number; id?: string | null }
   | { kind: 'hotels'; latitude: number; longitude: number; uuid?: string | null }
   | { kind: 'airbnb'; latitude: number; longitude: number; uuid?: string | null }
+
+type NumberRange = { min: number | null; max: number | null }
 
 function formatMoney(value: unknown) {
   const n = typeof value === 'number' ? value : Number(value)
@@ -85,6 +88,31 @@ function tryParseNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+function normalizeQuery(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function matchesSearch(parts: string[], query: string) {
+  const q = normalizeQuery(query)
+  if (!q) return true
+  const hay = parts.filter(Boolean).join(' ').toLowerCase()
+  return hay.includes(q)
+}
+
+function inRange(value: number | null, range: NumberRange) {
+  if (value == null) return false
+  if (range.min != null && value < range.min) return false
+  if (range.max != null && value > range.max) return false
+  return true
+}
+
+function parseNullableNumber(raw: string): number | null {
+  const s = raw.trim()
+  if (!s) return null
+  const n = Number(s)
+  return Number.isFinite(n) ? n : null
+}
+
 function ClickableCard({
   children,
   onClick,
@@ -120,6 +148,21 @@ export function PublicListingsPanel({
   const hotelsQuery = useHotels()
   const airbnbQuery = useAirbnbListings()
 
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const [apartmentMonthlyPrice, setApartmentMonthlyPrice] = useState<NumberRange>({
+    min: null,
+    max: null,
+  })
+  const [apartmentType, setApartmentType] = useState<string>('all')
+
+  const [hotelType, setHotelType] = useState<string>('all')
+  const [hotelRatingMin, setHotelRatingMin] = useState<number | null>(null)
+
+  const [airbnbNightPrice, setAirbnbNightPrice] = useState<NumberRange>({ min: null, max: null })
+  const [airbnbCapacityMin, setAirbnbCapacityMin] = useState<number | null>(null)
+  const [airbnbRatingMin, setAirbnbRatingMin] = useState<number | null>(null)
+
   const apartments = useMemo(() => {
     if (!Array.isArray(apartmentsQuery.data)) return []
     return apartmentsQuery.data as Array<Record<string, unknown>>
@@ -136,6 +179,121 @@ export function PublicListingsPanel({
     if (!fc?.features || !Array.isArray(fc.features)) return []
     return fc.features as Array<{ geometry?: { coordinates?: unknown[] }; properties?: Record<string, unknown> }>
   }, [airbnbQuery.data])
+
+  const apartmentTypeOptions = useMemo(() => {
+    const set = new Set<string>()
+    apartments.forEach((l) => {
+      const v = safeString(l.property_type_other) || safeString(l.property_type)
+      if (v) set.add(v)
+    })
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'he'))
+  }, [apartments])
+
+  const hotelTypeOptions = useMemo(() => {
+    const set = new Set<string>()
+    hotels.forEach((f) => {
+      const v = safeString(f.properties?.type)
+      if (v) set.add(v)
+    })
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'he'))
+  }, [hotels])
+
+  const filteredApartments = useMemo(() => {
+    const q = searchQuery
+    const typeFilter = apartmentType
+    const priceFilter = apartmentMonthlyPrice
+
+    const hasPriceConstraint = priceFilter.min != null || priceFilter.max != null
+
+    return apartments.filter((listing) => {
+      const lat = tryParseNumber(listing.latitude)
+      const lon = tryParseNumber(listing.longitude)
+      const typeLabel = safeString(listing.property_type_other) || safeString(listing.property_type)
+
+      if (typeFilter !== 'all' && typeLabel !== typeFilter) return false
+
+      if (
+        !matchesSearch(
+          [
+            safeString(listing.publisher_name),
+            typeLabel,
+            safeString(listing.city),
+            safeString(listing.neighborhood),
+            safeString(listing.street),
+            safeString(listing.house_number),
+            safeString(listing.phone_number),
+            lat != null && lon != null ? `${lat},${lon}` : '',
+          ],
+          q,
+        )
+      ) {
+        return false
+      }
+
+      if (!hasPriceConstraint) return true
+
+      const units = Array.isArray(listing.units) ? (listing.units as Array<Record<string, unknown>>) : []
+      const unitPrices = units.map((u) => tryParseNumber(u?.monthly_price)).filter((n): n is number => n != null)
+      if (unitPrices.length === 0) return false
+      return unitPrices.some((p) => inRange(p, priceFilter))
+    })
+  }, [apartments, apartmentMonthlyPrice, apartmentType, searchQuery])
+
+  const filteredHotels = useMemo(() => {
+    const q = searchQuery
+    const typeFilter = hotelType
+    const ratingMin = hotelRatingMin
+
+    return hotels.filter((feature) => {
+      const props = feature.properties ?? {}
+      const t = safeString(props.type)
+      const rating = tryParseNumber(props.rating_value)
+      if (typeFilter !== 'all' && t !== typeFilter) return false
+      if (ratingMin != null && (rating == null || rating < ratingMin)) return false
+
+      return matchesSearch(
+        [
+          safeString(props.name),
+          t,
+          safeString(props.location_fulladdress),
+          safeString(props.stat_2022),
+          safeString(props.url),
+        ],
+        q,
+      )
+    })
+  }, [hotels, hotelRatingMin, hotelType, searchQuery])
+
+  const filteredAirbnb = useMemo(() => {
+    const q = searchQuery
+    const price = airbnbNightPrice
+    const capMin = airbnbCapacityMin
+    const ratingMin = airbnbRatingMin
+
+    const hasPriceConstraint = price.min != null || price.max != null
+
+    return airbnb.filter((feature) => {
+      const props = feature.properties ?? {}
+      const p = tryParseNumber(props.price_per_night)
+      const cap = tryParseNumber(props.person_capacity)
+      const rating = tryParseNumber(props.rating_value)
+
+      if (hasPriceConstraint && !inRange(p, price)) return false
+      if (capMin != null && (cap == null || cap < capMin)) return false
+      if (ratingMin != null && (rating == null || rating < ratingMin)) return false
+
+      return matchesSearch(
+        [
+          safeString(props.title),
+          safeString(props.stat_2022),
+          safeString(props.url),
+          cap != null ? `capacity ${cap}` : '',
+          rating != null ? `rating ${rating}` : '',
+        ],
+        q,
+      )
+    })
+  }, [airbnb, airbnbCapacityMin, airbnbNightPrice, airbnbRatingMin, searchQuery])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" dir="rtl" lang="he">
@@ -169,15 +327,59 @@ export function PublicListingsPanel({
         </TabsList>
 
         <TabsContent value="apartments" className="mt-0 min-h-0 flex-1 px-3 pb-4 pt-3 data-[state=inactive]:hidden">
+          <div className="mb-3 space-y-2">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="חיפוש חופשי…"
+              aria-label="חיפוש"
+              className="h-9"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                inputMode="numeric"
+                value={apartmentMonthlyPrice.min ?? ''}
+                onChange={(e) =>
+                  setApartmentMonthlyPrice((prev) => ({ ...prev, min: parseNullableNumber(e.target.value) }))
+                }
+                placeholder="מינ׳ מחיר חודשי"
+                aria-label="מינימום מחיר חודשי"
+                className="h-9"
+              />
+              <Input
+                inputMode="numeric"
+                value={apartmentMonthlyPrice.max ?? ''}
+                onChange={(e) =>
+                  setApartmentMonthlyPrice((prev) => ({ ...prev, max: parseNullableNumber(e.target.value) }))
+                }
+                placeholder="מקס׳ מחיר חודשי"
+                aria-label="מקסימום מחיר חודשי"
+                className="h-9"
+              />
+              <select
+                value={apartmentType}
+                onChange={(e) => setApartmentType(e.target.value)}
+                aria-label="סוג נכס"
+                className="col-span-2 h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="all">כל הסוגים</option>
+                {apartmentTypeOptions.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           {apartmentsQuery.loading ? (
             <LoadingBlock title="דירות" />
           ) : apartmentsQuery.error ? (
             <ErrorBlock title="דירות" message={apartmentsQuery.error} />
-          ) : apartments.length === 0 ? (
+          ) : filteredApartments.length === 0 ? (
             <EmptyState title="דירות" detail="לא נמצאו דירות להצגה." />
           ) : (
             <div className="space-y-3">
-              {apartments.map((listing) => {
+              {filteredApartments.map((listing) => {
                 const id = safeString(listing.id ?? listing.uuid ?? listing.listing_id ?? listing.created_at)
                 const title = safeString(listing.publisher_name) || 'דירה'
                 const propertyType = safeString(listing.property_type_other) || safeString(listing.property_type)
@@ -252,15 +454,48 @@ export function PublicListingsPanel({
         </TabsContent>
 
         <TabsContent value="hotels" className="mt-0 min-h-0 flex-1 px-3 pb-4 pt-3 data-[state=inactive]:hidden">
+          <div className="mb-3 space-y-2">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="חיפוש חופשי…"
+              aria-label="חיפוש"
+              className="h-9"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                inputMode="numeric"
+                value={hotelRatingMin ?? ''}
+                onChange={(e) => setHotelRatingMin(parseNullableNumber(e.target.value))}
+                placeholder="דירוג מינ׳"
+                aria-label="דירוג מינימום"
+                className="h-9"
+              />
+              <div />
+              <select
+                value={hotelType}
+                onChange={(e) => setHotelType(e.target.value)}
+                aria-label="סוג מלון"
+                className="col-span-2 h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="all">כל הסוגים</option>
+                {hotelTypeOptions.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           {hotelsQuery.loading ? (
             <LoadingBlock title="מלונות" />
           ) : hotelsQuery.error ? (
             <ErrorBlock title="מלונות" message={hotelsQuery.error} />
-          ) : hotels.length === 0 ? (
+          ) : filteredHotels.length === 0 ? (
             <EmptyState title="מלונות" detail="לא נמצאו מלונות להצגה." />
           ) : (
             <div className="space-y-3">
-              {hotels.map((feature) => {
+              {filteredHotels.map((feature) => {
                 const props = feature.properties ?? {}
                 const uuid = safeString(props.uuid)
                 const name = safeString(props.name) || 'מלון'
@@ -317,15 +552,62 @@ export function PublicListingsPanel({
         </TabsContent>
 
         <TabsContent value="airbnb" className="mt-0 min-h-0 flex-1 px-3 pb-4 pt-3 data-[state=inactive]:hidden">
+          <div className="mb-3 space-y-2">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="חיפוש חופשי…"
+              aria-label="חיפוש"
+              className="h-9"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                inputMode="numeric"
+                value={airbnbNightPrice.min ?? ''}
+                onChange={(e) =>
+                  setAirbnbNightPrice((prev) => ({ ...prev, min: parseNullableNumber(e.target.value) }))
+                }
+                placeholder="מינ׳ מחיר ללילה"
+                aria-label="מינימום מחיר ללילה"
+                className="h-9"
+              />
+              <Input
+                inputMode="numeric"
+                value={airbnbNightPrice.max ?? ''}
+                onChange={(e) =>
+                  setAirbnbNightPrice((prev) => ({ ...prev, max: parseNullableNumber(e.target.value) }))
+                }
+                placeholder="מקס׳ מחיר ללילה"
+                aria-label="מקסימום מחיר ללילה"
+                className="h-9"
+              />
+              <Input
+                inputMode="numeric"
+                value={airbnbCapacityMin ?? ''}
+                onChange={(e) => setAirbnbCapacityMin(parseNullableNumber(e.target.value))}
+                placeholder="קיבולת מינ׳"
+                aria-label="קיבולת מינימום"
+                className="h-9"
+              />
+              <Input
+                inputMode="numeric"
+                value={airbnbRatingMin ?? ''}
+                onChange={(e) => setAirbnbRatingMin(parseNullableNumber(e.target.value))}
+                placeholder="דירוג מינ׳"
+                aria-label="דירוג מינימום"
+                className="h-9"
+              />
+            </div>
+          </div>
           {airbnbQuery.loading ? (
             <LoadingBlock title="Airbnb" />
           ) : airbnbQuery.error ? (
             <ErrorBlock title="Airbnb" message={airbnbQuery.error} />
-          ) : airbnb.length === 0 ? (
+          ) : filteredAirbnb.length === 0 ? (
             <EmptyState title="Airbnb" detail="לא נמצאו נכסי Airbnb להצגה." />
           ) : (
             <div className="space-y-3">
-              {airbnb.map((feature) => {
+              {filteredAirbnb.map((feature) => {
                 const props = feature.properties ?? {}
                 const uuid = safeString(props.uuid)
                 const title = safeString(props.title) || 'נכס Airbnb'
