@@ -1,0 +1,17 @@
+[run]
+source = app
+branch = False
+omit =
+    app/__init__.py
+    */__init__.py
+
+[report]
+precision = 1
+show_missing = True
+skip_covered = False
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+
+[html]
+directory = htmlcov
