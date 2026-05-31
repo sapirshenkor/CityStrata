@@ -24,9 +24,7 @@ from app.models.property_listing import (
 
 router = APIRouter(prefix="/property-listings", tags=["property-listings"])
 _geolocator = Nominatim(user_agent="citystrata_geocoder")
-_GEOCODE_ERROR_DETAIL = (
-    "Could not resolve address to coordinates. Please provide coordinates or check the address."
-)
+_GEOCODE_ERROR_DETAIL = "Could not resolve address to coordinates. Please provide coordinates or check the address."
 
 _LISTING_SELECT = """
     pl.id, pl.municipality_user_id, pl.property_type, pl.property_type_other,
@@ -36,7 +34,9 @@ _LISTING_SELECT = """
     ST_X(pl.location::geometry) AS longitude,
     pl.publisher_name, pl.phone_number,
     pl.created_at, pl.updated_at
-""".replace("\n", " ").strip()
+""".replace(
+    "\n", " "
+).strip()
 
 _LISTING_RETURNING = """
     id, municipality_user_id, property_type, property_type_other,
@@ -46,7 +46,9 @@ _LISTING_RETURNING = """
     ST_X(location::geometry) AS longitude,
     publisher_name, phone_number,
     created_at, updated_at
-""".replace("\n", " ").strip()
+""".replace(
+    "\n", " "
+).strip()
 
 _UNIT_SELECT = """
     u.id, u.listing_id, u.floor, u.rooms, u.bathrooms,
@@ -56,14 +58,18 @@ _UNIT_SELECT = """
     u.has_mamad, u.has_mamak, u.has_building_shelter, u.has_storage,
     u.built_sqm, u.monthly_price, u.rental_period, u.is_occupied, u.description,
     u.created_at, u.updated_at
-""".replace("\n", " ").strip()
+""".replace(
+    "\n", " "
+).strip()
 
 
 def _is_missing_coordinate(value: float | None) -> bool:
     return value is None or value == 0
 
 
-async def _geocode_address(city: str, street: str, house_number: str) -> tuple[float, float]:
+async def _geocode_address(
+    city: str, street: str, house_number: str
+) -> tuple[float, float]:
     address = f"{street} {house_number}, {city}, Israel"
 
     def _lookup():
@@ -113,7 +119,9 @@ def _map_unit(row: asyncpg.Record) -> PropertyListingUnitRead:
     )
 
 
-def _map_listing(row: asyncpg.Record, units: list[PropertyListingUnitRead]) -> PropertyListingRead:
+def _map_listing(
+    row: asyncpg.Record, units: list[PropertyListingUnitRead]
+) -> PropertyListingRead:
     return PropertyListingRead(
         id=row["id"],
         municipality_user_id=row["municipality_user_id"],
@@ -221,7 +229,9 @@ async def _fetch_listing_by_id(
     return _map_listing(row, units_by_listing.get(listing_id, []))
 
 
-@router.post("", response_model=PropertyListingRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=PropertyListingRead, status_code=status.HTTP_201_CREATED
+)
 async def create_property_listing(
     body: PropertyListingCreate,
     current: Annotated[MunicipalityUserRecord, Depends(get_current_user)],
@@ -272,7 +282,9 @@ async def create_property_listing(
                 await _insert_units(conn, listing_id, body.units)
                 created = await _fetch_listing_by_id(conn, listing_id)
                 if created is None:
-                    raise HTTPException(status_code=500, detail="Failed to fetch created listing")
+                    raise HTTPException(
+                        status_code=500, detail="Failed to fetch created listing"
+                    )
                 return created
     except HTTPException:
         raise
@@ -291,7 +303,10 @@ async def list_property_listings(
     has_geo_filter = (
         latitude is not None and longitude is not None and distance_meters is not None
     )
-    if any(v is not None for v in (latitude, longitude, distance_meters)) and not has_geo_filter:
+    if (
+        any(v is not None for v in (latitude, longitude, distance_meters))
+        and not has_geo_filter
+    ):
         raise HTTPException(
             status_code=400,
             detail="latitude, longitude, and distance_meters must be provided together",
@@ -430,7 +445,9 @@ async def get_property_listing(
         async with pool.acquire() as conn:
             listing = await _fetch_listing_by_id(conn, listing_id)
             if listing is None:
-                raise HTTPException(status_code=404, detail="Property listing not found")
+                raise HTTPException(
+                    status_code=404, detail="Property listing not found"
+                )
             return listing
     except HTTPException:
         raise
@@ -469,7 +486,9 @@ async def update_property_listing(
                     listing_id,
                 )
                 if existing is None:
-                    raise HTTPException(status_code=404, detail="Property listing not found")
+                    raise HTTPException(
+                        status_code=404, detail="Property listing not found"
+                    )
                 if existing["municipality_user_id"] != current.id:
                     raise HTTPException(
                         status_code=403,
@@ -504,7 +523,9 @@ async def update_property_listing(
                 coordinates_provided = "latitude" in data or "longitude" in data
                 resolved_city = data.get("city", existing["city"])
                 resolved_street = data.get("street", existing["street"])
-                resolved_house_number = data.get("house_number", existing["house_number"])
+                resolved_house_number = data.get(
+                    "house_number", existing["house_number"]
+                )
 
                 resolved_latitude: float | None = None
                 resolved_longitude: float | None = None
@@ -517,14 +538,18 @@ async def update_property_listing(
                     )
                 elif coordinates_provided:
                     candidate_latitude = (
-                        data["latitude"] if "latitude" in data else float(existing["latitude"])
+                        data["latitude"]
+                        if "latitude" in data
+                        else float(existing["latitude"])
                     )
                     candidate_longitude = (
-                        data["longitude"] if "longitude" in data else float(existing["longitude"])
+                        data["longitude"]
+                        if "longitude" in data
+                        else float(existing["longitude"])
                     )
-                    if _is_missing_coordinate(candidate_latitude) or _is_missing_coordinate(
-                        candidate_longitude
-                    ):
+                    if _is_missing_coordinate(
+                        candidate_latitude
+                    ) or _is_missing_coordinate(candidate_longitude):
                         resolved_latitude, resolved_longitude = await _geocode_address(
                             city=resolved_city,
                             street=resolved_street,
@@ -534,10 +559,7 @@ async def update_property_listing(
                         resolved_latitude = float(candidate_latitude)
                         resolved_longitude = float(candidate_longitude)
 
-                if (
-                    resolved_latitude is not None
-                    and resolved_longitude is not None
-                ):
+                if resolved_latitude is not None and resolved_longitude is not None:
                     p_lon = add_arg(resolved_longitude)
                     p_lat = add_arg(resolved_latitude)
                     set_parts.append(
@@ -561,11 +583,17 @@ async def update_property_listing(
                         "DELETE FROM public.property_listing_units WHERE listing_id = $1",
                         listing_id,
                     )
-                    await _insert_units(conn, listing_id, [PropertyListingUnitCreate(**u) for u in units_data])
+                    await _insert_units(
+                        conn,
+                        listing_id,
+                        [PropertyListingUnitCreate(**u) for u in units_data],
+                    )
 
                 updated = await _fetch_listing_by_id(conn, listing_id)
                 if updated is None:
-                    raise HTTPException(status_code=500, detail="Failed to fetch updated listing")
+                    raise HTTPException(
+                        status_code=500, detail="Failed to fetch updated listing"
+                    )
                 return updated
     except HTTPException:
         raise
@@ -590,7 +618,9 @@ async def delete_property_listing(
                 listing_id,
             )
             if existing is None:
-                raise HTTPException(status_code=404, detail="Property listing not found")
+                raise HTTPException(
+                    status_code=404, detail="Property listing not found"
+                )
             if existing["municipality_user_id"] != current.id:
                 raise HTTPException(
                     status_code=403,
@@ -602,7 +632,9 @@ async def delete_property_listing(
                 listing_id,
             )
             if result == "DELETE 0":
-                raise HTTPException(status_code=404, detail="Property listing not found")
+                raise HTTPException(
+                    status_code=404, detail="Property listing not found"
+                )
             return None
     except HTTPException:
         raise
