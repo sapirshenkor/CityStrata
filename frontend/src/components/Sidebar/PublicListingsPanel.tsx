@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAirbnbListings, useHotels, usePropertyListings } from '@/hooks/useMapData'
 import { Input } from '@/components/ui/input'
@@ -370,16 +371,16 @@ export function PublicListingsPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden" dir="rtl" lang="he">
-      <header className="px-3 pb-2 pt-3">
+      <header className="shrink-0 px-3 pb-2 pt-3">
         <h2 className="text-sm font-semibold text-card-foreground">{headerTitle ?? 'מאגר מקומות לינה'}</h2>
         <p className="mt-1 text-xs text-muted-foreground">
           {headerSubtitle ?? 'אין משתמש מחובר — מציגים את כל הדירות, המלונות ונכסי ה-Airbnb.'}
         </p>
       </header>
 
-      <Tabs defaultValue={defaultValue} className="flex min-h-0 flex-1 flex-col">
+      <Tabs defaultValue={defaultValue} className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {tabs.length > 1 ? (
-          <TabsList className="mx-3 grid h-auto w-[calc(100%-1.5rem)] grid-cols-3 rounded-xl bg-muted/60 p-1">
+          <TabsList className="mx-3 grid h-auto w-[calc(100%-1.5rem)] shrink-0 grid-cols-3 rounded-xl bg-muted/60 p-1">
             {tabs.includes('apartments') ? (
               <TabsTrigger
                 value="apartments"
@@ -408,8 +409,11 @@ export function PublicListingsPanel({
         ) : null}
 
         {tabs.includes('apartments') ? (
-        <TabsContent value="apartments" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-3 pe-1 data-[state=inactive]:hidden">
-          <div className="mb-3 space-y-2">
+        <TabsContent
+          value="apartments"
+          className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+        >
+          <div className="shrink-0 space-y-2 px-3 pb-3 pt-3">
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -453,6 +457,8 @@ export function PublicListingsPanel({
               </select>
             </div>
           </div>
+          <ScrollArea className="min-h-0 flex-1 pe-1">
+            <div className="space-y-3 px-3 pb-4">
           {apartmentsQuery.loading ? (
             <LoadingBlock title="דירות" />
           ) : apartmentsQuery.error ? (
@@ -460,7 +466,7 @@ export function PublicListingsPanel({
           ) : filteredApartments.length === 0 ? (
             <EmptyState title="דירות" detail="לא נמצאו דירות להצגה." />
           ) : (
-            <div className="space-y-3">
+            <>
               {filteredApartments.map((listing) => {
                 const id = safeString(listing.id ?? listing.uuid ?? listing.listing_id ?? listing.created_at)
                 const title = safeString(listing.publisher_name) || 'דירה'
@@ -531,14 +537,16 @@ export function PublicListingsPanel({
                   </ClickableCard>
                 )
               })}
-            </div>
+            </>
           )}
+            </div>
+          </ScrollArea>
         </TabsContent>
         ) : null}
 
         {tabs.includes('hotels') ? (
-        <TabsContent value="hotels" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-3 pe-1 data-[state=inactive]:hidden">
-          <div className="mb-3 space-y-2">
+        <TabsContent value="hotels" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+          <div className="shrink-0 space-y-2 px-3 pb-3 pt-3">
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -571,6 +579,8 @@ export function PublicListingsPanel({
               </select>
             </div>
           </div>
+          <ScrollArea className="min-h-0 flex-1 pe-1">
+            <div className="space-y-3 px-3 pb-4">
           {hotelsQuery.loading ? (
             <LoadingBlock title="מלונות" />
           ) : hotelsQuery.error ? (
@@ -578,7 +588,7 @@ export function PublicListingsPanel({
           ) : filteredHotels.length === 0 ? (
             <EmptyState title="מלונות" detail="לא נמצאו מלונות להצגה." />
           ) : (
-            <div className="space-y-3">
+            <>
               {filteredHotels.map((feature) => {
                 const props = feature.properties ?? {}
                 const uuid = safeString(props.uuid)
@@ -631,14 +641,16 @@ export function PublicListingsPanel({
                   </ClickableCard>
                 )
               })}
-            </div>
+            </>
           )}
+            </div>
+          </ScrollArea>
         </TabsContent>
         ) : null}
 
         {tabs.includes('airbnb') ? (
-        <TabsContent value="airbnb" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-3 pe-1 data-[state=inactive]:hidden">
-          <div className="mb-3 space-y-2">
+        <TabsContent value="airbnb" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+          <div className="shrink-0 space-y-2 px-3 pb-3 pt-3">
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -685,6 +697,8 @@ export function PublicListingsPanel({
               />
             </div>
           </div>
+          <ScrollArea className="min-h-0 flex-1 pe-1">
+            <div className="space-y-3 px-3 pb-4">
           {airbnbQuery.loading ? (
             <LoadingBlock title="Airbnb" />
           ) : airbnbQuery.error ? (
@@ -692,7 +706,7 @@ export function PublicListingsPanel({
           ) : filteredAirbnb.length === 0 ? (
             <EmptyState title="Airbnb" detail="לא נמצאו נכסי Airbnb להצגה." />
           ) : (
-            <div className="space-y-3">
+            <>
               {filteredAirbnb.map((feature) => {
                 const props = feature.properties ?? {}
                 const uuid = safeString(props.uuid)
@@ -750,8 +764,10 @@ export function PublicListingsPanel({
                   </ClickableCard>
                 )
               })}
-            </div>
+            </>
           )}
+            </div>
+          </ScrollArea>
         </TabsContent>
         ) : null}
       </Tabs>

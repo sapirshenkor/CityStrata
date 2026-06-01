@@ -31,8 +31,7 @@ export function RadiusLodgingsSidebar({
         </Button>
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
-        <div className="flex min-h-0 flex-1 flex-col">
-          <PublicListingsPanel
+        <PublicListingsPanel
             recommendation={recommendation}
             onFocusLocation={onFocusLocation}
             headerTitle="מקומות לינה"
@@ -41,7 +40,6 @@ export function RadiusLodgingsSidebar({
             defaultTab="apartments"
             focusedRadiusPriorityIndex={focusedRadiusPriorityIndex}
           />
-        </div>
       </CardContent>
     </Card>
   )
