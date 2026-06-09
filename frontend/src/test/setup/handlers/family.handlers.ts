@@ -1,7 +1,8 @@
 import { http, HttpResponse } from 'msw'
+import { API_BASE_URL } from '@/config/apiBaseUrl'
 import { makeFamilyProfileResponse } from '../fixtures/familyProfiles'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = API_BASE_URL
 
 export const familyHandlers = [
   http.get(`${API_BASE}/api/family/me/profiles`, () => {

@@ -1,11 +1,12 @@
 import { http, HttpResponse } from 'msw'
+import { API_BASE_URL } from '@/config/apiBaseUrl'
 import {
   makeEmptyFeatureCollection,
   makeStatisticalAreaSummary,
   makeStatisticalAreasCollection,
 } from '../fixtures/geojson'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = API_BASE_URL
 
 export const mapHandlers = [
   http.get(`${API_BASE}/api/statistical-areas`, () => {

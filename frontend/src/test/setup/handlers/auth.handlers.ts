@@ -1,7 +1,8 @@
 import { http, HttpResponse } from 'msw'
+import { API_BASE_URL } from '@/config/apiBaseUrl'
 import { makeAuthUser, makeLoginResponse, TEST_ACCESS_TOKEN } from '../fixtures/users'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = API_BASE_URL
 
 export const authHandlers = [
   http.get(`${API_BASE}/api/auth/me`, () => {

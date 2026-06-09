@@ -27,15 +27,19 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS: `allow_origins=["*"]` with `allow_credentials=True` is disallowed; browsers/Starlette
-    # can omit Access-Control-Allow-Origin on 4xx, so the frontend sees a "network" error. The
-    # frontend (axios) does not use withCredentials, so we use allow_credentials=False; then
-    # wildcard origins are valid. This also covers all dev hostnames: localhost, 127.0.0.1, ::1, LAN.
-    #
-    # Set CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173 to restrict, and
-    # CORS_WITH_CREDENTIALS=1 if you need cookies (cannot use * with that).
-    _cors = os.environ.get("CORS_ORIGINS", "*").strip()
-    if _cors == "*":
+    # CORS: axios does not use withCredentials, so allow_credentials=False.
+    # Vercel preview/production hosts match allow_origin_regex; local Vite/React dev ports are explicit.
+    # Set CORS_EXTRA_ORIGINS=https://citystrata.example.com for custom frontend domains.
+    # Set CORS_ALLOW_ALL=1 only for unrestricted local debugging (not for production).
+    _default_origins = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ]
+    _extra = os.environ.get("CORS_EXTRA_ORIGINS", "").strip()
+    if _extra:
+        _default_origins.extend(o.strip() for o in _extra.split(",") if o.strip())
+
+    if os.environ.get("CORS_ALLOW_ALL", "0") == "1":
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
@@ -44,12 +48,11 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
     else:
-        _origins = [o.strip() for o in _cors.split(",") if o.strip()]
-        _cred = os.environ.get("CORS_WITH_CREDENTIALS", "0") == "1"
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=_origins,
-            allow_credentials=_cred,
+            allow_origins=_default_origins,
+            allow_origin_regex=r"https://.*\.vercel\.app",
+            allow_credentials=False,
             allow_methods=["*"],
             allow_headers=["*"],
         )
@@ -61,3 +64,10 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)

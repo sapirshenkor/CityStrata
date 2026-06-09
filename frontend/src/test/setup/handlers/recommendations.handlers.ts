@@ -1,11 +1,12 @@
 import { http, HttpResponse, delay } from 'msw'
+import { API_BASE_URL } from '@/config/apiBaseUrl'
 import {
   makeMatchingResult,
   makeOverviewFixture,
   makeTacticalRecommendation,
 } from '../fixtures/recommendations'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = API_BASE_URL
 
 export const recommendationsHandlers = [
   http.get(`${API_BASE}/api/recommendations/overview`, () => {

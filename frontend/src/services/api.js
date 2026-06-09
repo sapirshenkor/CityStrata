@@ -1,11 +1,10 @@
 import axios from 'axios'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { API_BASE_URL } from '@/config/apiBaseUrl'
 
 const TOKEN_KEY = 'citystrata_access_token'
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },

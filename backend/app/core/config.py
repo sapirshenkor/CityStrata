@@ -6,6 +6,8 @@ It uses pydantic-settings to load the configuration from the .env file.
 The configuration is used to configure the application.
 """
 from pathlib import Path
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Look for .env file in project root (parent of backend directory)
@@ -27,9 +29,17 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # supabase API credentials
+    # supabase API credentials (DATABASE_URL must be set in the environment on Render)
     ENV: str = "dev"
     DATABASE_URL: str
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        """Render/Supabase sometimes provide postgres://; asyncpg expects postgresql://."""
+        if isinstance(value, str) and value.startswith("postgres://"):
+            return "postgresql://" + value[len("postgres://") :]
+        return value
     SUPABASE_URL: str
     SUPABASE_ANON_KEY: str
     SUPABASE_SERVICE_ROLE_KEY: str
