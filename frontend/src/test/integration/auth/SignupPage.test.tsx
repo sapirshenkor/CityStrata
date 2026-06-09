@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
+import { API_BASE_URL } from '@/config/apiBaseUrl'
 import SignupPage from '@/pages/SignupPage'
 import { TEST_ACCESS_TOKEN } from '@/test/setup/handlers/auth.handlers'
 import { server } from '@/test/setup/server'
@@ -58,7 +59,7 @@ describe('SignupPage integration', () => {
 
   it('shows API validation errors from FastAPI detail arrays', async () => {
     server.use(
-      http.post('http://localhost:8000/api/auth/signup', () =>
+      http.post(`${API_BASE_URL}/api/auth/signup`, () =>
         HttpResponse.json(
           { detail: [{ msg: 'דוא"ל כבר קיים במערכת' }] },
           { status: 422 },
@@ -81,11 +82,11 @@ describe('SignupPage integration', () => {
 
   it('shows submitting state while signup and auto-login are in progress', async () => {
     server.use(
-      http.post('http://localhost:8000/api/auth/signup', async () => {
+      http.post(`${API_BASE_URL}/api/auth/signup`, async () => {
         await delay(80)
         return HttpResponse.json({ id: '11111111-1111-4111-8111-111111111111' }, { status: 201 })
       }),
-      http.post('http://localhost:8000/api/auth/login', async () => {
+      http.post(`${API_BASE_URL}/api/auth/login`, async () => {
         await delay(80)
         return HttpResponse.json({
           access_token: TEST_ACCESS_TOKEN,

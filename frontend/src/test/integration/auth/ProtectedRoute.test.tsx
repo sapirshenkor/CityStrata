@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import { Route, Routes, useLocation } from 'react-router-dom'
+import { API_BASE_URL } from '@/config/apiBaseUrl'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { meHandlerAs, TEST_ACCESS_TOKEN } from '@/test/setup/handlers/auth.handlers'
 import { makeAuthUser, makeVisitorUser } from '@/test/setup/fixtures/users'
@@ -41,7 +42,7 @@ function ProtectedFixture() {
 describe('ProtectedRoute', () => {
   it('shows the loading state while auth bootstrap is in progress', async () => {
     server.use(
-      http.get('http://localhost:8000/api/auth/me', async () => {
+      http.get(`${API_BASE_URL}/api/auth/me`, async () => {
         await delay(50)
         return HttpResponse.json({ detail: 'Not authenticated' }, { status: 401 })
       }),

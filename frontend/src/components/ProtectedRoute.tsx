@@ -4,10 +4,21 @@
  * Example (future):
  *   <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
  */
+import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-export default function ProtectedRoute({ children, allowedRoles = null, redirectTo = '/map' }) {
+interface ProtectedRouteProps {
+  children: ReactNode
+  allowedRoles?: string[] | null
+  redirectTo?: string
+}
+
+export default function ProtectedRoute({
+  children,
+  allowedRoles = null,
+  redirectTo = '/map',
+}: ProtectedRouteProps) {
   const { user, loading } = useAuth()
   const location = useLocation()
 

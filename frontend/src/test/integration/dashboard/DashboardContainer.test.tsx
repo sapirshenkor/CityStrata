@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { API_BASE_URL } from '@/config/apiBaseUrl'
 import DashboardContainer from '@/user_dashboard/DashboardContainer'
 import {
   makeEmptyFeatureCollection,
@@ -40,7 +41,7 @@ vi.mock('@/user_dashboard/MapView', () => ({
 describe('DashboardContainer integration', () => {
   it('renders KPI values after dashboard data loads', async () => {
     server.use(
-      http.get('http://localhost:8000/api/statistical-areas', () =>
+      http.get(`${API_BASE_URL}/api/statistical-areas`, () =>
         HttpResponse.json(makeStatisticalAreasCollection(1)),
       ),
     )
@@ -57,7 +58,7 @@ describe('DashboardContainer integration', () => {
 
   it('shows ApiErrorBanner with retry when metrics fetch fails', async () => {
     server.use(
-      http.get('http://localhost:8000/api/hotels', () =>
+      http.get(`${API_BASE_URL}/api/hotels`, () =>
         HttpResponse.json({ detail: 'שגיאת שרת במלונות' }, { status: 500 }),
       ),
     )
@@ -73,7 +74,7 @@ describe('DashboardContainer integration', () => {
     let hotelsCalls = 0
 
     server.use(
-      http.get('http://localhost:8000/api/hotels', () => {
+      http.get(`${API_BASE_URL}/api/hotels`, () => {
         hotelsCalls += 1
         if (hotelsCalls === 1) {
           return HttpResponse.json({ detail: 'שגיאה זמנית' }, { status: 500 })
@@ -94,7 +95,7 @@ describe('DashboardContainer integration', () => {
 
   it('shows map error alert in MapView when areas fetch fails', async () => {
     server.use(
-      http.get('http://localhost:8000/api/statistical-areas', () =>
+      http.get(`${API_BASE_URL}/api/statistical-areas`, () =>
         HttpResponse.json({ detail: 'שגיאת גבולות' }, { status: 500 }),
       ),
     )
@@ -106,7 +107,7 @@ describe('DashboardContainer integration', () => {
 
   it('shows empty insights messaging when no statistical areas exist', async () => {
     server.use(
-      http.get('http://localhost:8000/api/statistical-areas', () =>
+      http.get(`${API_BASE_URL}/api/statistical-areas`, () =>
         HttpResponse.json(makeEmptyFeatureCollection()),
       ),
     )

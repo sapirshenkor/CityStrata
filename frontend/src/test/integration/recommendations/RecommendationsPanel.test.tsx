@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { API_BASE_URL } from '@/config/apiBaseUrl'
 import RecommendationsPanel from '@/components/Recommendations/RecommendationsPanel'
 import {
   makeOverviewRow,
@@ -55,7 +56,7 @@ describe('RecommendationsPanel integration', () => {
 
   it('renders overview rows and supports cluster filtering', async () => {
     server.use(
-      http.get('http://localhost:8000/api/recommendations/overview', () =>
+      http.get(`${API_BASE_URL}/api/recommendations/overview`, () =>
         HttpResponse.json([
           makeOverviewRow({ family_name: 'Cohen', cluster_number: 1 }),
           makeOverviewRow({
@@ -86,12 +87,12 @@ describe('RecommendationsPanel integration', () => {
 
   it('selects a family row and shows detail placeholder', async () => {
     server.use(
-      http.get('http://localhost:8000/api/recommendations/overview', () =>
+      http.get(`${API_BASE_URL}/api/recommendations/overview`, () =>
         HttpResponse.json([
           makeOverviewRow({ family_name: 'Cohen', has_matching: true }),
         ]),
       ),
-      http.get('http://localhost:8000/api/matching/result/:profileUuid', () =>
+      http.get(`${API_BASE_URL}/api/matching/result/:profileUuid`, () =>
         HttpResponse.json({
           recommended_cluster_number: 1,
           cluster_name: 'Cluster A',
@@ -122,12 +123,12 @@ describe('RecommendationsPanel integration', () => {
     })
 
     server.use(
-      http.get('http://localhost:8000/api/recommendations/overview', () =>
+      http.get(`${API_BASE_URL}/api/recommendations/overview`, () =>
         HttpResponse.json([
           makeOverviewRow({ family_name: 'Cohen', has_matching: hasMatched }),
         ]),
       ),
-      http.post('http://localhost:8000/api/matching/cluster/:profileUuid', async () => {
+      http.post(`${API_BASE_URL}/api/matching/cluster/:profileUuid`, async () => {
         await matchingGate
         hasMatched = true
         return HttpResponse.json({
@@ -161,7 +162,7 @@ describe('RecommendationsPanel integration', () => {
 
   it('shows action error when mocked matching fails', async () => {
     server.use(
-      http.get('http://localhost:8000/api/recommendations/overview', () =>
+      http.get(`${API_BASE_URL}/api/recommendations/overview`, () =>
         HttpResponse.json([makeOverviewRow({ family_name: 'Cohen' })]),
       ),
       matchingFailureHandler('הרצת ההתאמה נכשלה'),
@@ -180,7 +181,7 @@ describe('RecommendationsPanel integration', () => {
 
   it('shows filter-empty state when no rows match active filters', async () => {
     server.use(
-      http.get('http://localhost:8000/api/recommendations/overview', () =>
+      http.get(`${API_BASE_URL}/api/recommendations/overview`, () =>
         HttpResponse.json([
           makeOverviewRow({ family_name: 'Cohen', cluster_number: 1, has_matching: true }),
           makeOverviewRow({

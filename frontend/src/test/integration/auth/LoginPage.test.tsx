@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
+import { API_BASE_URL } from '@/config/apiBaseUrl'
 import LoginPage from '@/pages/LoginPage'
 import { TEST_ACCESS_TOKEN } from '@/test/setup/handlers/auth.handlers'
 import { server } from '@/test/setup/server'
@@ -88,7 +89,7 @@ describe('LoginPage integration', () => {
 
   it('shows a network error message when login request fails without a response', async () => {
     server.use(
-      http.post('http://localhost:8000/api/auth/login', () => HttpResponse.error()),
+      http.post(`${API_BASE_URL}/api/auth/login`, () => HttpResponse.error()),
     )
 
     const view = renderWithProviders(<LoginRoutes />, { route: '/login' })
@@ -104,7 +105,7 @@ describe('LoginPage integration', () => {
 
   it('shows submitting state while login is in progress', async () => {
     server.use(
-      http.post('http://localhost:8000/api/auth/login', async ({ request }) => {
+      http.post(`${API_BASE_URL}/api/auth/login`, async ({ request }) => {
         await delay(100)
         const body = (await request.json()) as { email?: string }
         return HttpResponse.json({

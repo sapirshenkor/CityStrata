@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
+import { API_BASE_URL } from '@/config/apiBaseUrl'
 import FamilyEvacueeWizard from '@/family_portal/FamilyEvacueeWizard'
 import { meHandlerAs, TEST_ACCESS_TOKEN } from '@/test/setup/handlers/auth.handlers'
 import { createFamilyProfileCapture } from '@/test/setup/handlers/family.handlers'
@@ -97,7 +98,7 @@ describe('FamilyEvacueeWizard integration', () => {
 
   it('shows a server error when profile creation fails', async () => {
     server.use(
-      http.post('http://localhost:8000/api/family/me/profiles', () =>
+      http.post(`${API_BASE_URL}/api/family/me/profiles`, () =>
         HttpResponse.json({ detail: 'פרופיל לא תקין' }, { status: 422 }),
       ),
     )
