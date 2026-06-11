@@ -98,6 +98,7 @@ export default function LeafletMap({
   clusterAssignments,
   selectedRecommendation,
   familyMacroClusterFocus,
+  macroClusterFocusGeneration = 0,
   focusLocation,
   focusedListing,
   lodgingsMapScope = 'radius',
@@ -324,6 +325,7 @@ export default function LeafletMap({
 
       <ClusterMacroFit
         macroClusterIndex={familyMacroClusterFocus}
+        macroClusterFocusGeneration={macroClusterFocusGeneration}
         clusterAssignments={clusterAssignments ?? undefined}
         selectedRecommendation={selectedRecommendation}
       />

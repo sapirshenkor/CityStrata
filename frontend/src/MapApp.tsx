@@ -39,6 +39,8 @@ export default function MapApp() {
   const [selectedArea, setSelectedArea] = useState<number | null>(null)
   const [selectedRecommendation, setSelectedRecommendation] = useState<unknown>(null)
   const [familyMacroClusterFocus, setFamilyMacroClusterFocus] = useState<number | null>(null)
+  /** Bumps when the same cluster should re-fit after the user panned the map away. */
+  const [macroClusterFocusGeneration, setMacroClusterFocusGeneration] = useState(0)
   const [recommendationsAgentProcessing, setRecommendationsAgentProcessing] = useState(false)
   const [focusLocation, setFocusLocation] = useState<{ latitude: number; longitude: number; zoom?: number } | null>(
     null,
@@ -55,6 +57,13 @@ export default function MapApp() {
   const onRunClustering = useCallback(() => {
     void refetchClusterAssignments()
   }, [refetchClusterAssignments])
+
+  const handleMacroClusterFocus = useCallback((cluster: number | null) => {
+    setFamilyMacroClusterFocus(cluster)
+    if (cluster != null) {
+      setMacroClusterFocusGeneration((g) => g + 1)
+    }
+  }, [])
 
   const handleFocusLocation = useCallback((focused: FocusedListing) => {
     setFocusLocation({ latitude: focused.latitude, longitude: focused.longitude, zoom: 16 })
@@ -144,7 +153,7 @@ export default function MapApp() {
         <MapSidebar
           selectedRecommendation={selectedRecommendation}
           onSelectRecommendation={setSelectedRecommendation}
-          onFamilyMacroClusterFocus={setFamilyMacroClusterFocus}
+          onFamilyMacroClusterFocus={handleMacroClusterFocus}
           onRecommendationsProcessingChange={setRecommendationsAgentProcessing}
           onFocusLocation={handleFocusLocation}
           agentThinkingOverlay={
@@ -169,6 +178,7 @@ export default function MapApp() {
                   clusterAssignments={clusterAssignments}
                   selectedRecommendation={selectedRecommendation}
                   familyMacroClusterFocus={familyMacroClusterFocus}
+                  macroClusterFocusGeneration={macroClusterFocusGeneration}
                   focusLocation={focusLocation}
                   focusedListing={focusedListing}
                   lodgingsMapScope={lodgingsMapScope}

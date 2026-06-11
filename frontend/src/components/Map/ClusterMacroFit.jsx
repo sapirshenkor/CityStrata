@@ -8,7 +8,12 @@ import { geojsonBBoxLngLat, mergeLngLatBounds } from '../../utils/geoBounds'
  * fit the map to the union of statistical areas assigned to that cluster.
  * Tactical recommendation radii (when present) take precedence — RecommendationsLayer handles those.
  */
-function ClusterMacroFit({ macroClusterIndex, clusterAssignments, selectedRecommendation }) {
+function ClusterMacroFit({
+  macroClusterIndex,
+  macroClusterFocusGeneration = 0,
+  clusterAssignments,
+  selectedRecommendation,
+}) {
   const mapRef = useMap()?.current
   const { data: statGeo, loading, error } = useStatisticalAreas()
 
@@ -68,7 +73,16 @@ function ClusterMacroFit({ macroClusterIndex, clusterAssignments, selectedRecomm
       cancelled = true
       mb?.off?.('load', applyFit)
     }
-  }, [mapRef, macroClusterIndex, clusterAssignments, statGeo, loading, error, selectedRecommendation])
+  }, [
+    mapRef,
+    macroClusterIndex,
+    macroClusterFocusGeneration,
+    clusterAssignments,
+    statGeo,
+    loading,
+    error,
+    selectedRecommendation,
+  ])
 
   return null
 }

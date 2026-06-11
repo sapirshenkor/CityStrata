@@ -126,10 +126,30 @@ function CommunityMatchingBlock({ data }: { data: CommunityMatchingDetail | null
   )
 }
 
+/** Macro cluster index for map fit: prefer matching detail, else overview row field. */
+function resolveMacroCluster(
+  row: CommunityProfileRow | null,
+  matchingData: CommunityMatchingDetail | null,
+): number | null {
+  const fromMatch = matchingData?.recommended_cluster_number
+  if (fromMatch != null && Number.isFinite(Number(fromMatch))) return Number(fromMatch)
+  const fromRow = row?.matching_cluster_number
+  if (fromRow != null && Number.isFinite(Number(fromRow))) return Number(fromRow)
+  return null
+}
+
+export interface CommunityProfilesPanelProps {
+  /** Fit map to statistical areas in this cluster (same as family recommendations). */
+  onMacroClusterFocus?: (clusterIndex: number | null) => void
+  /** Clear family tactical radii when a community is selected. */
+  onSelectRecommendation?: (rec: unknown) => void
+}
+
 /** Row shape from GET community profiles (used in list + detail). */
 export interface CommunityProfileRow {
   id: unknown
   community_name?: string | null
+  matching_cluster_number?: number | null
   leader_name?: string | null
   contact_email?: string | null
   contact_phone?: string | null
@@ -155,7 +175,10 @@ export interface CommunityProfileRow {
 /**
  * Sidebar tab: browse saved community_profiles (same list + detail pattern as Recommendations).
  */
-export default function CommunityProfilesPanel() {
+export default function CommunityProfilesPanel({
+  onMacroClusterFocus,
+  onSelectRecommendation,
+}: CommunityProfilesPanelProps = {}) {
   const queryClient = useQueryClient()
   const {
     data: rawList = [],
@@ -196,15 +219,29 @@ export default function CommunityProfilesPanel() {
     await refetch()
   }
 
+  const emitMacroCluster = (
+    row: CommunityProfileRow | null,
+    matchingData: CommunityMatchingDetail | null,
+  ) => {
+    onMacroClusterFocus?.(resolveMacroCluster(row, matchingData))
+  }
+
+  const handleClose = () => {
+    setSelected(null)
+    setMatchingDetail(null)
+    onMacroClusterFocus?.(null)
+  }
+
   const handleRowClick = (row: CommunityProfileRow) => {
     if (selected && pid(selected.id) === pid(row.id)) {
-      setSelected(null)
-      setMatchingDetail(null)
+      emitMacroCluster(row, matchingDetail)
       return
     }
     setSelected(row)
     setMatchingDetail(null)
     setActionError(null)
+    onSelectRecommendation?.(null)
+    emitMacroCluster(row, null)
   }
 
   useEffect(() => {
@@ -230,6 +267,12 @@ export default function CommunityProfilesPanel() {
     }
   }, [selected])
 
+  useEffect(() => {
+    if (!selected) return
+    emitMacroCluster(selected, matchingDetail)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- emit when matching detail arrives
+  }, [selected, matchingDetail])
+
   const handleRunMatching = async (e: MouseEvent, row: CommunityProfileRow) => {
     e.stopPropagation()
     setActionError(null)
@@ -245,7 +288,9 @@ export default function CommunityProfilesPanel() {
         setSelected(updated)
         try {
           const m = await getMatchingResultForCommunity(updated.id)
-          setMatchingDetail(m.data as CommunityMatchingDetail)
+          const detail = m.data as CommunityMatchingDetail
+          setMatchingDetail(detail)
+          emitMacroCluster(updated, detail)
         } catch {
           setMatchingDetail(null)
         }
@@ -406,7 +451,7 @@ export default function CommunityProfilesPanel() {
                   <button
                     className="rec-detail-close"
                     type="button"
-                    onClick={() => setSelected(null)}
+                    onClick={handleClose}
                     title="סגור"
                     aria-label="סגור פאנל"
                   >
